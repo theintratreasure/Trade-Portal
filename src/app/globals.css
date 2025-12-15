@@ -32,22 +32,34 @@
 /* ----------------------------------
    DARK THEME (CLASS BASED)
 ---------------------------------- */
+/* ----------------------------------
+   DARK THEME (CLASS BASED) – FIXED
+---------------------------------- */
 .dark {
+  /* Backgrounds */
   --bg-main: #0b0f1a;
-  --bg-card: rgba(255, 255, 255, 0.08);
-  --bg-glass: rgba(255, 255, 255, 0.12);
 
+  /* 🔥 IMPORTANT: CARD MUST BE SOLID */
+  --bg-card: #111827; /* slate-900 like */
+
+  /* Glass only for hover / subtle areas */
+  --bg-glass: rgba(255, 255, 255, 0.08);
+
+  /* Brand */
   --primary: #4f8cff;
   --primary-hover: #3b7bff;
-  --primary-glow: #7aa2ff;
+  --primary-glow: rgba(122, 162, 255, 0.45);
 
+  /* Text */
   --text-main: #e5e7eb;
   --text-muted: #9ca3af;
   --text-invert: #0b0f1a;
 
-  --border-glass: rgba(255, 255, 255, 0.15);
+  /* Borders */
+  --border-glass: rgba(255, 255, 255, 0.12);
   --border-soft: rgba(255, 255, 255, 0.08);
 }
+
 
 /* ----------------------------------
    GLOBAL BASE STYLES

@@ -20,18 +20,33 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* 🔥 THEME INIT SCRIPT (RUNS BEFORE REACT) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function () {
+  try {
+    const theme = localStorage.getItem("theme");
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    }
+  } catch (e) {}
+})();
+            `,
+          }}
+        />
+      </head>
+
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AppProviders>
-
-        {children}
-        </AppProviders>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
