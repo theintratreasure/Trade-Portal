@@ -1,5 +1,6 @@
 "use client";
 
+import { initFcmListener } from "@/lib/fcmListener";
 import {
   QueryClient,
   QueryClientProvider,
@@ -7,6 +8,7 @@ import {
 import {
   createContext,
   useContext,
+  useEffect,
   useLayoutEffect,
   useState,
 } from "react";
@@ -58,6 +60,10 @@ export function AppProviders({
     localStorage.setItem("theme", next);
     applyTheme(next);
   };
+
+   useEffect(() => {
+    initFcmListener();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./components/sidebar";
 import Topbar from "./components/topbar";
+import { listenForegroundMessages } from "@/lib/foregroundMessage";
 
 export default function DashboardLayout({
   children,
@@ -12,6 +13,10 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
+  useEffect(() => {
+    listenForegroundMessages();
+  }, []);
+  
   return (
     <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
       <Sidebar

@@ -1,20 +1,10 @@
-"use client";
+import { Suspense } from "react";
+import ResetPasswordClient from "./client";
 
-import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
-
-export default function ResetPasswordRedirect() {
-  const params = useSearchParams();
-  const router = useRouter();
-
-  useEffect(() => {
-    const token = params.get("token");
-    if (token) {
-      router.replace(`/login?token=${token}`);
-    } else {
-      router.replace("/login");
-    }
-  }, [params, router]);
-
-  return null;
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordClient />
+    </Suspense>
+  );
 }
