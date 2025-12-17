@@ -1,8 +1,9 @@
 "use client";
 
-import { Provider } from "react-redux";
-import { store } from "@/store/store";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import {
   createContext,
   useContext,
@@ -26,7 +27,7 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
 /* =========================
-   APP PROVIDERS (FINAL)
+   APP PROVIDERS
 ========================= */
 
 export function AppProviders({
@@ -36,43 +37,34 @@ export function AppProviders({
 }) {
   const [theme, setTheme] = useState<Theme>("light");
 
-  // 🔥 Apply theme BEFORE paint (important for not-found, auth pages)
   useLayoutEffect(() => {
-    const savedTheme =
-      (localStorage.getItem("theme") as Theme | null) ?? "light";
+    const saved =
+      (localStorage.getItem("theme") as Theme) ?? "light";
 
-    setTheme(savedTheme);
-    applyTheme(savedTheme);
+    setTheme(saved);
+    applyTheme(saved);
   }, []);
 
   const applyTheme = (t: Theme) => {
-    const root = document.documentElement;
-    if (t === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
+    document.documentElement.classList.toggle(
+      "dark",
+      t === "dark"
+    );
   };
 
   const toggleTheme = () => {
-    const nextTheme: Theme =
-      theme === "dark" ? "light" : "dark";
-
-    setTheme(nextTheme);
-    localStorage.setItem("theme", nextTheme);
-    applyTheme(nextTheme);
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("theme", next);
+    applyTheme(next);
   };
 
   return (
-    <Provider store={store}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeContext.Provider
-          value={{ theme, toggleTheme }}
-        >
-          {children}
-        </ThemeContext.Provider>
-      </QueryClientProvider>
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeContext.Provider value={{ theme, toggleTheme }}>
+        {children}
+      </ThemeContext.Provider>
+    </QueryClientProvider>
   );
 }
 
@@ -83,9 +75,7 @@ export function AppProviders({
 export function useTheme() {
   const ctx = useContext(ThemeContext);
   if (!ctx) {
-    throw new Error(
-      "useTheme must be used inside AppProviders"
-    );
+    throw new Error("useTheme must be used inside AppProviders");
   }
   return ctx;
 }

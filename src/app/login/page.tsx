@@ -1,9 +1,9 @@
 "use client";
-
-import { JSX, useState } from "react";
+import { getFcmToken } from "@/lib/getFcmToken";
+import { JSX, useEffect, useState } from "react";
 import { PremiumInput } from "../components/ui/TextInput";
 import { AuthShell } from "../components/auth/AuthCard";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   User,
   Lock,
@@ -12,8 +12,13 @@ import {
   ArrowLeft,
   LucideIcon,
 } from "lucide-react";
+import {
+  useLogin,
+  useForgotPassword,
+  useResetPassword,
+} from "@/hooks/useAuth";
 
-type Step = "login" | "forgot" | "otp" | "reset";
+type Step = "login" | "forgot" | "reset";
 
 type FormState = {
   identity: string;
@@ -23,8 +28,24 @@ type FormState = {
 };
 
 export default function LoginPage() {
-  const [step, setStep] = useState<Step>("login");
   const router = useRouter();
+  const params = useSearchParams();
+
+  const login = useLogin();
+  const forgot = useForgotPassword();
+  const reset = useResetPassword();
+
+  const tokenFromUrl = params.get("token");
+
+  const [step, setStep] = useState<Step>("login");
+
+  useEffect(() => {
+    if (tokenFromUrl) {
+      setStep("reset");
+    }
+  }, [tokenFromUrl]);
+
+  const [toast, setToast] = useState<string | null>(null);
 
   const [form, setForm] = useState<FormState>({
     identity: "",
@@ -36,6 +57,96 @@ export default function LoginPage() {
   const updateForm = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  /* ================= ACTIONS ================= */
+
+  const handleLogin = async () => {
+    const fcmToken = await getFcmToken();
+
+    login.mutate(
+      {
+        email: form.identity,
+        password: form.password,
+        fcmToken: fcmToken ?? null,
+      },
+      {
+        onSuccess: (res) => {
+          // 🔐 STORE TOKENS
+          localStorage.setItem(
+            "accessToken",
+            res.data.accessToken
+          );
+
+          localStorage.setItem(
+            "refreshToken",
+            res.data.refreshToken
+          );
+          document.cookie = `accessToken=${res.data.accessToken}; path=/; max-age=86400`;
+
+          setToast("Login successful");
+          router.push("/dashboard");
+        },
+      }
+    );
+  };
+
+
+  const handleForgot = () => {
+    forgot.mutate(
+      { email: form.identity },
+      {
+        onSuccess: () => {
+          setToast("Reset link sent to your email");
+        },
+      }
+    );
+  };
+
+ const handleReset = () => {
+  if (!tokenFromUrl) return;
+
+  const isStrongPassword =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,16}$/.test(
+      form.newPassword
+    );
+
+  if (!isStrongPassword) {
+    setToast(
+      "Password must contain uppercase, lowercase, number & special character"
+    );
+    return;
+  }
+
+  reset.mutate(
+  {
+    token: tokenFromUrl,
+    password: form.newPassword,
+  },
+  {
+    onSuccess: () => {
+      setToast("Password updated successfully");
+
+      // 🔥 IMPORTANT FIX
+      setStep("login");
+
+      // 🔥 CLEAR URL TOKEN COMPLETELY
+      router.replace("/login");
+    },
+  }
+);
+
+};
+
+
+
+  /* ================= UI CONFIG ================= */
 
   const steps: Record<
     Step,
@@ -69,6 +180,7 @@ export default function LoginPage() {
         },
       ],
       buttonText: "Login",
+      onSubmit: handleLogin,
       footer: (
         <>
           <div className="flex justify-end">
@@ -104,22 +216,8 @@ export default function LoginPage() {
           icon: Mail,
         },
       ],
-      buttonText: "Send OTP",
-      onSubmit: () => setStep("otp"),
-    },
-
-    otp: {
-      title: "Verify OTP",
-      back: () => setStep("forgot"),
-      fields: [
-        {
-          key: "otp",
-          label: "One Time Password",
-          icon: KeyRound,
-        },
-      ],
-      buttonText: "Verify",
-      onSubmit: () => setStep("reset"),
+      buttonText: "Send reset link",
+      onSubmit: handleForgot,
     },
 
     reset: {
@@ -134,6 +232,7 @@ export default function LoginPage() {
         },
       ],
       buttonText: "Update password",
+      onSubmit: handleReset,
     },
   };
 
@@ -188,7 +287,9 @@ export default function LoginPage() {
                 label={field.label}
                 type={field.type}
                 value={form[field.key]}
-                onChange={(v) => updateForm(field.key, v)}
+                onChange={(v) =>
+                  updateForm(field.key, v)
+                }
                 icon={field.icon}
               />
             ))}
@@ -198,10 +299,9 @@ export default function LoginPage() {
           <button
             onClick={current.onSubmit}
             className={`w-full rounded-lg py-3 font-medium transition text-white
-              ${
-                step === "reset"
-                  ? "bg-emerald-500 hover:opacity-90"
-                  : "bg-[var(--primary)] hover:shadow-[0_0_30px_var(--primary-glow)]"
+              ${step === "reset"
+                ? "bg-emerald-500 hover:opacity-90"
+                : "bg-[var(--primary)] hover:shadow-[0_0_30px_var(--primary-glow)]"
               }`}
           >
             {current.buttonText}
@@ -211,6 +311,13 @@ export default function LoginPage() {
           {current.footer}
         </div>
       </AuthShell>
+
+      {/* SUCCESS TOAST */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 rounded-lg bg-[var(--primary)] text-white px-4 py-2 shadow-xl">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
