@@ -8,7 +8,7 @@ export default function GlobalLoader({ label = "Loading" }) {
           <div className="absolute inset-0 rounded-full border-4 border-[var(--primary)]/20" />
           <div className="absolute inset-0 rounded-full border-4 border-t-[var(--primary)] animate-spin" />
         </div>
-        <p className="text-sm tracking-wide text-[var--(--text-invert)]/90">
+        <p className="text-sm tracking-wide text-white/90">
           {label}…
         </p>
       </div>

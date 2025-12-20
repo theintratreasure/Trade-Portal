@@ -83,4 +83,18 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-soft);
   border-radius: 1rem;
+}@keyframes dropdown {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
+
+.animate-dropdown {
+  animation: dropdown 0.30s ease-in-out;
+}
+

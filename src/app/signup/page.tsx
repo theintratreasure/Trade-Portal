@@ -174,7 +174,7 @@ if (!countries || !defaultCountry) return null;
               onClick={handleSignup}
               disabled={signup.isPending}
               className="
-                w-full rounded-lg py-3 font-medium text-[var--(--text-invert)]
+                w-full rounded-lg py-3 font-medium text-white
                 bg-[var(--primary)]
                 hover:shadow-[0_0_30px_var(--primary-glow)]
                 transition
@@ -206,7 +206,7 @@ if (!countries || !defaultCountry) return null;
             <button
               onClick={() => router.push("/login")}
               className="
-                w-full rounded-lg py-3 font-medium text-[var--(--text-invert)]
+                w-full rounded-lg py-3 font-medium text-white
                 bg-[var(--primary)]
                 hover:shadow-[0_0_30px_var(--primary-glow)]
                 transition
@@ -229,7 +229,7 @@ if (!countries || !defaultCountry) return null;
       </div>
 
       {toast && (
-        <div className="fixed bottom-4 right-4 rounded-lg bg-[var(--primary)] text-[var--(--text-invert)] px-4 py-2 shadow-xl">
+        <div className="fixed bottom-4 right-4 rounded-lg bg-[var(--primary)] text-white px-4 py-2 shadow-xl">
           {toast}
         </div>
       )}

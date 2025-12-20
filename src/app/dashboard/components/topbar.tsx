@@ -15,12 +15,10 @@ import {
   Gift,
   Headphones,
   LogOut,
-  Sun,
-  Moon,
   User,
   Repeat,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Topbar({
@@ -28,46 +26,55 @@ export default function Topbar({
 }: {
   onMenuClick: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [nHovered, setNHovered] = useState(false);
-  const [nPinned, setNPinned] = useState(false);
-
-  const open = hovered || pinned;
-  const nOpen = nHovered || nPinned;
-
+  const router = useRouter();
   const logout = useLogout();
 
+  /* ================= STATES ================= */
+  const [userHover, setUserHover] = useState(false);
+  const [userPinned, setUserPinned] = useState(false);
+
+  const [notifHover, setNotifHover] = useState(false);
+  const [notifPinned, setNotifPinned] = useState(false);
+
+  const [toast, setToast] = useState<string | null>(null);
+
+  const userRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const userOpen = userHover || userPinned;
+  const notifOpen = notifHover || notifPinned;
+
+  /* ================= OUTSIDE CLICK ================= */
+ {(userPinned || notifPinned) && (
+  <div
+    className="fixed inset-0 z-20"
+    onClick={() => {
+      setUserHover(false);
+      setUserPinned(false);
+      setNotifHover(false);
+      setNotifPinned(false);
+    }}
+  />
+)}
+
+
+  /* ================= LOGOUT ================= */
   const handleLogout = () => {
     const refreshToken = localStorage.getItem("refreshToken");
 
-    // 🔥 UI FIRST (instant)
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     document.cookie = "accessToken=; path=/; max-age=0";
 
     setToast("Logged out");
 
-    // 🔁 backend cleanup async (no UI wait)
-    if (refreshToken) {
-      logout.mutate({ refreshToken });
-    }
+    if (refreshToken) logout.mutate({ refreshToken });
 
-    // ⚡ instant redirect
     window.location.replace("/login");
   };
 
-  const closeUserDropdown = () => {
-    setHovered(false);
-    setPinned(false);
-  };
-
-
-
   return (
     <>
-
       <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[var(--bg-card)] border-b border-[var(--border-glass)] backdrop-blur-xl">
         <button
           onClick={onMenuClick}
@@ -78,27 +85,24 @@ export default function Topbar({
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          {/* NOTIFICATION */}
+
+          {/* 🔔 NOTIFICATIONS */}
           <div
-            tabIndex={0}
-            onBlur={() => {
-              setNHovered(false);
-              setNPinned(false);
-            }}
-            onMouseEnter={() => setNHovered(true)}
-            onMouseLeave={() => !nPinned && setNHovered(false)}
-            className="relative outline-none"
+            ref={notifRef}
+            className="relative"
+            onMouseEnter={() => setNotifHover(true)}
+            onMouseLeave={() => !notifPinned && setNotifHover(false)}
           >
             <button
-              onClick={() => setNPinned((v) => !v)}
+              onClick={() => setNotifPinned((v) => !v)}
               className="relative rounded-xl p-2 hover:bg-[var(--bg-main)]"
             >
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--primary)]" />
             </button>
 
-            {nOpen && (
-              <div className="absolute right-0 top-4 mt-3 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4">
+            {notifOpen && (
+              <div className="absolute right-0 top-7 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4 animate-dropdown z-30" onClick={(e) => e.stopPropagation()}>
                 <p className="text-sm font-semibold">Notifications</p>
                 <p className="mt-2 text-sm text-[var(--text-muted)]">
                   No new notifications
@@ -107,38 +111,32 @@ export default function Topbar({
             )}
           </div>
 
-          {/* USER */}
+          {/* 👤 USER */}
           <div
-            tabIndex={0}
-            onBlur={() => {
-              setHovered(false);
-              setPinned(false);
-            }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => !pinned && setHovered(false)}
-            className="relative outline-none"
+            ref={userRef}
+            className="relative"
+            onMouseEnter={() => setUserHover(true)}
+            onMouseLeave={() => !userPinned && setUserHover(false)}
           >
             <button
-              onClick={() => setPinned((v) => !v)}
+              onClick={() => setUserPinned((v) => !v)}
               className="flex items-center gap-2 rounded-xl px-3 py-2 hover:bg-[var(--bg-glass)]"
             >
-              <div className="h-8 w-8 rounded-full bg-[var(--primary)] text-[var--(--text-invert)] flex items-center justify-center text-sm font-semibold">
+              <div className="h-8 w-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-sm font-semibold">
                 U
               </div>
               <ChevronDown size={14} />
             </button>
 
-            {open && (
-              <div className="absolute right-0 top-7 mt-3 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4">
+            {userOpen && (
+              <div className="absolute right-0 top-12 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4 origin-top animate-dropdown z-30" onClick={(e) => e.stopPropagation()}>
                 {/* INFO */}
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full bg-[var(--bg-glass)] flex items-center justify-center">
                     U
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">
-                      vAgMDpQh
-                    </p>
+                    <p className="text-sm font-semibold">vAgMDpQh</p>
                     <p className="text-xs text-[var(--warning)]">
                       KYC Not Verified
                     </p>
@@ -155,43 +153,49 @@ export default function Topbar({
 
                 <Divider />
 
-                <MenuItem icon={BadgeCheck} label="Verification / KYC" />
+                <MenuItem
+                  icon={BadgeCheck}
+                  label="Verification / KYC"
+                  onClick={() => {
+                    setUserHover(false);
+                    setUserPinned(false);
+                  }}
+                />
                 <MenuItem
                   icon={User}
                   label="Edit Profile"
                   page="profile"
-                  onClick={closeUserDropdown}
+                  onClick={() => {
+                    setUserHover(false);
+                    setUserPinned(false);
+                  }}
                 />
                 <MenuItem icon={Settings} label="Reset Password" />
                 <MenuItem icon={Layers} label="Client Portal" />
                 <MenuItem icon={Gift} label="Referral Link" />
                 <MenuItem icon={Headphones} label="Support" />
-                <MenuItem icon={Sun} label="Theme Light / Dark" />
 
                 <Divider />
 
                 <button
                   onClick={handleLogout}
-                  disabled={logout.isPending}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-[var(--error)] hover:bg-[var(--bg-glass)] disabled:opacity-60"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-[var(--error)] hover:bg-[var(--bg-glass)]"
                 >
                   <LogOut size={16} />
                   Logout
                 </button>
-
-
               </div>
             )}
           </div>
         </div>
       </header>
+
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-[var(--primary)] text-[var--(--text-invert)] px-4 py-2 shadow-xl animate-fadeIn">
+        <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-[var(--primary)] text-white px-4 py-2 shadow-xl animate-fadeIn">
           {toast}
         </div>
       )}
     </>
-
   );
 }
 
@@ -201,10 +205,8 @@ function MenuItem({ icon: Icon, label, page, onClick }: any) {
   const router = useRouter();
 
   const handleClick = () => {
-    onClick?.();            // 🔥 dropdown close
-    if (page) {
-      router.push(`/dashboard/${page}`);
-    }
+    onClick?.();
+    if (page) router.push(`/dashboard/${page}`);
   };
 
   return (
@@ -217,7 +219,6 @@ function MenuItem({ icon: Icon, label, page, onClick }: any) {
     </button>
   );
 }
-
 
 function Btn({ icon: Icon, label }: any) {
   return (

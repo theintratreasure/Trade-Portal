@@ -35,3 +35,13 @@ export const useResendVerifyEmail = () =>
   useMutation({
     mutationFn: (email: string) => userService.resendVerifyEmail(email),
   });
+
+  export function useAuthGuard() {
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: userService.getMe,
+    retry: false,        // ❌ retry nahi
+    staleTime: 0,        // ❌ cache nahi
+    refetchOnWindowFocus: false,
+  });
+}

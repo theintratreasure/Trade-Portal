@@ -70,44 +70,49 @@ export default function LoginPage() {
 
   /* ================= ACTIONS ================= */
 
-const handleLogin = async () => {
-  const fcmToken = await getFcmToken();
-
+const handleLogin = () => {
+  // ✅ LOGIN FIRST (NO WAIT)
   login.mutate(
     {
       email: form.identity,
       password: form.password,
-      fcmToken: fcmToken ?? null,
+      fcmToken: null, // initially null
     },
     {
-      onSuccess: (res) => {
+      onSuccess: async (res) => {
         const { accessToken, refreshToken, isMailVerified } = res.data;
 
-        // 🔒 EMAIL NOT VERIFIED
         if (!isMailVerified) {
           setToast("Please verify your email first");
           setStep("verify");
-
-          // 🔥 ensure tokens are NOT saved
           return;
         }
 
-        // ✅ VERIFIED USER ONLY
         localStorage.setItem("accessToken", accessToken);
         localStorage.setItem("refreshToken", refreshToken);
-
         document.cookie = `accessToken=${accessToken}; path=/; max-age=86400`;
 
         setToast("Login successful");
         router.push("/dashboard");
-      },
 
+        // 🔥 FCM TOKEN — NON BLOCKING
+        try {
+          const token = await getFcmToken();
+          if (token) {
+            // optional: backend update api
+            // updateFcmToken.mutate({ fcmToken: token });
+          }
+        } catch {
+          // ignore
+        }
+      },
       onError: () => {
         setToast("Invalid email or password");
       },
     }
   );
 };
+
 
   const handleForgot = () => {
     forgot.mutate(
