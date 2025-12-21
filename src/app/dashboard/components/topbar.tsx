@@ -156,6 +156,7 @@ export default function Topbar({
                 <MenuItem
                   icon={BadgeCheck}
                   label="Verification / KYC"
+                  page="kyc"
                   onClick={() => {
                     setUserHover(false);
                     setUserPinned(false);

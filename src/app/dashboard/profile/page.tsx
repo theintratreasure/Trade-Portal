@@ -26,6 +26,7 @@ import {
   useUserMe,
   useUpdateProfile,
 } from "@/hooks/useUser";
+import { Toast } from "@/app/components/ui/Toast";
 
 type Gender = "MALE" | "FEMALE";
 
@@ -34,6 +35,7 @@ export default function ProfilePage() {
   const updateProfile = useUpdateProfile();
 
   const [editOpen, setEditOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const [form, setForm] = useState<{
     date_of_birth: string;
@@ -97,27 +99,35 @@ export default function ProfilePage() {
 
 
   if (!data) return null;
-
+  
   const handleChange =
     (key: keyof typeof form) => (value: string | Gender | undefined) => {
       setForm((prev) => ({ ...prev, [key]: value as any }));
     };
 
-  const handleSave = () => {
-    updateProfile.mutate(
-      {
-        date_of_birth: form.date_of_birth,
-        gender: form.gender,
-        address_line_1: form.address_line_1,
-        address_line_2: form.address_line_2,
-        city: form.city,
-        state: form.state,
-        country: form.country,
-        pincode: form.pincode,
-      },
-      { onSuccess: () => setEditOpen(false) }
-    );
-  };
+  const handleSave = async () => {
+  try {
+    await updateProfile.mutateAsync({
+      date_of_birth: form.date_of_birth,
+      gender: form.gender,
+      address_line_1: form.address_line_1,
+      address_line_2: form.address_line_2,
+      city: form.city,
+      state: form.state,
+      country: form.country,
+      pincode: form.pincode,
+    });
+
+    setEditOpen(false);
+    setToastMsg("Profile updated successfully");
+
+    setTimeout(() => setToastMsg(null), 3000);
+  } catch (err) {
+    setToastMsg("Failed to update profile");
+    setTimeout(() => setToastMsg(null), 3000);
+  }
+};
+
 
   return (
     <>
@@ -326,6 +336,11 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+        {toastMsg && <Toast message={toastMsg} />}
+
+
+         
+
     </>
   );
 }
@@ -377,5 +392,6 @@ function SettingRow({
       </div>
       {action}
     </div>
+    
   );
 }

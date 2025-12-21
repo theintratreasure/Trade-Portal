@@ -4,29 +4,33 @@
    LIGHT THEME (DEFAULT)
 ---------------------------------- */
 :root {
-  /* Backgrounds */
-  --bg-main: #f8fafc;
+  /* Page background (not pure white) */
+  --bg-main: #f4f7fb; /* soft cool gray */
+
+  /* Cards */
   --bg-card: #ffffff;
-  --bg-glass: rgba(0, 0, 0, 0.04);
+
+  /* Glass / subtle panels */
+  --bg-glass: rgba(15, 23, 42, 0.04);
 
   /* Brand */
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
-  --primary-glow: rgba(37, 99, 235, 0.35);
+  --primary-glow: rgba(37, 99, 235, 0.25);
 
   /* Text */
   --text-main: #0f172a;
-  --text-muted: #475569;
+  --text-muted: #5b6474;
   --text-invert: #ffffff;
 
-  /* Borders */
-  --border-glass: rgba(0, 0, 0, 0.12);
-  --border-soft: rgba(0, 0, 0, 0.08);
+  /* Borders (stronger than before) */
+  --border-glass: rgba(15, 23, 42, 0.14);
+  --border-soft: rgba(15, 23, 42, 0.1);
 
   /* Status */
-  --success: #22c55e;
-  --error: #ef4444;
-  --warning: #f59e0b;
+  --success: #16a34a;
+  --error: #dc2626;
+  --warning: #d97706;
 }
 
 /* ----------------------------------
