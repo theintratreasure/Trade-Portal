@@ -14,7 +14,6 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const { isLoading, isError } = useAuthGuard();
   useEffect(() => {
     listenForegroundMessages();
     if (Notification.permission === "default") {
@@ -22,19 +21,7 @@ export default function DashboardLayout({
     }
   }, []);
 
-
-if (isLoading) {
-  return null;
-}
-
-if (isError) {
-  window.location.replace("/login");
-  return null;
-}
-
-
   return (
-    <AuthGuard>
     <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
       <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-[var(--primary)] opacity-20 blur-3xl" />
       <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500 opacity-20 blur-3xl" />
@@ -54,6 +41,5 @@ if (isError) {
 
       </div>
     </div>
-    </AuthGuard>
   );
 }
