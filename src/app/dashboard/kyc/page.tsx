@@ -90,7 +90,7 @@ export default function KycPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-6 py-12 md:grid-cols-3">
+    <div className="mx-auto w-full grid max-w-6xl gap-8 px-6 py-12 md:grid-cols-3">
       {/* ================= LEFT ================= */}
       <section className="md:col-span-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] p-6 shadow-sm">
         {/* Header */}

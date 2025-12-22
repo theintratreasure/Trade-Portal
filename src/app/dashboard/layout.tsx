@@ -48,20 +48,28 @@ export default function DashboardLayout({
 
   // ✅ Auth OK → dashboard allowed
   return (
-    <div className="flex h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
+    <div className="relative min-h-screen bg-[var(--bg-main)] text-[var(--text-main)]">
+      
+      {/* background blobs */}
       <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-[var(--primary)] opacity-20 blur-3xl" />
       <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500 opacity-20 blur-3xl" />
 
-      <Sidebar
+      <div className="flex">
+        <Sidebar
         open={sidebarOpen}
         collapsed={collapsed}
         onClose={() => setSidebarOpen(false)}
         onToggleCollapse={() => setCollapsed((v) => !v)}
       />
 
-      <div className="flex flex-1 flex-col">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-auto p-4">{children}</main>
+        {/* ❌ NO overflow here */}
+        <div className="flex flex-1 flex-col">
+          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+          {/* PAGE CONTENT */}
+          <main className="p-4">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

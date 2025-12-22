@@ -132,7 +132,7 @@ export default function ProfilePage() {
   return (
     <>
       {/* ============= PAGE CONTAINER ============= */}
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+      <div className="mx-auto w-full flex max-w-6xl flex-col gap-6 p-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>

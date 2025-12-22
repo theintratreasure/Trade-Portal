@@ -68,11 +68,19 @@
 /* ----------------------------------
    GLOBAL BASE STYLES
 ---------------------------------- */
-body {
+body, html {
   background-color: var(--bg-main);
   color: var(--text-main);
   font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  height: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
+
+
 
 /* ----------------------------------
    OPTIONAL PREMIUM UTILITIES
