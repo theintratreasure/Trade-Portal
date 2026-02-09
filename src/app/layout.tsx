@@ -89,13 +89,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased mt-font`}
       >
+        <AppProviders>
         <CapacitorStatusBar />
-        <PushRegister />
+        {/* <PushRegister /> */}
         <InstallPrompt />
         <BackHandler />
         {/* <SWRegister /> */}
           <ChunkErrorBoundary/>
-        <AppProviders>
           <FcmRegister />
           <InitNotifications />
           {children}</AppProviders>

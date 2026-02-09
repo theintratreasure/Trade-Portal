@@ -20,6 +20,9 @@ import { AuthShell } from "../auth/AuthCard";
 import { useVerifyEmail } from "@/hooks/useAuth";
 import { useResendVerifyEmail } from "@/hooks/useUser";
 import BackButton from "../ui/BackButton";
+import { useSaveDeviceToken } from "@/hooks/useDevice";
+import { Capacitor } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
 
 type Step = "login" | "forgot" | "reset" | "verify";
 
@@ -70,6 +73,7 @@ export default function LoginPage() {
   }, [toast]);
 
   /* ================= ACTIONS ================= */
+  const saveDevice = useSaveDeviceToken();
 
   const handleLogin = () => {
     // ✅ LOGIN FIRST (NO WAIT)
@@ -94,18 +98,40 @@ export default function LoginPage() {
           document.cookie = `accessToken=${accessToken}; path=/; max-age=86400`;
 
           setToast("Login successful");
-          router.push("/dashboard");
 
-          // 🔥 FCM TOKEN — NON BLOCKING
+          // 🔥 UNIVERSAL FCM LOGIC
           try {
-            const token = await getFcmToken();
-            if (token) {
-              // optional: backend update api
-              // updateFcmToken.mutate({ fcmToken: token });
+            let fcmToken: string | null = null;
+
+            if (Capacitor.isNativePlatform()) {
+              const perm = await PushNotifications.requestPermissions();
+              if (perm.receive === "granted") {
+                await PushNotifications.register();
+
+                PushNotifications.addListener("registration", (token) => {
+                  fcmToken = token.value;
+
+                  saveDevice.mutate({
+                    fcmToken: token.value,
+                    platform: "android",
+                  });
+                });
+              }
+            } else {
+              fcmToken = await getFcmToken();
+
+              if (fcmToken) {
+                saveDevice.mutate({
+                  fcmToken,
+                  platform: "web",
+                });
+              }
             }
-          } catch {
-            // ignore
+          } catch (err) {
+            console.log("FCM error:", err);
           }
+
+          router.push("/dashboard");
         },
         onError: () => {
           setToast("Invalid email or password");
@@ -297,7 +323,7 @@ export default function LoginPage() {
       <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-[var(--primary)] opacity-20 blur-3xl" />
       <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500 opacity-20 blur-3xl" />
       <AuthShell>
-      <BackButton />
+        <BackButton />
         <div className="space-y-8 animate-fadeIn">
           {/* BRAND */}
           <div className="text-center space-y-2">
@@ -337,8 +363,8 @@ export default function LoginPage() {
               <button
                 onClick={() => router.push("/login")}
                 className={`px-4 py-2 text-sm rounded-md transition ${!params.get("trade")
-                    ? "bg-[var(--primary)] text-[var(--text-main)]"
-                    : "text-[var(--text-muted)]"
+                  ? "bg-[var(--primary)] text-[var(--text-main)]"
+                  : "text-[var(--text-muted)]"
                   }`}
               >
                 Broker Login
@@ -347,8 +373,8 @@ export default function LoginPage() {
               <button
                 onClick={() => router.push("/trade-login")}
                 className={`px-4 py-2 text-sm rounded-md transition ${params.get("trade")
-                    ? "bg-[var(--primary)] text-[var(--text-main)]"
-                    : "text-[var(--text-muted)]"
+                  ? "bg-[var(--primary)] text-[var(--text-main)]"
+                  : "text-[var(--text-muted)]"
                   }`}
               >
                 Trade Panel Login
