@@ -87,7 +87,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased mt-font`}
       >
         <InstallPrompt />
-        <SWRegister />
+        {/* <SWRegister /> */}
           <ChunkErrorBoundary/>
         <AppProviders>
           <FcmRegister />
