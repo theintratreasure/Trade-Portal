@@ -52,16 +52,31 @@ const options = [
 export default function Home() {
   const router = useRouter();
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [showIntro, setShowIntro] = useState(true);
 
 
+const [showIntro, setShowIntro] = useState(false);
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const hasSeenIntro = sessionStorage.getItem("hasSeenIntro");
+
+  if (!hasSeenIntro) {
+    setShowIntro(true);
+  }
+}, []);
+
+const handleIntroFinish = () => {
+  sessionStorage.setItem("hasSeenIntro", "true");
+  setShowIntro(false);
+};
 
  
 
   return (
     <>
       {/* <SplashHandler /> */}
-      {showIntro && <AppIntro onFinish={() => setShowIntro(false)} />}
+      {showIntro && <AppIntro onFinish={handleIntroFinish} />}
       <div className="min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] relative overflow-hidden flex items-center justify-center px-4 py-12">
         
         {/* Background Gradient */}
