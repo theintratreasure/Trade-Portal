@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+android/
+ios/
+
 # production
 /build
 
