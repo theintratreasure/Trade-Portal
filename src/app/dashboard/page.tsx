@@ -22,7 +22,7 @@ import TipBanner from "@/app/components/ui/TipBanner";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { data: user } = useUserMe();
+  const { data: user } = useUserMe({ enabled: false });
 
   function getKycStyle(status?: string) {
     switch (status?.toUpperCase()) {
