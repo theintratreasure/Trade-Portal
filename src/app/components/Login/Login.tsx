@@ -227,7 +227,7 @@ export default function LoginPage() {
     }
   > = {
     login: {
-      title: "Sign in to Intra Treasure",
+      title: "Sign in to ALS Trades",
       fields: [
         {
           key: "identity",
@@ -318,22 +318,25 @@ export default function LoginPage() {
   const current = steps[step];
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4">
-      {/* BACKGROUND GLOW */}
-      <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-[var(--primary)] opacity-20 blur-3xl" />
-      <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500 opacity-20 blur-3xl" />
+<div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4 overflow-hidden">
+  
+  {/* Ambient Light Layers */}
+  <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-[var(--primary)] opacity-20 blur-[160px]" />
+  <div className="absolute bottom-[-200px] right-[-200px] h-[700px] w-[700px] rounded-full bg-indigo-500 opacity-20 blur-[180px]" />
       <AuthShell>
-        <BackButton />
+        <BackButton to="/"/>
         <div className="space-y-8 animate-fadeIn">
           {/* BRAND */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              Intra Treasure
-            </h1>
-            <p className="text-sm text-[var(--text-muted)]">
-              Institutional-grade trading platform
-            </p>
-          </div>
+         <div className="text-center space-y-2">
+  <h1 className="text-2xl font-semibold tracking-wide text-[var(--text-main)]">
+    ALS Trades
+  </h1>
+
+  <p className="text-sm text-[var(--text-muted)]">
+    Secure client access
+  </p>
+</div>
+
 
           {/* BACK BUTTON */}
           {current.back && (
@@ -357,31 +360,6 @@ export default function LoginPage() {
               </p>
             )}
           </div>
-          {/* LOGIN MODE SWITCH */}
-          <div className="flex justify-center mt-4">
-            <div className="flex bg-[var(--bg-glass)] p-1 rounded-lg">
-              <button
-                onClick={() => router.push("/login")}
-                className={`px-4 py-2 text-sm rounded-md transition ${!params.get("trade")
-                  ? "bg-[var(--primary)] text-[var(--text-main)]"
-                  : "text-[var(--text-muted)]"
-                  }`}
-              >
-                Broker Login
-              </button>
-
-              <button
-                onClick={() => router.push("/trade-login")}
-                className={`px-4 py-2 text-sm rounded-md transition ${params.get("trade")
-                  ? "bg-[var(--primary)] text-[var(--text-main)]"
-                  : "text-[var(--text-muted)]"
-                  }`}
-              >
-                Trade Panel Login
-              </button>
-            </div>
-          </div>
-
 
           {/* INPUTS */}
           <div className="space-y-6">

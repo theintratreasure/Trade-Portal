@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
 import Pagination from "@/app/components/ui/pagination";
+import BackButton from "@/app/components/ui/BackButton";
 
 export default function NotificationsPage() {
   const [page, setPage] = useState(1);
@@ -14,6 +15,9 @@ export default function NotificationsPage() {
 
   return (
     <div className="p-6 space-y-6">
+        <div className="md:hidden">
+            <BackButton />
+        </div>
       <h1 className="text-2xl font-bold">All Notifications</h1>
 
       <div className="space-y-4">

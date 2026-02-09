@@ -11,6 +11,7 @@ import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
 import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import { useModifyPosition } from "@/hooks/trade/useModifyPosition";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
+import { FilePlus, FileX } from "lucide-react";
 type SplitPrice = {
   int: string;
   normal: string;
@@ -80,7 +81,10 @@ export default function ModifyPositionPage() {
   const [stopLoss, setStopLoss] = useState<number | null>(null);
   const [takeProfit, setTakeProfit] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
-
+  const [modifyResult, setModifyResult] = useState<{
+    status: "loading" | "success" | "error";
+    message?: string;
+  } | null>(null);
   const STEP = 0.0001;
 
   useEffect(() => {
@@ -117,67 +121,51 @@ export default function ModifyPositionPage() {
       : live?.askDir === "down"
         ? "text-[var(--mt-red)]"
         : "text-[var(--text-main)]";
+
+
+
   const handleModify = () => {
-    if (stopLoss === null || takeProfit === null) {
-      return setToast({
-        type: "error",
-        message: "Please enter both SL and TP",
-      });
-    }
+    if (stopLoss === null && takeProfit === null) return;
 
-    if (stopLoss === takeProfit) {
-      return setToast({
-        type: "error",
-        message: "SL and TP cannot be same",
-      });
-    }
-
-    if (isBuy) {
-      if (stopLoss >= currentPrice)
-        return setToast({ type: "error", message: "SL must be below price" });
-
-      if (takeProfit <= currentPrice)
-        return setToast({ type: "error", message: "TP must be above price" });
-
-      if (takeProfit <= stopLoss)
-        return setToast({ type: "error", message: "TP must be greater than SL" });
-    } else {
-      if (stopLoss <= currentPrice)
-        return setToast({ type: "error", message: "SL must be above price" });
-
-      if (takeProfit >= currentPrice)
-        return setToast({ type: "error", message: "TP must be below price" });
-
-      if (takeProfit >= stopLoss)
-        return setToast({ type: "error", message: "TP must be less than SL" });
-    }
+    // 🔵 Show loading sheet immediately
+    setModifyResult({
+      status: "loading",
+    });
 
     mutate(
       {
         positionId: id,
-        stopLoss,
-        takeProfit,
+        stopLoss: stopLoss ?? undefined,
+        takeProfit: takeProfit ?? undefined,
       },
       {
         onSuccess: () => {
-          setToast({
-            type: "success",
-            message: "Position modified successfully",
-          });
-
           setTimeout(() => {
-            router.push("/trade/trade");
-          }, 1000);
+            setModifyResult({
+              status: "success",
+            });
+
+            setTimeout(() => {
+              router.push("/trade/trade");
+            }, 1000);
+          }, 700);
         },
         onError: (err: any) => {
-          setToast({
-            type: "error",
-            message: err?.message || "Modify failed",
-          });
+          setTimeout(() => {
+            setModifyResult({
+              status: "error",
+              message: err?.response?.data?.message || err?.message || "Modify failed",
+            });
+
+            setTimeout(() => {
+              setModifyResult(null);
+            }, 1500);
+          }, 700);
         },
       }
     );
   };
+
 
   return (
     <>
@@ -312,16 +300,16 @@ export default function ModifyPositionPage() {
 
         </div>
 
-              <div className="mt-8">
+        <div className="mt-8">
 
-        <LiveChart
-          bid={Number(live?.bid )}
-          ask={Number(live?.ask )}
-          sl={stopLoss ?? undefined}
-          tp={takeProfit ?? undefined}
-          height={350} gridCount={10}
+          <LiveChart
+            bid={Number(live?.bid)}
+            ask={Number(live?.ask)}
+            sl={stopLoss ?? undefined}
+            tp={takeProfit ?? undefined}
+            height={350} gridCount={10}
           />
-          </div>
+        </div>
 
         <div className="fixed bottom-0 z-[99] w-full p-5 bg-[var(--bg-plan)] border-t border-[var(--border-soft)]">
           <button
@@ -334,149 +322,220 @@ export default function ModifyPositionPage() {
         </div>
 
       </div>
-{/* ================= DESKTOP MODIFY ================= */}
-<div className="hidden md:block px-8 py-6 bg-[var(--bg-main)] min-h-screen">
+      {/* ================= DESKTOP MODIFY ================= */}
+      <div className="hidden md:block px-8 py-6 bg-[var(--bg-main)] min-h-screen">
 
-  <div className="max-w-6xl mx-auto bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-xl shadow-sm">
+        <div className="max-w-6xl mx-auto bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-xl shadow-sm">
 
-    {/* Header */}
-    <div className="px-6 py-4 border-b border-[var(--border-soft)] bg-[var(--bg-glass)] flex justify-between items-center">
-      <div>
-        <div className="text-lg font-semibold">
-          Modify Position
-        </div>
-        <div className="text-sm text-[var(--text-muted)]">
-          #{id.slice(0, 10)} · {position.symbol}
-        </div>
-      </div>
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-[var(--border-soft)] bg-[var(--bg-glass)] flex justify-between items-center">
+            <div>
+              <div className="text-lg font-semibold">
+                Modify Position
+              </div>
+              <div className="text-sm text-[var(--text-muted)]">
+                #{id.slice(0, 10)} · {position.symbol}
+              </div>
+            </div>
 
-      <div className={`text-lg font-semibold ${
-        isBuy ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"
-      }`}>
-        {position.side} {position.volume}
-      </div>
-    </div>
-
-    {/* Body */}
-    <div className="grid grid-cols-2 gap-8 p-8">
-
-      {/* LEFT SIDE - PRICE + SLTP */}
-      <div>
-
-        {/* Live Prices */}
-        <div className="flex justify-between mb-8">
-          <div className={`font-bold text-2xl ${bidColor}`}>
-            BID {live?.bid ?? "--"}
+            <div className={`text-lg font-semibold ${isBuy ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"
+              }`}>
+              {position.side} {position.volume}
+            </div>
           </div>
 
-          <div className={`font-bold text-2xl ${askColor}`}>
-            ASK {live?.ask ?? "--"}
+          {/* Body */}
+          <div className="grid grid-cols-2 gap-8 p-8">
+
+            {/* LEFT SIDE - PRICE + SLTP */}
+            <div>
+
+              {/* Live Prices */}
+              <div className="flex justify-between mb-8">
+                <div className={`font-bold text-2xl ${bidColor}`}>
+                  BID {live?.bid ?? "--"}
+                </div>
+
+                <div className={`font-bold text-2xl ${askColor}`}>
+                  ASK {live?.ask ?? "--"}
+                </div>
+              </div>
+
+              {/* SL */}
+              <div className="mb-6">
+                <label className="text-sm text-[var(--text-muted)]">Stop Loss</label>
+
+                <div className="flex items-center gap-4 mt-2">
+                  <button
+                    onClick={() => {
+                      const base = stopLoss ?? currentPrice;
+                      setStopLoss(Number((base - STEP).toFixed(5)));
+                    }}
+                    className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
+                  >
+                    −
+                  </button>
+
+                  <input
+                    type="number"
+                    value={stopLoss ?? ""}
+                    onChange={(e) =>
+                      setStopLoss(e.target.value === "" ? null : Number(e.target.value))
+                    }
+                    className="flex-1 px-4 py-2 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-lg text-center outline-none"
+                  />
+
+                  <button
+                    onClick={() => {
+                      const base = stopLoss ?? currentPrice;
+                      setStopLoss(Number((base + STEP).toFixed(5)));
+                    }}
+                    className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* TP */}
+              <div>
+                <label className="text-sm text-[var(--text-muted)]">Take Profit</label>
+
+                <div className="flex items-center gap-4 mt-2">
+                  <button
+                    onClick={() => {
+                      const base = takeProfit ?? currentPrice;
+                      setTakeProfit(Number((base - STEP).toFixed(5)));
+                    }}
+                    className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
+                  >
+                    −
+                  </button>
+
+                  <input
+                    type="number"
+                    value={takeProfit ?? ""}
+                    onChange={(e) =>
+                      setTakeProfit(e.target.value === "" ? null : Number(e.target.value))
+                    }
+                    className="flex-1 px-4 py-2 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-lg text-center outline-none"
+                  />
+
+                  <button
+                    onClick={() => {
+                      const base = takeProfit ?? currentPrice;
+                      setTakeProfit(Number((base + STEP).toFixed(5)));
+                    }}
+                    className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* RIGHT SIDE - CHART */}
+            <div className="border border-[var(--border-soft)] rounded-xl overflow-hidden">
+              <LiveChart
+                bid={Number(live?.bid)}
+                ask={Number(live?.ask)}
+                sl={stopLoss ?? undefined}
+                tp={takeProfit ?? undefined}
+                height={420}
+                gridCount={10}
+              />
+            </div>
+
           </div>
-        </div>
 
-        {/* SL */}
-        <div className="mb-6">
-          <label className="text-sm text-[var(--text-muted)]">Stop Loss</label>
-
-          <div className="flex items-center gap-4 mt-2">
-            <button
-              onClick={() => {
-                const base = stopLoss ?? currentPrice;
-                setStopLoss(Number((base - STEP).toFixed(5)));
-              }}
-              className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
-            >
-              −
-            </button>
-
-            <input
-              type="number"
-              value={stopLoss ?? ""}
-              onChange={(e) =>
-                setStopLoss(e.target.value === "" ? null : Number(e.target.value))
-              }
-              className="flex-1 px-4 py-2 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-lg text-center outline-none"
-            />
+          {/* Footer */}
+          <div className="px-8 py-6 border-t border-[var(--border-soft)] bg-[var(--bg-glass)] flex justify-end">
 
             <button
-              onClick={() => {
-                const base = stopLoss ?? currentPrice;
-                setStopLoss(Number((base + STEP).toFixed(5)));
-              }}
-              className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
+              onClick={handleModify}
+              disabled={isPending}
+              className="px-10 py-3 rounded-xl bg-[var(--primary)] text-[var(--text-invert)] font-semibold hover:bg-[var(--primary-hover)] transition disabled:opacity-50"
             >
-              +
+              {isPending ? "Modifying..." : "Modify Position"}
             </button>
+
           </div>
+
         </div>
-
-        {/* TP */}
-        <div>
-          <label className="text-sm text-[var(--text-muted)]">Take Profit</label>
-
-          <div className="flex items-center gap-4 mt-2">
-            <button
-              onClick={() => {
-                const base = takeProfit ?? currentPrice;
-                setTakeProfit(Number((base - STEP).toFixed(5)));
-              }}
-              className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
-            >
-              −
-            </button>
-
-            <input
-              type="number"
-              value={takeProfit ?? ""}
-              onChange={(e) =>
-                setTakeProfit(e.target.value === "" ? null : Number(e.target.value))
-              }
-              className="flex-1 px-4 py-2 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-lg text-center outline-none"
-            />
-
-            <button
-              onClick={() => {
-                const base = takeProfit ?? currentPrice;
-                setTakeProfit(Number((base + STEP).toFixed(5)));
-              }}
-              className="px-3 py-2 bg-[var(--bg-glass)] rounded-lg"
-            >
-              +
-            </button>
-          </div>
-        </div>
-
       </div>
+      {modifyResult && (
+        <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] flex flex-col items-center justify-center text-[var(--text-main)]">
 
-      {/* RIGHT SIDE - CHART */}
-      <div className="border border-[var(--border-soft)] rounded-xl overflow-hidden">
-        <LiveChart
-          bid={Number(live?.bid)}
-          ask={Number(live?.ask)}
-          sl={stopLoss ?? undefined}
-          tp={takeProfit ?? undefined}
-          height={420}
-          gridCount={10}
-        />
-      </div>
+          {/* LOADING */}
+          {modifyResult.status === "loading" && (
+            <>
+              <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] flex flex-col items-center pt-[8vh] text-[var(--text-main)]">
+                {/* ICON CIRCLE */}
+                <div className="relative w-22 h-22 mb-8">
+                  {/* Blue background */}
+                  <div className="absolute inset-0 rounded-full bg-[var(--mt-blue)] flex items-center justify-center">
+                    {/* File icon */}
+                    <FilePlus size={44} className="text-var[var(--text-main)]" />
+                  </div>
 
-    </div>
+                  {/* Circular loader */}
+                  <div className="absolute inset-0 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+                </div>
+                <div className="text-xl font-semibold">
+                  Modifying position...
+                </div>
+              </div>
+            </>
+          )}
 
-    {/* Footer */}
-    <div className="px-8 py-6 border-t border-[var(--border-soft)] bg-[var(--bg-glass)] flex justify-end">
+          {/* SUCCESS */}
+          {modifyResult.status === "success" && (
+            <>
+              <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] flex flex-col items-center pt-[12vh] text-[var(--text-main)]">
 
-      <button
-        onClick={handleModify}
-        disabled={isPending}
-        className="px-10 py-3 rounded-xl bg-[var(--primary)] text-[var(--text-invert)] font-semibold hover:bg-[var(--primary-hover)] transition disabled:opacity-50"
-      >
-        {isPending ? "Modifying..." : "Modify Position"}
-      </button>
+                {/* ICON CIRCLE */}
+                <div className="relative w-22 h-22 mb-8">
+                  <div className="absolute inset-0 rounded-full bg-[var(--success)] flex items-center justify-center">
+                    <FilePlus size={34} className="text-[var(--text-main)]" />
+                  </div>
+                </div>
 
-    </div>
+                <div className="text-3xl font-bold mb-4">
+                  Modified Successfully
+                </div>
 
-  </div>
-</div>
+                <div className="text-gray-400">
+                  #{id.slice(0, 10)}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ERROR */}
+          {modifyResult.status === "error" && (
+            <>
+              <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] flex flex-col items-center pt-[12vh] text-[var(--text-main)]">
+
+                {/* ICON CIRCLE */}
+                <div className="relative w-22 h-22 mb-8">
+                  <div className="absolute inset-0 rounded-full bg-[var(--mt-red)] flex items-center justify-center">
+                    <FileX size={34} className="text-white" />
+                  </div>
+                </div>
+
+                <div className="text-3xl font-bold mb-4">
+                  Modify Failed
+                </div>
+
+                <div className="text-[var(--mt-red)] text-lg text-center px-6">
+                  {modifyResult.message || "Something went wrong"}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} />}
     </>

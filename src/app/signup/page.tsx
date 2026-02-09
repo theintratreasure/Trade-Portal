@@ -100,7 +100,7 @@ export default function SignupPage() {
       <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500 opacity-20 blur-3xl" />
 
       <div className="relative w-full max-w-md rounded-2xl border border-[var(--border-glass)] bg-[var(--bg-card)] backdrop-blur-xl shadow-2xl p-6 space-y-6">
-      <BackButton />
+      <BackButton to="/"/>
         <div className="space-y-1 text-center">
           <h2 className="text-2xl font-semibold tracking-tight">
             Create account

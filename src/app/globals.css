@@ -473,3 +473,17 @@ body {
 .animate-dropdown {
   animation: dropdownFade 0.25s ease forwards;
 }
+@keyframes kycPop {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-kycPop {
+  animation: kycPop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}

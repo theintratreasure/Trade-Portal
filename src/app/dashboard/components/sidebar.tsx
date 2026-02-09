@@ -1,6 +1,7 @@
 "use client";
 
 import { useMyAccounts } from "@/hooks/useMyAccounts";
+import { useUserMe } from "@/hooks/useUser";
 import {
   LayoutDashboard,
   Wallet,
@@ -35,7 +36,7 @@ const paymentItems = [
 
 const bottomItems = [
   { label: "Trading Platform", icon: Layers, href: "/trade" },
-  // { label: "Task Center", icon: Gift, href: "/dashboard/tasks" },
+  { label: "Referal", icon: Gift, href: "/dashboard/referal" },
   { label: "Support", icon: Headphones, href: "/dashboard/support" },
 ];
 
@@ -53,7 +54,7 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { data: accounts } = useMyAccounts();
-
+  const { data: user } = useUserMe();
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   const isPaymentActive = pathname.startsWith("/dashboard/payments");
@@ -137,10 +138,10 @@ export default function Sidebar({
 
           {!collapsed && (
             <div className="relative z-10">
-              <p className="text-xs uppercase tracking-wider text-[var(--text-muted)]">
-                ALS
+              <p className="text-lg uppercase tracking-wider text-[var(--text-main)] font-bold">
+                {user?.name}
               </p>
-              <p className="text-lg font-semibold text-[var(--text-main)]">
+              <p className="text-xs font-semibold text-[var(--text-muted)]">
                 Dashboard
               </p>
             </div>

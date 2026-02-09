@@ -140,14 +140,27 @@ export default function BottomSheet({
               Market Statistics
             </button>
             <button
-              onClick={() => {
-                onToggleViewMode();
-                onClose();
-              }}
-              className="w-full px-6 py-4 text-left text-sm border-b border-[var(--border-soft)]"
-            >
-              {viewMode === "advanced" ? "Simple View Mode" : "Advanced View Mode"}
-            </button>
+  onClick={() => {
+    const next =
+      viewMode === "advanced" ? "simple" : "advanced";
+
+    localStorage.setItem("trade-quote-view", next);
+
+    window.dispatchEvent(
+      new CustomEvent("trade-quote-view-change", {
+        detail: next,
+      })
+    );
+
+    onClose();
+  }}
+  className="w-full px-6 py-4 text-left text-sm border-b border-[var(--border-soft)]"
+>
+  {viewMode === "advanced"
+    ? "Simple View Mode"
+    : "Advanced View Mode"}
+</button>
+
           </div>
         </div>
       </div>

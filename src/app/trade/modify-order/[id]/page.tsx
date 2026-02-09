@@ -10,6 +10,7 @@ import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
 import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import { useModifyPendingOrder } from "@/hooks/trade/useModifyPendingOrder";
+import { FilePlus, FileX } from "lucide-react";
 
 export default function ModifyPendingOrderPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +32,10 @@ export default function ModifyPendingOrderPage() {
   const [stopLoss, setStopLoss] = useState<number | null>(null);
   const [takeProfit, setTakeProfit] = useState<number | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [modifyResult, setModifyResult] = useState<{
+  status: "loading" | "success" | "error";
+  message?: string;
+} | null>(null);
 
   const STEP = 0.0001;
 
@@ -53,37 +58,44 @@ export default function ModifyPendingOrderPage() {
   }
 
   const handleModify = () => {
-    if (!price || !stopLoss || !takeProfit) {
-      return setToast({
-        type: "error",
-        message: "All fields required",
-      });
-    }
+  // 🔵 Show loading immediately
+  setModifyResult({ status: "loading" });
 
-    mutate(
-      {
-        orderId: id,
-        price,
-        stopLoss,
-        takeProfit,
+  mutate(
+    {
+      positionId: id,
+      price: price ?? 0,
+      stopLoss: stopLoss ?? 0,
+      takeProfit: takeProfit ?? 0,
+    },
+    {
+      onSuccess: () => {
+        setTimeout(() => {
+          setModifyResult({ status: "success" });
+
+          setTimeout(() => {
+            router.push("/trade/trade");
+          }, 1000);
+        }, 700);
       },
-      {
-        onSuccess: () => {
-          setToast({
-            type: "success",
-            message: "Pending order modified",
+      onError: (err: any) => {
+        setTimeout(() => {
+          setModifyResult({
+            status: "error",
+            message:
+              err?.response?.data?.message ||
+              err?.message ||
+              "Modify failed",
           });
-          setTimeout(() => router.push("/trade/trade"), 1000);
-        },
-        onError: (err: any) => {
-          setToast({
-            type: "error",
-            message: err?.message || "Modify failed",
-          });
-        },
-      }
-    );
-  };
+
+          setTimeout(() => {
+            setModifyResult(null);
+          }, 1500);
+        }, 700);
+      },
+    }
+  );
+};
 
   return (
   <>
@@ -394,6 +406,69 @@ export default function ModifyPendingOrderPage() {
     </div>
 
     {toast && <Toast message={toast.message} type={toast.type} />}
+    {modifyResult && (
+  <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] flex flex-col items-center justify-center text-[var(--text-main)]">
+
+    {/* LOADING */}
+    {modifyResult.status === "loading" && (
+      <>
+        <div className="relative w-24 h-24 mb-8">
+          <div className="absolute inset-0 rounded-full bg-[var(--mt-blue)] flex items-center justify-center">
+            <FilePlus size={36} className="text-white" />
+          </div>
+          <div className="absolute inset-0 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+        </div>
+
+        <div className="text-xl font-semibold">
+          Modifying order...
+        </div>
+
+        <div className="text-gray-400 text-sm mt-2">
+          #{id.slice(0, 10)}
+        </div>
+      </>
+    )}
+
+    {/* SUCCESS */}
+    {modifyResult.status === "success" && (
+      <>
+        <div className="relative w-24 h-24 mb-8">
+          <div className="absolute inset-0 rounded-full bg-[var(--success)] flex items-center justify-center">
+            <FilePlus size={36} className="text-white" />
+          </div>
+        </div>
+
+        <div className="text-3xl font-bold mb-4">
+          Order Modified
+        </div>
+
+        <div className="text-gray-400 text-lg">
+          #{id.slice(0, 10)}
+        </div>
+      </>
+    )}
+
+    {/* ERROR */}
+    {modifyResult.status === "error" && (
+      <>
+        <div className="relative w-24 h-24 mb-8">
+          <div className="absolute inset-0 rounded-full bg-[var(--mt-red)] flex items-center justify-center">
+            <FileX size={36} className="text-white" />
+          </div>
+        </div>
+
+        <div className="text-3xl font-bold mb-4">
+          Modify Failed
+        </div>
+
+        <div className="text-[var(--mt-red)] text-lg text-center max-w-md px-6">
+          {modifyResult.message}
+        </div>
+      </>
+    )}
+  </div>
+)}
+
   </>
 );
 

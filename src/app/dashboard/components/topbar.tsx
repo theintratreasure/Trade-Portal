@@ -132,7 +132,7 @@ export default function Topbar({
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-7 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4 z-30">
+              <div className="absolute -right-24 md:right-0 top-7 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4 z-30">
 
                 <p className="text-sm font-semibold mb-3">Notifications</p>
 
@@ -221,9 +221,18 @@ export default function Topbar({
                     setUserHover(false);
                     setUserPinned(false);
                   }} />
-                  <Btn icon={Repeat} label="Withdraw" />
-                  <Btn icon={ArrowLeftRight} label="Transfer" page="payments/internal-fund-transfer" />
-                  <Btn icon={FileText} label="Transactions" />
+                  <Btn icon={Repeat} label="Withdraw" page="payments/withdraw" onClick={() => {
+                    setUserHover(false);
+                    setUserPinned(false);
+                  }}/>
+                  <Btn icon={ArrowLeftRight} label="Transfer" page="payments/internal-fund-transfer"  onClick={() => {
+                    setUserHover(false);
+                    setUserPinned(false);
+                  }} />
+                  <Btn icon={FileText} label="Transactions" page="payments/transactions"  onClick={() => {
+                    setUserHover(false);
+                    setUserPinned(false);
+                  }}/>
                 </div>
 
                 <Divider />
@@ -246,13 +255,18 @@ export default function Topbar({
                     setUserPinned(false);
                   }}
                 />
-                <MenuItem icon={Settings} label="Reset Password" />
-                <MenuItem icon={Layers} label="Client Portal" />
+                {/* <MenuItem icon={Settings} label="Reset Password" onClick={() => {
+                  setUserHover(false);
+                  setUserPinned(false);
+                }}/> */}
                 <MenuItem icon={Gift} label="Referral Link" page="referal" onClick={() => {
                   setUserHover(false);
                   setUserPinned(false);
                 }} />
-                <MenuItem icon={Headphones} label="Support" />
+                <MenuItem icon={Headphones} label="Support" page="/support" onClick={() => {
+                  setUserHover(false);
+                  setUserPinned(false);
+                }}/>
 
                 <Divider />
 

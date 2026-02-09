@@ -168,7 +168,7 @@ export default function AccountRow({
 
                             <Action
                                 icon={<RefreshCw />}
-                                label="Reset Watch"
+                                label="Reset Investor"
                                 onClick={() => setPasswordModal({ type: "watch" })}
                             />
                         </>
@@ -197,7 +197,7 @@ export default function AccountRow({
 
                             <Action
                                 icon={<RefreshCw />}
-                                label="Reset Watch"
+                                label="Reset Investor"
                                 onClick={() => setPasswordModal({ type: "watch" })}
                             />
                         </>
@@ -283,7 +283,7 @@ export default function AccountRow({
                         )}
 
                         {/* More Actions */}
-                        {!isDemo && (
+                        {isDemo && (
                             <div className="relative">
                                 <button
                                     onClick={() => setShowActions(!showActions)}
@@ -311,7 +311,7 @@ export default function AccountRow({
                                             }}
                                             className="w-full px-4 py-2 text-left text-sm hover:bg-[var(--bg-glass)]"
                                         >
-                                            Reset Watch Password
+                                            Reset Investor Password
                                         </button>
                                     </div>
                                 )}
@@ -348,7 +348,7 @@ export default function AccountRow({
                 <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40">
                     <div className="w-[90%] max-w-sm rounded-xl bg-[var(--bg-card)] p-6 shadow-xl">
                         <h2 className="text-lg font-semibold">
-                            Reset {passwordModal.type === "trade" ? "Trade" : "Watch"} Password
+                            Reset {passwordModal.type === "trade" ? "Trade" : "Investor"} Password
                         </h2>
 
                         <input

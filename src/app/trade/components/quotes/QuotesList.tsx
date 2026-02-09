@@ -4,6 +4,7 @@
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import QuoteRow from "./QuoteRow";
 import { QuoteLiveState } from "@/types/market";
+import { useEffect, useState } from "react";
 
 type Props = {
   onSelect: (symbol: string) => void;
@@ -18,9 +19,25 @@ function getTradeTokenFromStorage(): string | null {
   return cookie ? cookie.split("=")[1] : null;
 }
 
-export default function QuotesList({ onSelect, viewMode }: Props) {
+export default function QuotesList({ onSelect, }:Props) {
   const token = getTradeTokenFromStorage() ?? undefined;
   const liveQuotes = useMarketQuotes(token);
+const [viewMode, setViewMode] = useState<"simple" | "advanced">("simple");
+
+useEffect(() => {
+  const saved = localStorage.getItem("trade-quote-view");
+  if (saved === "simple" || saved === "advanced") {
+    setViewMode(saved);
+  }
+
+  const handler = (e: any) => {
+    setViewMode(e.detail);
+  };
+
+  window.addEventListener("trade-quote-view-change", handler);
+  return () =>
+    window.removeEventListener("trade-quote-view-change", handler);
+}, []);
 
   // filter out undefined entries (TypeScript-safe)
   const rows = Object.values(liveQuotes).filter(

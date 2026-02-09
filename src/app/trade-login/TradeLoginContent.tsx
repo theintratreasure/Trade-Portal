@@ -74,8 +74,8 @@ export default function TradeLogin() {
         <>
         <div className="min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] px-4 flex items-center justify-center">
             <div className="w-full max-w-md md:max-w-3xl py-10">
-                <div className="text-center font-semibold text-[18px] md:text-[20px] md:hidden">
                 <BackButton />
+                <div className="text-center font-semibold text-[18px] md:text-[20px] md:hidden">
                     Login to an existing account
                 </div>
 

@@ -6,6 +6,7 @@ import {
   Mail,
   Send,
   HelpCircle,
+  MessageCircleCodeIcon,
 } from "lucide-react";
 import Select from "@/app/components/ui/Select";
 import TipBanner from "@/app/components/ui/TipBanner";
@@ -45,22 +46,22 @@ export default function Support() {
         {/* WhatsApp */}
         <div className="card p-5 flex items-start gap-4 hover:shadow-lg transition">
           <div className="h-11 w-11 flex items-center justify-center rounded-xl bg-green-500/10 text-green-500">
-            <MessageCircle size={22} />
+            <MessageCircleCodeIcon size={22} />
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold">WhatsApp Support</h3>
+            <h3 className="font-semibold">Live Chat Support</h3>
             <p className="text-sm text-[var(--text-muted)] mt-1">
-              Get instant support directly on WhatsApp.
+              Coming Soon
             </p>
 
-            <a
+            {/* <a
               href="https://wa.me/1234567890"
               target="_blank"
               className="inline-flex items-center mt-3 text-sm font-medium text-[var(--primary)] hover:underline"
             >
               Connect now →
-            </a>
+            </a> */}
           </div>
         </div>
 

@@ -8,6 +8,7 @@ import { listenForegroundMessages } from "@/lib/foregroundMessage";
 import { useUserMe } from "@/hooks/useUser";
 import GlobalLoader from "../components/ui/GlobalLoader";
 import { Capacitor } from "@capacitor/core";
+import KycReminderModal from "./components/KycReminderModal";
 
 export default function DashboardLayout({
   children,
@@ -80,6 +81,8 @@ export default function DashboardLayout({
 
   /* ================= LAYOUT ================= */
   return (
+    <>
+    <KycReminderModal kycStatus={user?.kycStatus} />
     <div
       className={`relative h-screen overflow-hidden text-[var(--text-main)] ${isTradePage ? "bg-[var(--bg-plan)]" : "bg-[var(--bg-main)]"
         }`}
@@ -122,6 +125,7 @@ export default function DashboardLayout({
         </div>
       </div>
     </div>
+    </>
   );
 
 }

@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 type Props = {
-  fallback?: string; // optional fallback route
-  label?: string;    // optional text
+  to?: string;        // custom route if you want forced navigation
+  fallback?: string;  // if no history exists
+  label?: string;
   className?: string;
 };
 
 export default function BackButton({
+  to,
   fallback = "/",
   label,
   className = "",
@@ -17,8 +19,15 @@ export default function BackButton({
   const router = useRouter();
 
   const handleBack = () => {
+    // If custom route is provided → always go there
+    if (to) {
+      router.push(to);
+      return;
+    }
+
+    // Otherwise behave like real back button
     if (window.history.length > 1) {
-      router.push('/');
+      router.back();
     } else {
       router.push(fallback);
     }
