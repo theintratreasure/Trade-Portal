@@ -8,6 +8,8 @@ import { Roboto } from "next/font/google";
 import InstallPrompt from "./components/InstallPrompt";
 import SWRegister from "./sw-register";
 import ChunkErrorBoundary from "./components/ChunkErrorBoundary";
+import BackHandler from "./components/BackHandler";
+import StatusBarHandler from "./components/StatusBarHandler";
 
 const mtFont = Roboto({
   subsets: ["latin"],
@@ -87,6 +89,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased mt-font`}
       >
         <InstallPrompt />
+        <StatusBarHandler />
+        <BackHandler />
         {/* <SWRegister /> */}
           <ChunkErrorBoundary/>
         <AppProviders>

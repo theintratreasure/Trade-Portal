@@ -84,6 +84,7 @@ body {
   color: var(--text-main);
   font-family: Trebuchet MS, Roboto, Ubuntu, sans-serif;
   min-height: 100%;
+  padding-top: env(safe-area-inset-top);
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
