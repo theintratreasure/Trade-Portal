@@ -10,6 +10,7 @@ import SWRegister from "./sw-register";
 import ChunkErrorBoundary from "./components/ChunkErrorBoundary";
 import BackHandler from "./components/BackHandler";
 import CapacitorStatusBar from "./components/CapacitorStatusBar";
+import PushRegister from "./components/PushRegister";
 
 const mtFont = Roboto({
   subsets: ["latin"],
@@ -89,6 +90,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased mt-font`}
       >
         <CapacitorStatusBar />
+        <PushRegister />
         <InstallPrompt />
         <BackHandler />
         {/* <SWRegister /> */}
