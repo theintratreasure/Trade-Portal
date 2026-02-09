@@ -8,3 +8,30 @@ export const notificationService = {
     return res.data;
   },
 };
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface NotificationResponse {
+  data: NotificationItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export const getNotifications = async (
+  page: number,
+  limit: number
+): Promise<NotificationResponse> => {
+  const accessToken = localStorage.getItem("accessToken");
+
+  const res = await api.get(
+    `/notification?page=${page}&limit=${limit}`,
+  );
+
+  return res.data;
+};

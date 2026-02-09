@@ -21,6 +21,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUserMe } from "@/hooks/useUser";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export default function Topbar({
   onMenuClick,
@@ -45,6 +46,7 @@ export default function Topbar({
 
   const userOpen = userHover || userPinned;
   const notifOpen = notifHover || notifPinned;
+  const { data: notifData } = useNotifications(1, 3);
 
   /* ================= OUTSIDE CLICK ================= */
   {
@@ -99,8 +101,8 @@ export default function Topbar({
 
     window.location.replace("/login");
   };
-const initial =
-  user?.name?.trim()?.charAt(0)?.toUpperCase() || "U";
+  const initial =
+    user?.name?.trim()?.charAt(0)?.toUpperCase() || "U";
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[var(--bg-card)] border-b border-[var(--border-glass)] backdrop-blur-xl">
@@ -130,13 +132,45 @@ const initial =
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-7 w-72 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4 animate-dropdown z-30" onClick={(e) => e.stopPropagation()}>
-                <p className="text-sm font-semibold">Notifications</p>
-                <p className="mt-2 text-sm text-[var(--text-muted)]">
-                  No new notifications
-                </p>
+              <div className="absolute right-0 top-7 w-80 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-glass)] shadow-xl p-4 z-30">
+
+                <p className="text-sm font-semibold mb-3">Notifications</p>
+
+                {notifData?.data?.length ? (
+                  <>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {notifData.data.map((n) => (
+                        <div
+                          key={n.id}
+                          className="p-3 rounded-xl bg-[var(--bg-glass)]"
+                        >
+                          <p className="text-sm font-medium">{n.title}</p>
+                          <p className="text-xs text-[var(--text-muted)] line-clamp-2">
+                            {n.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setNotifHover(false);
+                        setNotifPinned(false);
+                        router.push("/dashboard/notifications");
+                      }}
+                      className="mt-4 w-full text-sm text-[var(--primary)] hover:underline"
+                    >
+                      View All
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    No notifications
+                  </p>
+                )}
               </div>
             )}
+
           </div>
 
           {/* 👤 USER */}
@@ -214,10 +248,10 @@ const initial =
                 />
                 <MenuItem icon={Settings} label="Reset Password" />
                 <MenuItem icon={Layers} label="Client Portal" />
-                <MenuItem icon={Gift} label="Referral Link" page="referal"  onClick={() => {
-                    setUserHover(false);
-                    setUserPinned(false);
-                  }}/>
+                <MenuItem icon={Gift} label="Referral Link" page="referal" onClick={() => {
+                  setUserHover(false);
+                  setUserPinned(false);
+                }} />
                 <MenuItem icon={Headphones} label="Support" />
 
                 <Divider />
