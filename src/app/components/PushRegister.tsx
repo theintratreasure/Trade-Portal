@@ -6,32 +6,62 @@ import { PushNotifications } from "@capacitor/push-notifications";
 
 export default function PushRegister() {
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!Capacitor.isNativePlatform()) {
+      alert("❌ Not running in native app");
+      return;
+    }
+
+    alert("✅ Running inside native app");
 
     const initPush = async () => {
-      // 🔥 Create Android notification channel (important for Android 8+)
-      await PushNotifications.createChannel({
-        id: "default",
-        name: "Default",
-        importance: 5,
-        visibility: 1,
-        sound: "default"
-      });
+      try {
+        // Create Android channel
+        await PushNotifications.createChannel({
+          id: "default",
+          name: "Default",
+          importance: 5,
+          visibility: 1,
+          sound: "default",
+        });
 
-      const permStatus = await PushNotifications.requestPermissions();
+        alert("✅ Notification channel created");
 
-      if (permStatus.receive === "granted") {
-        await PushNotifications.register();
+        const permStatus = await PushNotifications.requestPermissions();
+        alert("🔔 Permission: " + permStatus.receive);
+
+        if (permStatus.receive === "granted") {
+          await PushNotifications.register();
+          alert("📡 Register called");
+        } else {
+          alert("❌ Permission denied");
+        }
+      } catch (err) {
+        alert("Init error: " + JSON.stringify(err));
       }
     };
 
+    // 🔑 When token generated
     PushNotifications.addListener("registration", (token) => {
-      console.log("FCM Token:", token.value);
+      alert("🔥 FCM REGISTERED\n\nTOKEN:\n\n" + token.value);
     });
 
-    PushNotifications.addListener("pushNotificationReceived", (notification) => {
-      console.log("Push received:", notification);
+    // ❌ If registration fails
+    PushNotifications.addListener("registrationError", (error) => {
+      alert("❌ Registration error:\n" + JSON.stringify(error));
     });
+
+    // 📩 When push received (foreground)
+    PushNotifications.addListener("pushNotificationReceived", (notification) => {
+      alert("📩 PUSH RECEIVED:\n\n" + JSON.stringify(notification, null, 2));
+    });
+
+    // 👆 When notification tapped
+    PushNotifications.addListener(
+      "pushNotificationActionPerformed",
+      (action) => {
+        alert("👉 Notification tapped:\n\n" + JSON.stringify(action, null, 2));
+      }
+    );
 
     initPush();
   }, []);
