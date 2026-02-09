@@ -18,7 +18,7 @@ export default function BackButton({
 
   const handleBack = () => {
     if (window.history.length > 1) {
-      router.back();
+      router.push('/');
     } else {
       router.push(fallback);
     }
