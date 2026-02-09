@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://trade-portal-uiub.vercel.app',
     cleartext: false
+  },
+  plugins: {
+    StatusBar: {
+      overlay: false
+    }
   }
 };
 
