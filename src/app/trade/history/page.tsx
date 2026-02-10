@@ -344,10 +344,13 @@ export default function TradeHistory() {
     : allSymbols;
 
   useEffect(() => {
-    if (!selectedSymbolKey && allSymbols.length > 0) {
-      setSymbolsCache(allSymbols);
-    }
-  }, [allSymbols, selectedSymbolKey]);
+  if (!selectedSymbolKey && allSymbols.length > 0) {
+    setSymbolsCache(prev => {
+      if (prev.length === allSymbols.length) return prev;
+      return allSymbols;
+    });
+  }
+}, [allSymbols, selectedSymbolKey]);
 
   const positionSummary = summary
     ? [
