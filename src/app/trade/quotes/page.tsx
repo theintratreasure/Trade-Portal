@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Edit, Pencil } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import QuotesList from "../components/quotes/QuotesList";
 import EditSymbols from "../components/quotes/EditSymbols";
 import AddSymbol from "../components/quotes/AddSymbol";
+import PropertySheet from "../components/quotes/PropertySheet";
 
 import TradeTopBar from "../components/layout/TradeTopBar";
 import TopBarSlot from "../components/layout/TopBarSlot";
@@ -16,6 +17,7 @@ import BottomSheet from "../components/quotes/BottomSheet";
 export default function QuotesPage() {
     const [sheet, setSheet] = useState<null | "actions" | "edit" | "add">(null);
     const [selected, setSelected] = useState<string | null>(null);
+    const [openProperty, setOpenProperty] = useState(false);
     const [viewMode, setViewMode] = useState<"advanced" | "simple">(() => {
         if (typeof window === "undefined") return "advanced";
         const saved = localStorage.getItem("trade-quote-view");
@@ -127,7 +129,7 @@ export default function QuotesPage() {
     })
   }
   onOpenProperty={() => {
-    // TODO: property open logic
+    setOpenProperty(true);
   }}
 />
 
@@ -136,6 +138,11 @@ export default function QuotesPage() {
                 <AddSymbol
                     open={sheet === "add"}
                     onClose={() => setSheet(null)}
+                />
+                <PropertySheet
+                    open={openProperty}
+                    symbol={selected || ""}
+                    onClose={() => setOpenProperty(false)}
                 />
             </div>
         </>

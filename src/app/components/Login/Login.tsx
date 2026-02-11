@@ -8,6 +8,7 @@ import {
   Mail,
   KeyRound,
   ArrowLeft,
+  Home,
   LucideIcon,
 } from "lucide-react";
 import {
@@ -318,24 +319,33 @@ export default function LoginPage() {
   const current = steps[step];
 
   return (
-<div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4 overflow-hidden">
-  
-  {/* Ambient Light Layers */}
-  <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-[var(--primary)] opacity-20 blur-[160px]" />
-  <div className="absolute bottom-[-200px] right-[-200px] h-[700px] w-[700px] rounded-full bg-indigo-500 opacity-20 blur-[180px]" />
+    <div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4 overflow-hidden">
+
+      {/* Ambient Light Layers */}
+      <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-[var(--primary)] opacity-20 blur-[160px]" />
+      <div className="absolute bottom-[-200px] right-[-200px] h-[700px] w-[700px] rounded-full bg-indigo-500 opacity-20 blur-[180px]" />
       <AuthShell>
-        <BackButton to="/"/>
+        <div className="flex gap-2">
+
+          <BackButton to="/" />
+          <button
+            onClick={() => router.push("/")}
+            className=" inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] text-sm"
+          >
+            <Home size={18} />
+          </button>
+        </div>
         <div className="space-y-8 animate-fadeIn">
           {/* BRAND */}
-         <div className="text-center space-y-2">
-  <h1 className="text-2xl font-semibold tracking-wide text-[var(--text-main)]">
-    ALS Trades
-  </h1>
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-semibold tracking-wide text-[var(--text-main)]">
+              ALS Trades
+            </h1>
 
-  <p className="text-sm text-[var(--text-muted)]">
-    Secure client access
-  </p>
-</div>
+            <p className="text-sm text-[var(--text-muted)]">
+              Secure client access
+            </p>
+          </div>
 
 
           {/* BACK BUTTON */}

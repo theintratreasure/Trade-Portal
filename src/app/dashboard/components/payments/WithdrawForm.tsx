@@ -10,9 +10,10 @@ import { Toast } from "@/app/components/ui/Toast";
 import { useSearchParams } from "next/navigation";
 
 export default function WithdrawForm() {
-    const { data: accounts } = useMyAccounts();
+    const { data: accounts = [] } = useMyAccounts();
     const { mutateAsync, isPending } = useCreateWithdrawal();
     const searchParams = useSearchParams();
+    const liveAccounts = accounts.filter((acc: any) => acc.account_type === "live");
 
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -35,11 +36,19 @@ export default function WithdrawForm() {
         if (form.accountId) return;
         const fromQuery = searchParams.get("account") || searchParams.get("accountId");
         if (!fromQuery) return;
-        const exists = accounts?.some((a: any) => a._id === fromQuery);
+        const exists = liveAccounts.some((a: any) => a._id === fromQuery);
         if (exists) {
             setForm((prev: any) => ({ ...prev, accountId: fromQuery }));
         }
-    }, [accounts, form.accountId, searchParams]);
+    }, [liveAccounts, form.accountId, searchParams]);
+
+    useEffect(() => {
+        if (!form.accountId) return;
+        const stillLive = liveAccounts.some((a: any) => a._id === form.accountId);
+        if (!stillLive) {
+            setForm((prev: any) => ({ ...prev, accountId: "" }));
+        }
+    }, [liveAccounts, form.accountId]);
 
     const handleSubmit = async () => {
         // Close modal immediately
@@ -79,12 +88,12 @@ export default function WithdrawForm() {
                 value={form.accountId}
                 onChange={(v) => setForm({ ...form, accountId: v })}
                 options={
-                    accounts?.map((acc: any) => ({
-                        label: `${acc.account_number} • $${Number(acc.balance).toLocaleString(undefined, {
+                    liveAccounts.map((acc: any) => ({
+                        label: `${acc.account_number} | $${Number(acc.balance).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                         })}`,
                         value: acc._id,
-                    })) || []
+                    }))
                 }
             />
 

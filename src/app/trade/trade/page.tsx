@@ -11,6 +11,7 @@ import TopBarSlot from "../components/layout/TopBarSlot";
 import TradeTopBar from "../components/layout/TradeTopBar";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
+import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { useCancelPendingOrder } from "@/hooks/useCancelPendingOrder";
 import { Toast } from "@/app/components/ui/Toast";
 import DeleteOrderModal from "../components/trade/DeleteOrderModal";
@@ -40,6 +41,28 @@ type Position = {
     takeProfit?: number | null;
 };
 
+function buildModifyPositionUrl(pos: Position): string {
+    const params = new URLSearchParams({
+        symbol: pos.pair ?? "",
+        side: (pos.type ?? "").toUpperCase(),
+        volume: String(pos.lot ?? ""),
+        currentPrice: String(pos.to ?? ""),
+        stopLoss: pos.stopLoss == null ? "" : String(pos.stopLoss),
+        takeProfit: pos.takeProfit == null ? "" : String(pos.takeProfit),
+    });
+    return `/trade/modify/${pos.id}?${params.toString()}`;
+}
+
+function getTradeTokenFromStorageSync(): string {
+    if (typeof window === "undefined") return "";
+    const local = localStorage.getItem("accessToken");
+    if (local) return local;
+    const cookie = document.cookie
+        .split("; ")
+        .find((c) => c.trim().startsWith("tradeToken="));
+    return cookie ? cookie.split("=")[1] : "";
+}
+
 export default function TradePage() {
     const [sortOpen, setSortOpen] = useState<boolean>(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -53,6 +76,19 @@ export default function TradePage() {
     const [showOrderSheet, setShowOrderSheet] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const { account, positions, pending } = useLiveTradeSocket(accountId);
+    const [token] = useState<string>(() => getTradeTokenFromStorageSync());
+    const pendingSymbols = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    pending
+                        .map((order) => order?.symbol)
+                        .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
+                )
+            ),
+        [pending]
+    );
+    const quotes = useMarketQuotes(token, pendingSymbols);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
@@ -112,6 +148,20 @@ export default function TradePage() {
             takeProfit: pos.takeProfit ?? null,
         }));
     }, [positions]);
+
+    const pendingWithLive = useMemo(() => {
+        return pending.map((order) => {
+            const directCurrentPrice =
+                order.currentPrice ?? order.current_price ?? order.ltp ?? order.lastPrice;
+            const liveQuote = order.symbol ? quotes[order.symbol] : undefined;
+            const side = String(order.side ?? "").toUpperCase();
+            const quoteCurrentPrice = side === "BUY" ? liveQuote?.ask : liveQuote?.bid;
+            return {
+                ...order,
+                currentPrice: directCurrentPrice ?? quoteCurrentPrice ?? "-",
+            };
+        });
+    }, [pending, quotes]);
 
     const router = useRouter();
     return (
@@ -200,8 +250,8 @@ export default function TradePage() {
                             </span>
                         </div>
 
-                        {pending.length > 0 ? (
-                            pending.map((order) => (
+                        {pendingWithLive.length > 0 ? (
+                            pendingWithLive.map((order) => (
                                 <MobilePendingOrderItem
                                     key={order.orderId}
                                     order={order}
@@ -366,7 +416,7 @@ export default function TradePage() {
                                                         <ActionItem
                                                             label="Modify position"
                                                             onClick={() => {
-                                                                router.push(`/trade/modify/${pos.id}`);
+                                                                router.push(buildModifyPositionUrl(pos));
                                                                 setOpenMenuId(null);
                                                             }}
                                                         />
@@ -431,8 +481,8 @@ export default function TradePage() {
                                 </div>
 
                                 {/* Rows */}
-                                {pending.length > 0 ? (
-                                    pending.map((order) => (
+                                {pendingWithLive.length > 0 ? (
+                                    pendingWithLive.map((order) => (
                                         <div
                                             key={order.orderId}
                                             className="grid grid-cols-[100px_150px_90px_70px_70px_90px_90px_90px_90px_90px_70px] px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
@@ -468,7 +518,11 @@ export default function TradePage() {
                                             <div>{order.currentPrice ?? "-"}</div>
 
                                             <div className="text-right font-semibold text-[var(--text-muted)]">
-                                                {order.status}
+                                                {(order.status ?? order.orderStatus ?? order.state ?? "PENDING")
+                                                    ?.toString()
+                                                    .toUpperCase() === "PENDING"
+                                                    ? "PLACED"
+                                                    : (order.status ?? order.orderStatus ?? order.state ?? "PENDING")}
                                             </div>
 
                                             {/* ACTION COLUMN */}

@@ -2,7 +2,6 @@
 
 import { useLongPress } from "@/lib/useLongPress";
 
-
 type MobilePendingOrderItemProps = {
     order: any;
     expandedId: string | null;
@@ -16,16 +15,20 @@ export default function MobilePendingOrderItem({
     setExpandedId,
     onLongPress,
 }: MobilePendingOrderItemProps) {
-
     const expanded = expandedId === order.orderId;
 
     const longPress = useLongPress(() => {
         onLongPress(order);
     });
+
+    const statusRaw =
+        order.status ?? order.orderStatus ?? order.state ?? order.order_state;
     const statusLabel =
-        order.status?.toLowerCase() === "pending"
+        typeof statusRaw === "string" && statusRaw.toLowerCase() === "pending"
             ? "PLACED"
-            : order.status;
+            : (statusRaw ?? "PENDING");
+    const currentPriceValue =
+        order.currentPrice ?? order.current_price ?? order.ltp ?? "-";
 
     return (
         <div
@@ -33,11 +36,8 @@ export default function MobilePendingOrderItem({
             onContextMenu={(e) => e.preventDefault()}
             className="border-b border-[var(--border-grey)] bg-[var(--bg-plan)]"
         >
-           
             <button
-                onClick={() =>
-                    setExpandedId(expanded ? null : order.orderId)
-                }
+                onClick={() => setExpandedId(expanded ? null : order.orderId)}
                 className="w-full flex justify-between items-center pt-[10px] pb-[8px]"
             >
                 <div className="text-left">
@@ -55,26 +55,20 @@ export default function MobilePendingOrderItem({
                     </div>
 
                     <div className="mt-price-line">
-                        {order.price} → {order.currentPrice ?? "-"}
+                        {order.price} → {currentPriceValue}
                     </div>
                 </div>
 
-                <div className="font-semibold mt-price-line">
-                    {order.status}
-                </div>
+                <div className="font-semibold mt-price-line">{statusLabel}</div>
             </button>
 
             {expanded && (
                 <div className="px-[2px] pb-[8px] text-[11px] space-y-[3px] grid grid-cols-2">
-                    <div className="opacity-70 mr-2">
-                        #{order.orderId.slice(0, 10)}
-                    </div>
+                    <div className="opacity-70 mr-2">#{order.orderId.slice(0, 10)}</div>
 
                     <div className="flex justify-between mr-2">
                         <span>Created:</span>
-                        <span>
-                            {new Date(order.createdAt).toLocaleString()}
-                        </span>
+                        <span>{new Date(order.createdAt).toLocaleString()}</span>
                     </div>
 
                     <div className="flex justify-between mr-2">
@@ -94,12 +88,8 @@ export default function MobilePendingOrderItem({
 
                     <div className="flex justify-between mr-2">
                         <span className="font-semibold text-[var(--mt-blue)]">
-                            {order.status?.toLowerCase() === "pending"
-                                ? "PLACED"
-                                : order.status}
+                            {statusLabel}
                         </span>
-
-
                     </div>
                 </div>
             )}

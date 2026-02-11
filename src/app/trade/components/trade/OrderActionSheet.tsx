@@ -10,21 +10,30 @@ type OrderSheetProps = {
     onDeleteClick: () => void;
 };
 
-export default function OrderActionSheet({ order, open, onClose, onDeleteClick }: OrderSheetProps) {
+export default function OrderActionSheet({
+    order,
+    open,
+    onClose,
+    onDeleteClick,
+}: OrderSheetProps) {
     const router = useRouter();
     if (!open || !order) return null;
 
+    const statusRaw =
+        order.status ?? order.orderStatus ?? order.state ?? order.order_state;
+    const statusLabel =
+        typeof statusRaw === "string" && statusRaw.toLowerCase() === "pending"
+            ? "PLACED"
+            : (statusRaw ?? "PENDING");
+    const currentPriceValue = order.currentPrice ?? order.current_price ?? order.ltp ?? "-";
+
     return (
         <div className="fixed inset-0 z-[999] flex items-end bg-black/40 md:items-center md:justify-center">
-
             <div className="absolute inset-0" onClick={onClose} />
 
             <div className="relative w-full bg-[var(--bg-plan)] md:w-[420px] md:bg-[var(--bg-card)]">
-
                 <div className="p-2 border-b border-[var(--border-soft)]">
-
                     <div className="flex justify-between items-center pt-[10px] pb-[8px]">
-
                         <div className="text-left">
                             <div className="font-semibold">
                                 {order.symbol},{" "}
@@ -40,13 +49,11 @@ export default function OrderActionSheet({ order, open, onClose, onDeleteClick }
                             </div>
 
                             <div className="mt-price-line">
-                                {order.price} → {order.currentPrice ?? "-"}
+                                {order.price} → {currentPriceValue}
                             </div>
                         </div>
 
-                        <div className="font-semibold mt-price-line">
-                            {order.status}
-                        </div>
+                        <div className="font-semibold mt-price-line">{statusLabel}</div>
                     </div>
 
                     <div className="px-[2px] pb-[8px] text-[11px] space-y-[3px] grid grid-cols-2">
@@ -56,9 +63,7 @@ export default function OrderActionSheet({ order, open, onClose, onDeleteClick }
 
                         <div className="flex justify-between mr-2">
                             <span>Created:</span>
-                            <span>
-                                {new Date(order.createdAt).toLocaleString()}
-                            </span>
+                            <span>{new Date(order.createdAt).toLocaleString()}</span>
                         </div>
 
                         <div className="flex justify-between mr-2">
@@ -78,13 +83,12 @@ export default function OrderActionSheet({ order, open, onClose, onDeleteClick }
 
                         <div className="flex justify-between mr-2">
                             <span>Status:</span>
-                            <span>{order.status}</span>
+                            <span>{statusLabel}</span>
                         </div>
                     </div>
                 </div>
 
                 <div className="divide-y divide-[var(--border-soft)] text-[15px]">
-
                     <ActionItem
                         label="Delete order"
                         onClick={() => {
@@ -111,8 +115,6 @@ export default function OrderActionSheet({ order, open, onClose, onDeleteClick }
                         }}
                     />
 
-
-
                     <ActionItem
                         label="Chart"
                         onClick={() => {
@@ -120,9 +122,7 @@ export default function OrderActionSheet({ order, open, onClose, onDeleteClick }
                             onClose();
                         }}
                     />
-
                 </div>
-
             </div>
         </div>
     );

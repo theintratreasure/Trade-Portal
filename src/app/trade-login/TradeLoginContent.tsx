@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { User, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Eye, EyeOff, Home } from "lucide-react";
 import { useTradeLogin } from "@/hooks/trade/useTradeLogin";
 import BackButton from "../components/ui/BackButton";
+
+const TRADE_LOGIN_REMEMBER_KEY = "trade-login-remembered";
+
+type RememberedTradeLogin = {
+    account_number: string;
+    password: string;
+};
 
 export default function TradeLogin() {
     const router = useRouter();
@@ -25,6 +32,25 @@ export default function TradeLogin() {
     };
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const raw = localStorage.getItem(TRADE_LOGIN_REMEMBER_KEY);
+        if (!raw) return;
+
+        try {
+            const saved = JSON.parse(raw) as RememberedTradeLogin;
+            if (saved?.account_number && saved?.password) {
+                setForm({
+                    account_number: saved.account_number,
+                    password: saved.password,
+                });
+                setSavePassword(true);
+            }
+        } catch {
+            localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+        }
+    }, []);
+
+    useEffect(() => {
         if (toast) {
             const t = setTimeout(() => setToast(null), 3000);
             return () => clearTimeout(t);
@@ -34,9 +60,25 @@ export default function TradeLogin() {
     useEffect(() => {
         const account = searchParams.get("account");
         if (account) {
+            let savedPassword = "";
+            if (typeof window !== "undefined") {
+                const raw = localStorage.getItem(TRADE_LOGIN_REMEMBER_KEY);
+                if (raw) {
+                    try {
+                        const saved = JSON.parse(raw) as RememberedTradeLogin;
+                        if (saved?.account_number === account) {
+                            savedPassword = saved.password || "";
+                            setSavePassword(true);
+                        }
+                    } catch {
+                        localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+                    }
+                }
+            }
             setForm((prev) => ({
                 ...prev,
                 account_number: account,
+                password: savedPassword || prev.password,
             }));
         }
     }, [searchParams]);
@@ -59,6 +101,20 @@ export default function TradeLogin() {
                     document.cookie = `tradeToken=${tradeToken}; path=/; max-age=43200`;
                     document.cookie = `sessionType=${res.sessionType}; path=/; max-age=43200`;
                     document.cookie = `accountId=${accountId}; path=/; max-age=43200`;
+                    if (typeof window !== "undefined") {
+                        if (savePassword) {
+                            const rememberData: RememberedTradeLogin = {
+                                account_number: form.account_number,
+                                password: form.password,
+                            };
+                            localStorage.setItem(
+                                TRADE_LOGIN_REMEMBER_KEY,
+                                JSON.stringify(rememberData)
+                            );
+                        } else {
+                            localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+                        }
+                    }
 
                    router.push("/trade");
                 },
@@ -74,7 +130,17 @@ export default function TradeLogin() {
         <>
         <div className="min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] px-4 flex items-center justify-center">
             <div className="w-full max-w-md md:max-w-3xl py-10">
-                <BackButton />
+                 <div className="flex gap-2">
+               
+                         <BackButton to="/" />
+                         <button
+                           onClick={() => router.push("/")}
+                           className="inline-flex items-center gap-2 px-3 py-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] text-sm"
+                         >
+                           <Home size={18} />
+                         </button>
+                       </div>
+
                 <div className="text-center font-semibold text-[18px] md:text-[20px] md:hidden">
                     Login to an existing account
                 </div>
@@ -140,7 +206,15 @@ export default function TradeLogin() {
                             Save password
                         </span>
                         <button
-                            onClick={() => setSavePassword((prev) => !prev)}
+                            onClick={() =>
+                                setSavePassword((prev) => {
+                                    const next = !prev;
+                                    if (!next && typeof window !== "undefined") {
+                                        localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+                                    }
+                                    return next;
+                                })
+                            }
                             aria-pressed={savePassword}
                             className={`h-6 w-6 rounded-md border flex items-center justify-center transition ${
                                 savePassword

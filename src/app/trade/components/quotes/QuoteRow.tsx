@@ -164,11 +164,8 @@ const formattedPercent =
       <div className="flex flex-col gap-[2px] min-w-[130px]">
 
         {/* CHANGE + % */}
-        <div className="text-[13px] text-[var(--text-muted)] font-semibold">
-          {formattedChange}{" "}
-          <span className={changeColor}>
-            {formattedPercent}%
-          </span>
+        <div className={`text-[13px] font-semibold ${changeColor}`}>
+          {formattedChange} | {formattedPercent}
         </div>
 
 

@@ -7,7 +7,16 @@ import { useWatchlist } from "./watchlist/useWatchlist";
 
 type QuoteMap = Record<string, QuoteLiveState | undefined>;
 
-export function useMarketQuotes(token?: string) {
+function getNumber(...values: unknown[]): number | undefined {
+  for (const v of values) {
+    if (v === null || v === undefined || v === "") continue;
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return undefined;
+}
+
+export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
   const socketRef = useRef<MarketSocket | null>(null);
   const bufferRef = useRef<QuoteMap>({});
   const rafRef = useRef<number | null>(null);
@@ -42,18 +51,42 @@ export function useMarketQuotes(token?: string) {
           const cur = bufferRef.current[sym];
 
           if (cur) {
-            const dayClose =
-              msg.dayClose !== undefined
-                ? String(msg.dayClose)
-                : cur.bid;
+            const dayHigh = getNumber(
+              msg.dayHigh,
+              msg.day_high,
+              msg.high,
+              msg.h,
+              msg.data?.dayHigh,
+              msg.data?.day_high,
+              msg.data?.high,
+              msg.data?.h
+            );
+            const dayLow = getNumber(
+              msg.dayLow,
+              msg.day_low,
+              msg.low,
+              msg.l,
+              msg.data?.dayLow,
+              msg.data?.day_low,
+              msg.data?.low,
+              msg.data?.l
+            );
+            const dayOpen = getNumber(msg.dayOpen, msg.day_open, msg.data?.dayOpen, msg.data?.day_open);
+            const dayCloseNum = getNumber(
+              msg.dayClose,
+              msg.day_close,
+              msg.data?.dayClose,
+              msg.data?.day_close
+            );
+            const dayClose = dayCloseNum !== undefined ? String(dayCloseNum) : cur.bid;
 
             bufferRef.current[sym] = {
               ...cur,
 
-              high: msg.dayHigh !== undefined ? Number(msg.dayHigh) : cur.high,
-              low: msg.dayLow !== undefined ? Number(msg.dayLow) : cur.low,
-              dayOpen: msg.dayOpen !== undefined ? Number(msg.dayOpen) : cur.dayOpen,
-              dayClose: msg.dayClose !== undefined ? Number(msg.dayClose) : cur.dayClose,
+              high: dayHigh ?? cur.high,
+              low: dayLow ?? cur.low,
+              dayOpen: dayOpen ?? cur.dayOpen,
+              dayClose: dayCloseNum ?? cur.dayClose,
 
               bid: dayClose,
               ask: dayClose,
@@ -103,6 +136,30 @@ export function useMarketQuotes(token?: string) {
 
             const currentPrice = Number(bid.price);
             const dayClose = old.dayClose ?? 0;
+            const dayHigh = getNumber(
+              msg.data?.dayHigh,
+              msg.data?.day_high,
+              msg.data?.high,
+              msg.data?.h,
+              msg.dayHigh,
+              msg.day_high,
+              msg.high,
+              msg.h
+            );
+            const dayLow = getNumber(
+              msg.data?.dayLow,
+              msg.data?.day_low,
+              msg.data?.low,
+              msg.data?.l,
+              msg.dayLow,
+              msg.day_low,
+              msg.low,
+              msg.l
+            );
+            const nextHigh =
+              dayHigh ?? (typeof old.high === "number" ? Math.max(old.high, currentPrice) : currentPrice);
+            const nextLow =
+              dayLow ?? (typeof old.low === "number" ? Math.min(old.low, currentPrice) : currentPrice);
 
             let change = 0;
             let changePercent = 0;
@@ -123,6 +180,8 @@ export function useMarketQuotes(token?: string) {
 
               change,
               changePercent,
+              high: nextHigh,
+              low: nextLow,
 
               bidDir:
                 old.bid === "--"
@@ -167,12 +226,16 @@ export function useMarketQuotes(token?: string) {
 
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !watchlist) return;
+    if (!socket) return;
 
-    const desired = new Set(watchlist.map((w: any) => w.code));
+    const watchlistSymbols = (watchlist ?? [])
+      .map((w: any) => w?.code)
+      .filter((code: unknown): code is string => typeof code === "string" && code.length > 0);
+    const manualSymbols = (extraSymbols ?? [])
+      .filter((code): code is string => typeof code === "string" && code.length > 0);
+    const desired = new Set([...watchlistSymbols, ...manualSymbols]);
 
-    for (const item of watchlist) {
-      const code = item.code;
+    for (const code of desired) {
       if (!subscribedRef.current.has(code)) {
         subscribedRef.current.add(code);
         bufferRef.current[code] = {
@@ -198,7 +261,7 @@ export function useMarketQuotes(token?: string) {
     }
 
     scheduleFlush();
-  }, [watchlist]);
+  }, [watchlist, extraSymbols]);
 
   function scheduleFlush() {
     if (rafRef.current) return;

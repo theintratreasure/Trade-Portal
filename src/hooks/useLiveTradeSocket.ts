@@ -45,6 +45,34 @@ export type LivePending = {
   status: string;
 };
 
+const toNumberOrUndefined = (value: unknown): number | undefined => {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const normalizePendingOrder = (data: any): LivePending | null => {
+  if (!data?.orderId) return null;
+
+  const statusRaw = data.status ?? data.orderStatus ?? data.state ?? data.order_state;
+  const currentPriceRaw =
+    data.currentPrice ?? data.current_price ?? data.ltp ?? data.lastPrice;
+
+  return {
+    orderId: String(data.orderId),
+    symbol: String(data.symbol ?? "-"),
+    side: String(data.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
+    orderType: String(data.orderType ?? data.order_type ?? "-"),
+    price: Number(data.price ?? 0),
+    volume: Number(data.volume ?? 0),
+    stopLoss: data.stopLoss ?? data.stop_loss ?? null,
+    takeProfit: data.takeProfit ?? data.take_profit ?? null,
+    createdAt: Number(data.createdAt ?? data.created_at ?? Date.now()),
+    currentPrice: toNumberOrUndefined(currentPriceRaw),
+    status: String(statusRaw ?? "PENDING"),
+  };
+};
+
 
 export const useLiveTradeSocket = (accountId?: string) => {
   const wsRef = useRef<WebSocket | null>(null);
@@ -91,9 +119,12 @@ export const useLiveTradeSocket = (accountId?: string) => {
           }));
         }
         if (message.type === "live_pending") {
+          const normalized = normalizePendingOrder(message.data);
+          if (!normalized) return;
+
           setPendingOrders((prev) => ({
             ...prev,
-            [message.data.orderId]: message.data,
+            [normalized.orderId]: normalized,
           }));
         }
 

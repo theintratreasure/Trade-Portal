@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { UserPlus, LogIn, LineChart, ChevronRight } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import AppIntro from "./components/AppIntro";
 import SplashHandler from "./SplashHandler";
 
@@ -117,7 +117,7 @@ const handleIntroFinish = () => {
                       whileTap={{ scale: 0.98 }}
                       onClick={() => router.push(option.route)}
                       className={`
-                        group relative h-64 rounded-3xl p-8
+                        group relative h-64 rounded-3xl p-8 overflow-hidden
                         border border-[var(--border-soft)]
                         bg-[var(--bg-card)] backdrop-blur-xl
                         shadow-xl hover:shadow-2xl
@@ -127,12 +127,12 @@ const handleIntroFinish = () => {
                     >
                       {/* Shine Effect */}
                       <motion.div 
-                        className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-150%] group-hover:translate-x-[150%]"
+                        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-150%] group-hover:translate-x-[150%]"
                         transition={{ duration: 0.8 }}
                       />
                       
                       {/* Glow */}
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ boxShadow: `inset 0 0 50px ${option.glow}` }} />
+                      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ boxShadow: `inset 0 0 50px ${option.glow}` }} />
 
                       <div className="relative z-10 flex flex-col h-full justify-between">
                         {/* Icon */}
@@ -191,7 +191,7 @@ const handleIntroFinish = () => {
                     whileTap={{ scale: 0.99 }}
                    onClick={() => router.push(option.route)}
                     className={`
-                      group relative h-28 w-full rounded-2xl p-5
+                      group relative h-28 w-full rounded-2xl p-5 overflow-hidden
                       border border-[var(--border-soft)]
                       bg-[var(--bg-card)] backdrop-blur-lg
                       shadow-lg hover:shadow-xl
@@ -201,7 +201,7 @@ const handleIntroFinish = () => {
                   >
                     {/* Shine */}
                     <motion.div 
-                      className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-120%] group-hover:translate-x-[120%]"
+                      className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-120%] group-hover:translate-x-[120%]"
                       transition={{ duration: 0.6 }}
                     />
 
