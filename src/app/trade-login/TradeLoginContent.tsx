@@ -1,28 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { User, Lock, Eye, EyeOff, Home } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTradeLogin } from "@/hooks/trade/useTradeLogin";
 import BackButton from "../components/ui/BackButton";
-
-const TRADE_LOGIN_REMEMBER_KEY = "trade-login-remembered";
-
-type RememberedTradeLogin = {
-    account_number: string;
-    password: string;
-};
+import {
+    clearDefaultRememberedTradeLogin,
+    getDefaultRememberedTradeLogin,
+    getSavedTradeAccount,
+    removeTradeAccount,
+    saveTradeAccount,
+    setDefaultRememberedTradeLogin,
+} from "@/lib/tradeLoginAccounts";
 
 export default function TradeLogin() {
     const router = useRouter();
+    const queryClient = useQueryClient();
     const searchParams = useSearchParams();
     const tradeLogin = useTradeLogin();
+    const accountParam = searchParams.get("account") || "";
+    const prefetchedAccount = accountParam ? getSavedTradeAccount(accountParam) : null;
+    const rememberedDefault = getDefaultRememberedTradeLogin();
 
-    const [form, setForm] = useState({
-        account_number: "",
-        password: "",
-    });
-    const [savePassword, setSavePassword] = useState(true);
+    const [form, setForm] = useState(() => ({
+        account_number: accountParam || rememberedDefault?.account_number || "",
+        password:
+            prefetchedAccount?.password ||
+            rememberedDefault?.password ||
+            "",
+    }));
+    const [savePassword, setSavePassword] = useState(
+        Boolean(prefetchedAccount?.password || rememberedDefault?.password)
+    );
     const [showPassword, setShowPassword] = useState(false);
 
     const [toast, setToast] = useState<string | null>(null);
@@ -32,67 +43,22 @@ export default function TradeLogin() {
     };
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
-        const raw = localStorage.getItem(TRADE_LOGIN_REMEMBER_KEY);
-        if (!raw) return;
-
-        try {
-            const saved = JSON.parse(raw) as RememberedTradeLogin;
-            if (saved?.account_number && saved?.password) {
-                setForm({
-                    account_number: saved.account_number,
-                    password: saved.password,
-                });
-                setSavePassword(true);
-            }
-        } catch {
-            localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
-        }
-    }, []);
-
-    useEffect(() => {
         if (toast) {
             const t = setTimeout(() => setToast(null), 3000);
             return () => clearTimeout(t);
         }
     }, [toast]);
 
-    useEffect(() => {
-        const account = searchParams.get("account");
-        if (account) {
-            let savedPassword = "";
-            if (typeof window !== "undefined") {
-                const raw = localStorage.getItem(TRADE_LOGIN_REMEMBER_KEY);
-                if (raw) {
-                    try {
-                        const saved = JSON.parse(raw) as RememberedTradeLogin;
-                        if (saved?.account_number === account) {
-                            savedPassword = saved.password || "";
-                            setSavePassword(true);
-                        }
-                    } catch {
-                        localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
-                    }
-                }
-            }
-            setForm((prev) => ({
-                ...prev,
-                account_number: account,
-                password: savedPassword || prev.password,
-            }));
-        }
-    }, [searchParams]);
-
-    const handleTradeLogin = () => {
-        if (!form.account_number || !form.password) {
+    const loginWithCredentials = useCallback((accountNumber: string, password: string) => {
+        if (!accountNumber || !password) {
             setToast("All fields are required");
             return;
         }
 
         tradeLogin.mutate(
             {
-                account_number: form.account_number,
-                password: form.password,
+                account_number: accountNumber,
+                password,
             },
             {
                 onSuccess: (res) => {
@@ -103,20 +69,17 @@ export default function TradeLogin() {
                     document.cookie = `accountId=${accountId}; path=/; max-age=43200`;
                     if (typeof window !== "undefined") {
                         if (savePassword) {
-                            const rememberData: RememberedTradeLogin = {
-                                account_number: form.account_number,
-                                password: form.password,
-                            };
-                            localStorage.setItem(
-                                TRADE_LOGIN_REMEMBER_KEY,
-                                JSON.stringify(rememberData)
-                            );
+                            saveTradeAccount(accountNumber, password);
+                            setDefaultRememberedTradeLogin(accountNumber, password);
                         } else {
-                            localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+                            removeTradeAccount(accountNumber);
+                            clearDefaultRememberedTradeLogin();
                         }
                     }
 
-                   router.push("/trade");
+                    queryClient.removeQueries({ queryKey: ["trade-account"] });
+                    queryClient.invalidateQueries({ queryKey: ["trade-account"] });
+                    router.push("/trade");
                 },
 
                 onError: () => {
@@ -124,6 +87,12 @@ export default function TradeLogin() {
                 },
             }
         );
+    }, [queryClient, router, savePassword, tradeLogin]);
+
+    const handleTradeLogin = () => {
+        const accountNumber = form.account_number || accountParam || rememberedDefault?.account_number || "";
+        const password = form.password || prefetchedAccount?.password || rememberedDefault?.password || "";
+        loginWithCredentials(accountNumber, password);
     };
 
     return (
@@ -210,7 +179,8 @@ export default function TradeLogin() {
                                 setSavePassword((prev) => {
                                     const next = !prev;
                                     if (!next && typeof window !== "undefined") {
-                                        localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+                                        removeTradeAccount(form.account_number);
+                                        clearDefaultRememberedTradeLogin();
                                     }
                                     return next;
                                 })

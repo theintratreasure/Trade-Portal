@@ -6,6 +6,7 @@ import {
   LogOut,
   ChevronRight,
   User,
+  Users,
   Palette,
   Globe,
   Calendar,
@@ -45,7 +46,7 @@ const t = translations[language];
     window.location.href = "/trade-login";
   };
   useEffect(() => {
-    const langMap: any = {
+    const langMap: Record<string, string> = {
       english: "en",
       indonesia: "id",
       russia: "ru",
@@ -117,6 +118,20 @@ const t = translations[language];
               value={`${account?.balance?.toFixed(2)} ${account?.currency}`}
             />
           </div>
+        </div>
+
+        <div className={cardClass}>
+          <button
+            onClick={() => router.push("/trade/settings/manageaccounts")}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <Users size={18} />
+              <span className="text-sm font-medium">Manage Accounts</span>
+            </div>
+
+            <ChevronRight size={16} />
+          </button>
         </div>
 
         {/* THEME */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import {
   BarChart3,
@@ -16,6 +16,7 @@ import {
   ChevronRight,
   CandlestickChart,
   Clock,
+  type LucideIcon,
 } from "lucide-react";
 import { useTradeSidebar } from "./TradeSidebarContext";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
@@ -130,7 +131,7 @@ export default function TradeSidebar() {
             <button
               className="mt-3 text-[13px] font-medium transition text-left"
               style={{ color: "var(--primary)" }}
-              onClick={() => go("/accounts")}
+              onClick={() => go("/trade/settings/manageaccounts")}
             >
               Manage accounts
             </button>
@@ -163,8 +164,8 @@ export default function TradeSidebar() {
           <Item
             icon={Settings}
             label="Settings"
-            active={pathname === "/settings"}
-            onClick={() => go("/settings")}
+            active={pathname?.startsWith(`${base}/settings`)}
+            onClick={() => go(`${base}/settings`)}
           />
           <Item
             icon={Calendar}
@@ -204,7 +205,13 @@ function Item({
   badge,
   onClick,
   active,
-}: any) {
+}: {
+  icon: LucideIcon;
+  label: string;
+  badge?: ReactNode;
+  onClick: () => void;
+  active?: boolean;
+}) {
   return (
     <button
       onClick={onClick}

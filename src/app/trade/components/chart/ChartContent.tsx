@@ -293,9 +293,9 @@ if (theme === "dark") {
           showMenu
           right={
             <div className="flex items-center gap-3 pr-2">
-              <button className="w-9 h-9 flex items-center justify-center hover:opacity-80 transition">
+              {/* <button className="w-9 h-9 flex items-center justify-center hover:opacity-80 transition">
                 <GradientClock size={20} />
-              </button>
+              </button> */}
 
               <button
                 className="w-9 h-9 flex items-center justify-center hover:opacity-80 transition disabled:opacity-50"

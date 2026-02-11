@@ -8,7 +8,10 @@ export function middleware(req: NextRequest) {
 
   // TRADE LOGIN PAGE
   if (pathname === "/trade-login") {
-    if (tradeToken) {
+    const fromManageAccounts =
+      req.nextUrl.searchParams.get("manageAccounts") === "1";
+
+    if (tradeToken && !fromManageAccounts) {
       return NextResponse.redirect(new URL("/trade", req.url));
     }
     return NextResponse.next();

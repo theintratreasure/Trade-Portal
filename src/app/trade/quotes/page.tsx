@@ -78,7 +78,7 @@ export default function QuotesPage() {
                                 <Plus size={22} strokeWidth={2.5} />
                             </button>
 
-                            <button
+                            {/* <button
                                 onClick={() => setSheet("edit")}
                                 className="h-12 w-12 flex items-center justify-center text-[var(--text-main)]"
                             >
@@ -96,7 +96,7 @@ export default function QuotesPage() {
                                     <path d="M12 3l9 9-9 9-9-9z" opacity="0" />
                                     <path d="M16.5 3.5l4 4L7 21H3v-4L16.5 3.5z" />
                                 </svg>
-                            </button>
+                            </button> */}
 
                         </div>
                     }
