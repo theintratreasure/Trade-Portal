@@ -70,7 +70,7 @@ export default function AssetsPage() {
                 </div>
 
                 {/* ACCOUNT SUMMARY GRID */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 gap-4">
                     {data?.map((acc: any) => {
                         const isLive = acc.account_type === "live";
 
@@ -98,7 +98,7 @@ export default function AssetsPage() {
                                 </span>
 
                                 {/* PLAN NAME */}
-                                <p className="text-xs text-[var(--text-muted)]">
+                                <p className="text-xs text-[var(--text-muted)] pr-14">
                                     {acc.plan_name}{" "}
                                     <button
                                         type="button"
@@ -106,7 +106,7 @@ export default function AssetsPage() {
                                             e.stopPropagation();
                                             router.push(`/trade-login?account=${encodeURIComponent(acc.account_number)}`);
                                         }}
-                                        className="mx-2 text-[var(--primary)] hover:underline"
+                                        className="mt-1 ml-0 block w-full break-all text-[var(--primary)] hover:underline"
                                     >
                                         {acc.account_number}
                                     </button>

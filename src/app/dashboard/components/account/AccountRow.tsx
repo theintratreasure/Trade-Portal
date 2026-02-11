@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     ChevronDown,
-    MoreVertical,
     ArrowDownCircle,
     ArrowUpCircle,
     BarChart3,
@@ -44,6 +43,7 @@ export default function AccountRow({
     const resetTrade = useResetTradePassword();
     const resetWatch = useResetWatchPassword();
     const [showActions, setShowActions] = useState(false);
+    const actionsWrapRef = useRef<HTMLDivElement | null>(null);
 
     const handleSubmitPassword = () => {
         if (!newPassword.trim()) {
@@ -71,10 +71,14 @@ export default function AccountRow({
             setPasswordModal({ type: null });
             setShowConfirm(false);
             setNewPassword("");
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const error = err as {
+                response?: { data?: { message?: string } };
+            };
+            setShowConfirm(false);
             setToast({
                 message:
-                    err?.response?.data?.message || "Failed to reset password",
+                    error?.response?.data?.message || "Failed to reset password",
                 type: "error",
             });
         }
@@ -87,14 +91,31 @@ export default function AccountRow({
         return () => clearTimeout(t);
     }, [toast]);
 
+    useEffect(() => {
+        function handleOutsideClick(event: MouseEvent) {
+            if (!showActions) return;
+            const target = event.target as Node;
+            if (actionsWrapRef.current && !actionsWrapRef.current.contains(target)) {
+                setShowActions(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handleOutsideClick);
+        return () => document.removeEventListener("mousedown", handleOutsideClick);
+    }, [showActions]);
+
     const handleResetDemo = async () => {
         try {
             await resetDemo.mutateAsync(account._id);
             setToast({ message: "Demo balance reset successfully", type: "success" });
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const error = err as {
+                response?: { data?: { message?: string } };
+                message?: string;
+            };
             const message =
-                err?.response?.data?.message ||
-                err?.message ||
+                error?.response?.data?.message ||
+                error?.message ||
                 "Failed to reset demo balance";
             setToast({ message, type: "error" });
         }
@@ -224,23 +245,23 @@ export default function AccountRow({
 
             {/* ================= DESKTOP VIEW ================= */}
             <div className="hidden lg:block px-6 py-5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     {/* LEFT */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex min-w-0 items-center gap-3 xl:gap-4">
                         <span className="rounded bg-[var(--bg-glass)] text-[var(--success)] px-2 py-0.5 text-xs">
                             {account.account_type === "live" ? "Live" : "Demo"}
                         </span>
 
-                        <div className="font-medium">
-                            {account.account_number}
-                            <span className="ml-2 text-lg text-[var(--text-muted)] uppercase">
+                        <div className="min-w-0 font-medium">
+                            <span className="break-all">{account.account_number}</span>
+                            <span className="block text-sm text-[var(--text-muted)] uppercase xl:ml-2 xl:inline xl:text-lg">
                                 {account.plan_name}
                             </span>
                         </div>
                     </div>
 
                     {/* CENTER */}
-                    <div className="text-xl font-semibold">
+                    <div className="text-left text-lg font-semibold xl:text-xl">
                         $ {account.balance.toFixed(2)}{" "}
                         <span className="text-sm font-normal">
                             {account.currency}
@@ -248,14 +269,14 @@ export default function AccountRow({
                     </div>
 
                     {/* RIGHT */}
-                    <div className="relative flex items-center gap-2 flex-wrap">
+                    <div ref={actionsWrapRef} className="relative flex w-full items-center gap-2 flex-wrap xl:w-auto xl:justify-end">
                         <button
                             onClick={() =>
                                 router.push(
                                     `/trade-login?account=${encodeURIComponent(account.account_number)}`
                                 )
                             }
-                            className="rounded-md bg-yellow-400 px-4 py-2 text-sm font-medium text-black"
+                            className="rounded-md bg-yellow-400 px-3 xl:px-4 py-2 text-sm font-medium text-black"
                         >
                             Trade
                         </button>
@@ -266,7 +287,7 @@ export default function AccountRow({
                                     onClick={() =>
                                         router.push(`/dashboard/payments/deposit?account=${account._id}`)
                                     }
-                                    className="rounded-md bg-[var(--bg-glass)] px-4 py-2 text-sm"
+                                    className="rounded-md bg-[var(--bg-glass)] px-3 xl:px-4 py-2 text-sm"
                                 >
                                     Deposit
                                 </button>
@@ -275,10 +296,42 @@ export default function AccountRow({
                                     onClick={() =>
                                         router.push(`/dashboard/payments/withdraw?account=${account._id}`)
                                     }
-                                    className="rounded-md bg-[var(--bg-glass)] px-4 py-2 text-sm"
+                                    className="rounded-md bg-[var(--bg-glass)] px-3 xl:px-4 py-2 text-sm"
                                 >
                                     Withdraw
                                 </button>
+                                 <div className="relative">
+                                <button
+                                    onClick={() => setShowActions(!showActions)}
+                                    className="rounded-md bg-[var(--bg-glass)] px-3 py-2 text-sm"
+                                >
+                                    More
+                                </button>
+
+                                {showActions && (
+                                    <div className="absolute right-0 mt-2 w-48 rounded-lg bg-[var(--bg-card)] shadow-lg border border-[var(--border-soft)]">
+                                        <button
+                                            onClick={() => {
+                                                setPasswordModal({ type: "trade" });
+                                                setShowActions(false);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm hover:bg-[var(--bg-glass)]"
+                                        >
+                                            Reset Trade Password
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setPasswordModal({ type: "watch" });
+                                                setShowActions(false);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm hover:bg-[var(--bg-glass)]"
+                                        >
+                                            Reset Investor Password
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             </>
                         )}
 
@@ -345,14 +398,23 @@ export default function AccountRow({
             </div>
             {toast && <Toast message={toast.message} type={toast.type} />}
             {passwordModal.type && (
-                <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40">
-                    <div className="w-[90%] max-w-sm rounded-xl bg-[var(--bg-card)] p-6 shadow-xl">
+                <div
+                    className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/40"
+                    onClick={() => {
+                        setPasswordModal({ type: null });
+                        setNewPassword("");
+                    }}
+                >
+                    <div
+                        className="w-[90%] max-w-sm rounded-xl bg-[var(--bg-card)] p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <h2 className="text-lg font-semibold">
                             Reset {passwordModal.type === "trade" ? "Trade" : "Investor"} Password
                         </h2>
 
                         <input
-                            type=""
+                            type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="Enter new password"
@@ -429,4 +491,3 @@ function Action({
         </div>
     );
 }
-

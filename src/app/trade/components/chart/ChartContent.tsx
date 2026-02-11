@@ -80,33 +80,6 @@ function CSIcon({ size = 36 }: { size?: number }) {
   );
 }
 
-function GradientClock({ size = 20 }: { size?: number }) {
-  const gradientId = "clockGrad";
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ef4444" />
-          <stop offset="49.9%" stopColor="#ef4444" />
-          <stop offset="50%" stopColor="#3b82f6" />
-          <stop offset="100%" stopColor="#3b82f6" />
-        </linearGradient>
-      </defs>
-      <circle cx="12" cy="12" r="10" stroke={`url(#${gradientId})`} />
-      <path d="M12 6v6l4 2" stroke={`url(#${gradientId})`} />
-    </svg>
-  );
-}
-
 /* ----------------- Component ----------------- */
 export default function ChartContent() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -136,12 +109,13 @@ export default function ChartContent() {
   useEffect(() => {
     if (paramSymbol) {
       const norm = normalizeSymbol(paramSymbol);
-      setCurrentSymbol(norm);
-      // don't immediately overwrite displaySymbol; widget will load that symbol and we poll iframe to detect it.
-      // but set displaySymbol so quotes are checked immediately
-      setDisplaySymbol(norm);
+      queueMicrotask(() => {
+        setCurrentSymbol(norm);
+        // don't immediately overwrite displaySymbol; widget will load that symbol and we poll iframe to detect it.
+        // but set displaySymbol so quotes are checked immediately
+        setDisplaySymbol(norm);
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramSymbol]);
 
   // theme sync (keep your background/theme behavior unchanged)
@@ -173,12 +147,12 @@ export default function ChartContent() {
   // load embed widget and then poll iframe.src to detect symbol changes
   useEffect(() => {
     if (!containerRef.current) return;
+    const containerEl = containerRef.current;
 
     // remove any previous contents (script/iframe)
-    containerRef.current.innerHTML = "";
+    containerEl.innerHTML = "";
 
    let chartBg = "#ffffff";
-    console.log(theme)
 if (theme === "dark") {
   chartBg = isDesktop ? "#111827" : "#000000";
 }
@@ -215,7 +189,7 @@ if (theme === "dark") {
       },
     });
 
-    containerRef.current.appendChild(script);
+    containerEl.appendChild(script);
 
     // start polling iframe.src after embed script inserts iframe
     let pollHandle: number | null = null;
@@ -223,7 +197,7 @@ if (theme === "dark") {
       if (pollHandle) return;
       pollHandle = window.setInterval(() => {
         try {
-          const iframe = containerRef.current?.querySelector("iframe");
+          const iframe = containerEl.querySelector("iframe");
           if (!iframe) return;
           const src = (iframe as HTMLIFrameElement).getAttribute("src") || (iframe as HTMLIFrameElement).src;
           const sym = symbolFromIframeSrc(src);
@@ -239,7 +213,7 @@ if (theme === "dark") {
               router.replace(url.toString(), { scroll: false });
             }
           }
-        } catch (e) {
+        } catch {
           // ignore cross-origin access errors (we only read src attribute which is safe)
         }
       }, 700); // poll every 700ms
@@ -251,7 +225,7 @@ if (theme === "dark") {
     // ensure poll starts again if iframe not present initially (rare)
     const fallbackInterval = window.setInterval(() => {
       if (!pollHandle) {
-        const iframe = containerRef.current?.querySelector("iframe");
+        const iframe = containerEl.querySelector("iframe");
         if (iframe) {
           // start immediately
           startPolling();
@@ -271,7 +245,7 @@ if (theme === "dark") {
       }
       clearInterval(fallbackInterval);
       // remove script & iframe (container innerHTML cleanup already done at start of new effect)
-      if (containerRef.current) containerRef.current.innerHTML = "";
+      containerEl.innerHTML = "";
     };
     // we intentionally depend on currentSymbol/theme/isDesktop - when currentSymbol changes we'll re-create widget
   }, [currentSymbol, theme, isDesktop, displaySymbol, router]);

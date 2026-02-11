@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarketSocket } from "@/services/marketSocket.service";
+import { WatchlistItem } from "@/services/watchlist.service";
 import { QuoteLiveState } from "@/types/market";
 import { useWatchlist } from "./watchlist/useWatchlist";
 
@@ -25,6 +26,14 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
   const [quotes, setQuotes] = useState<QuoteMap>({});
   const { data: watchlist } = useWatchlist();
 
+  const scheduleFlush = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      setQuotes({ ...bufferRef.current });
+    });
+  }, []);
+
   useEffect(() => {
     if (!token) {
       if (socketRef.current) {
@@ -33,7 +42,6 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       }
       subscribedRef.current.clear();
       bufferRef.current = {};
-      setQuotes({});
       return;
     }
 
@@ -42,41 +50,51 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
     const socket = new MarketSocket();
     socketRef.current = socket;
 
-    socket.connect(token, (msg: any) => {
+    socket.connect(token, (msg: unknown) => {
       try {
+        const payload = (msg ?? {}) as Record<string, unknown>;
+        const nestedData =
+          payload.data && typeof payload.data === "object"
+            ? (payload.data as Record<string, unknown>)
+            : undefined;
 
         /* ===================== SUBSCRIBED MESSAGE ===================== */
-        if (msg.status === "subscribed" && msg.symbol) {
-          const sym = msg.symbol;
+        if (payload.status === "subscribed" && typeof payload.symbol === "string") {
+          const sym = payload.symbol;
           const cur = bufferRef.current[sym];
 
           if (cur) {
             const dayHigh = getNumber(
-              msg.dayHigh,
-              msg.day_high,
-              msg.high,
-              msg.h,
-              msg.data?.dayHigh,
-              msg.data?.day_high,
-              msg.data?.high,
-              msg.data?.h
+              payload.dayHigh,
+              payload.day_high,
+              payload.high,
+              payload.h,
+              nestedData?.dayHigh,
+              nestedData?.day_high,
+              nestedData?.high,
+              nestedData?.h
             );
             const dayLow = getNumber(
-              msg.dayLow,
-              msg.day_low,
-              msg.low,
-              msg.l,
-              msg.data?.dayLow,
-              msg.data?.day_low,
-              msg.data?.low,
-              msg.data?.l
+              payload.dayLow,
+              payload.day_low,
+              payload.low,
+              payload.l,
+              nestedData?.dayLow,
+              nestedData?.day_low,
+              nestedData?.low,
+              nestedData?.l
             );
-            const dayOpen = getNumber(msg.dayOpen, msg.day_open, msg.data?.dayOpen, msg.data?.day_open);
+            const dayOpen = getNumber(
+              payload.dayOpen,
+              payload.day_open,
+              nestedData?.dayOpen,
+              nestedData?.day_open
+            );
             const dayCloseNum = getNumber(
-              msg.dayClose,
-              msg.day_close,
-              msg.data?.dayClose,
-              msg.data?.day_close
+              payload.dayClose,
+              payload.day_close,
+              nestedData?.dayClose,
+              nestedData?.day_close
             );
             const dayClose = dayCloseNum !== undefined ? String(dayCloseNum) : cur.bid;
 
@@ -101,14 +119,24 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
         }
 
         /* ===================== ORDERBOOK MESSAGE ===================== */
-        if (msg.type === "orderbook" && msg.data?.code) {
-          const s = msg.data.code;
-          const bid = msg.data.bids?.[0];
-          const ask = msg.data.asks?.[0];
+        if (
+          payload.type === "orderbook" &&
+          nestedData &&
+          typeof nestedData.code === "string"
+        ) {
+          const s = nestedData.code;
+          const bids = Array.isArray(nestedData.bids)
+            ? (nestedData.bids as Array<Record<string, unknown>>)
+            : [];
+          const asks = Array.isArray(nestedData.asks)
+            ? (nestedData.asks as Array<Record<string, unknown>>)
+            : [];
+          const bid = bids[0];
+          const ask = asks[0];
 
           // Convert tick_time
-          const tickTime = msg.data.tick_time
-            ? new Date(Number(msg.data.tick_time)).toLocaleTimeString("en-US", {
+          const tickTime = nestedData.tick_time
+            ? new Date(Number(nestedData.tick_time)).toLocaleTimeString("en-US", {
                 hour12: false,
               })
             : undefined;
@@ -125,7 +153,7 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
             } as unknown as QuoteLiveState;
           }
 
-          const old = bufferRef.current[s] as any;
+          const old = bufferRef.current[s] as QuoteLiveState;
 
           if (
             bid &&
@@ -135,26 +163,26 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
           ) {
 
             const currentPrice = Number(bid.price);
-            const dayClose = old.dayClose ?? 0;
+            const dayClose = typeof old.dayClose === "number" ? old.dayClose : 0;
             const dayHigh = getNumber(
-              msg.data?.dayHigh,
-              msg.data?.day_high,
-              msg.data?.high,
-              msg.data?.h,
-              msg.dayHigh,
-              msg.day_high,
-              msg.high,
-              msg.h
+              nestedData.dayHigh,
+              nestedData.day_high,
+              nestedData.high,
+              nestedData.h,
+              payload.dayHigh,
+              payload.day_high,
+              payload.high,
+              payload.h
             );
             const dayLow = getNumber(
-              msg.data?.dayLow,
-              msg.data?.day_low,
-              msg.data?.low,
-              msg.data?.l,
-              msg.dayLow,
-              msg.day_low,
-              msg.low,
-              msg.l
+              nestedData.dayLow,
+              nestedData.day_low,
+              nestedData.low,
+              nestedData.l,
+              payload.dayLow,
+              payload.day_low,
+              payload.low,
+              payload.l
             );
             const nextHigh =
               dayHigh ?? (typeof old.high === "number" ? Math.max(old.high, currentPrice) : currentPrice);
@@ -200,7 +228,7 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
                   : Number(ask.price) < Number(old.ask)
                   ? "down"
                   : old.askDir,
-            } as unknown as QuoteLiveState;
+            } as QuoteLiveState;
 
             scheduleFlush();
           }
@@ -210,11 +238,12 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
         console.warn("[useMarketQuotes] message handler error", err);
       }
     });
+    const subscribedOnConnect = subscribedRef.current;
 
     return () => {
       socket.close();
       socketRef.current = null;
-      subscribedRef.current.clear();
+      subscribedOnConnect.clear();
       bufferRef.current = {};
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
@@ -222,18 +251,22 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       }
       setQuotes({});
     };
-  }, [token]);
+  }, [scheduleFlush, token]);
+
+  const desiredSymbols = useMemo(() => {
+    const watchlistSymbols = (watchlist ?? [])
+      .map((w: WatchlistItem) => w?.code)
+      .filter((code): code is string => typeof code === "string" && code.length > 0);
+    const manualSymbols = (extraSymbols ?? []).filter(
+      (code): code is string => typeof code === "string" && code.length > 0
+    );
+    return Array.from(new Set([...watchlistSymbols, ...manualSymbols]));
+  }, [extraSymbols, watchlist]);
 
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
-
-    const watchlistSymbols = (watchlist ?? [])
-      .map((w: any) => w?.code)
-      .filter((code: unknown): code is string => typeof code === "string" && code.length > 0);
-    const manualSymbols = (extraSymbols ?? [])
-      .filter((code): code is string => typeof code === "string" && code.length > 0);
-    const desired = new Set([...watchlistSymbols, ...manualSymbols]);
+    const desired = new Set(desiredSymbols);
 
     for (const code of desired) {
       if (!subscribedRef.current.has(code)) {
@@ -261,15 +294,7 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
     }
 
     scheduleFlush();
-  }, [watchlist, extraSymbols]);
+  }, [desiredSymbols, scheduleFlush]);
 
-  function scheduleFlush() {
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      setQuotes({ ...bufferRef.current });
-    });
-  }
-
-  return quotes;
+  return token ? quotes : {};
 }

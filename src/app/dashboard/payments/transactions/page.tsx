@@ -87,8 +87,8 @@ export default function TransactionsPage() {
             <thead className="bg-[var(--bg-glass)] text-[var(--text-muted)]">
               <tr>
                 <th className="px-3 py-3 text-left">Type</th>
-                <th className="px-3 py-3 text-left">Amount</th>
                 <th className="px-3 py-3 text-left">Amount No</th>
+                <th className="px-3 py-3 text-left">Amount</th>
                 <th className="px-3 py-3 text-left">Status</th>
                 <th className="px-3 py-3 text-left">Balance</th>
                 <th className="px-3 py-3 text-left">Date</th>
@@ -113,7 +113,7 @@ export default function TransactionsPage() {
                     {tx.type}
                   </td>
                   <td className="px-3 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
-                    {tx.account}
+                    {tx.accountNumber}
                   </td>
 
                   <td className="px-3 py-3 whitespace-nowrap">

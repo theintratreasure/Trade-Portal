@@ -5,6 +5,7 @@ export interface Transaction {
   type: string;
   amount: number;
   account: string;
+  accountNumber: string;
   balanceAfter: number;
   status: string;
   createdAt: string;
