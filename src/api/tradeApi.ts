@@ -5,6 +5,8 @@ const tradeApi = axios.create({
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
   },
   timeout: 10000,
 });

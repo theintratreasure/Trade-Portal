@@ -12,6 +12,8 @@ export const useTradeAccount = () =>
   useQuery({
     queryKey: ["trade-account"],
     queryFn: fetchTradeAccount,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });

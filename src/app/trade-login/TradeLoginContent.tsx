@@ -77,7 +77,8 @@ export default function TradeLogin() {
 
             queryClient.removeQueries({ queryKey: ["trade-account"] });
             queryClient.invalidateQueries({ queryKey: ["trade-account"] });
-            router.push("/trade");
+            router.replace("/trade");
+            router.refresh();
           },
           onError: () => {
             setToast("Invalid account credentials");
