@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Trade Portal',
   webDir: 'build', // not used when server.url present
   server: {
-    url: 'https://admin.alstrades.com',
+    url: 'https://user.alstrades.com',
     cleartext: false
   },
   plugins: {
