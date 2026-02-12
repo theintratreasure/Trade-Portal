@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
     ArrowDownUp,
     MoreHorizontal,
     FilePlus,
-    DotSquareIcon,
 } from "lucide-react";
 import TopBarSlot from "../components/layout/TopBarSlot";
 import TradeTopBar from "../components/layout/TradeTopBar";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
-import { useCancelPendingOrder } from "@/hooks/useCancelPendingOrder";
-import { Toast } from "@/app/components/ui/Toast";
 import DeleteOrderModal from "../components/trade/DeleteOrderModal";
 import OrderActionSheet from "../components/trade/OrderActionSheet";
 import MobilePositionItem from "../components/trade/MobilePositionItem";
@@ -41,6 +39,37 @@ type Position = {
     takeProfit?: number | null;
 };
 
+type PendingOrder = {
+    orderId: string;
+    createdAt: string | number;
+    symbol: string;
+    side: string;
+    orderType: string;
+    volume: number | string;
+    price: number | string;
+    stopLoss?: number | string | null;
+    takeProfit?: number | string | null;
+    currentPrice?: number | string | null;
+    current_price?: number | string | null;
+    ltp?: number | string | null;
+    lastPrice?: number | string | null;
+    status?: string | null;
+    orderStatus?: string | null;
+    state?: string | null;
+};
+
+type DesktopMenuAction = {
+    label: string;
+    onClick: () => void;
+};
+
+type DesktopMenuState = {
+    id: string;
+    top: number;
+    right: number;
+    actions: DesktopMenuAction[];
+};
+
 function buildModifyPositionUrl(pos: Position): string {
     const params = new URLSearchParams({
         symbol: pos.pair ?? "",
@@ -66,13 +95,12 @@ function getTradeTokenFromStorageSync(): string {
 export default function TradePage() {
     const [sortOpen, setSortOpen] = useState<boolean>(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [bulkOpen, setBulkOpen] = useState<boolean>(false);
     const { data: tradeAccount } = useTradeAccount();
 
     const accountId = tradeAccount?.accountId;
-    const [selectedPos, setSelectedPos] = useState<any | null>(null);
+    const [selectedPos, setSelectedPos] = useState<Position | null>(null);
     const [showSheet, setShowSheet] = useState(false);
-    const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+    const [selectedOrder, setSelectedOrder] = useState<PendingOrder | null>(null);
     const [showOrderSheet, setShowOrderSheet] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const { account, positions, pending } = useLiveTradeSocket(accountId);
@@ -89,18 +117,62 @@ export default function TradePage() {
         [pending]
     );
     const quotes = useMarketQuotes(token, pendingSymbols);
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+    const [openMenu, setOpenMenu] = useState<DesktopMenuState | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
+
+    const closeDesktopMenu = () => setOpenMenu(null);
+
+    const toggleDesktopMenu = (
+        key: string,
+        anchor: HTMLElement,
+        actions: DesktopMenuAction[]
+    ) => {
+        setOpenMenu((prev) => {
+            if (prev?.id === key) return null;
+            const rect = anchor.getBoundingClientRect();
+            return {
+                id: key,
+                top: rect.bottom + 6,
+                right: Math.max(8, window.innerWidth - rect.right),
+                actions,
+            };
+        });
+    };
+
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setOpenMenuId(null);
+                closeDesktopMenu();
             }
         }
 
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (!openMenu) return;
+
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                closeDesktopMenu();
+            }
+        }
+
+        function handleViewportChange() {
+            closeDesktopMenu();
+        }
+
+        window.addEventListener("keydown", handleEscape);
+        window.addEventListener("resize", handleViewportChange);
+        window.addEventListener("scroll", handleViewportChange, true);
+
+        return () => {
+            window.removeEventListener("keydown", handleEscape);
+            window.removeEventListener("resize", handleViewportChange);
+            window.removeEventListener("scroll", handleViewportChange, true);
+        };
+    }, [openMenu]);
 
 
     const marginLevel =
@@ -149,21 +221,25 @@ export default function TradePage() {
         }));
     }, [positions]);
 
-    const pendingWithLive = useMemo(() => {
+    const pendingWithLive = useMemo<PendingOrder[]>(() => {
         return pending.map((order) => {
-            const directCurrentPrice =
-                order.currentPrice ?? order.current_price ?? order.ltp ?? order.lastPrice;
+            const directCurrentPrice = order.currentPrice;
             const liveQuote = order.symbol ? quotes[order.symbol] : undefined;
             const side = String(order.side ?? "").toUpperCase();
             const quoteCurrentPrice = side === "BUY" ? liveQuote?.ask : liveQuote?.bid;
             return {
                 ...order,
                 currentPrice: directCurrentPrice ?? quoteCurrentPrice ?? "-",
-            };
+            } as PendingOrder;
         });
     }, [pending, quotes]);
 
     const router = useRouter();
+    const positionsGridTemplate =
+        "minmax(96px,1fr) minmax(150px,1.4fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(70px,0.7fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,1fr) minmax(72px,0.8fr)";
+    const ordersGridTemplate =
+        "minmax(96px,1fr) minmax(150px,1.4fr) minmax(100px,1fr) minmax(90px,0.9fr) minmax(70px,0.7fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(110px,1fr) minmax(72px,0.8fr)";
+
     return (
         <>
             <TopBarSlot>
@@ -185,7 +261,7 @@ export default function TradePage() {
                 />
             </TopBarSlot>
 
-            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(80vh)] md:h-[calc(97vh)] overflow-y-auto">
+            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100vh-3.5rem)] md:h-full overflow-y-auto">
 
                 {/* ================= MOBILE (UNCHANGED) ================= */}
                 <div className="md:hidden pb-6">
@@ -339,8 +415,11 @@ export default function TradePage() {
 
                         {/* Column Header */}
                         <div className="w-full overflow-x-auto">
-                            <div className="min-w-[1050px]">
-                                <div className="grid grid-cols-[100px_150px_90px_70px_70px_90px_90px_90px_90px_90px_90px_70px] px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]">
+                            <div className="min-w-[1050px] w-full">
+                                <div
+                                    className="grid w-full px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]"
+                                    style={{ gridTemplateColumns: positionsGridTemplate }}
+                                >
                                     <div>ID</div>
                                     <div>TIME</div>
                                     <div>SYMBOL</div>
@@ -361,7 +440,9 @@ export default function TradePage() {
                                     livePositions.map((pos) => (
                                         <div
                                             key={pos.id}
-                                            className="grid grid-cols-[100px_150px_90px_70px_70px_90px_90px_90px_90px_90px_90px_70px] px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center">
+                                            className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                                            style={{ gridTemplateColumns: positionsGridTemplate }}
+                                        >
                                             <div>{pos.id.slice(0, 10)}</div>
                                             <div>{pos.openTime}</div>
                                             <div className="font-semibold">{pos.pair}</div>
@@ -390,8 +471,41 @@ export default function TradePage() {
                                             </div>
                                             <div className="relative text-right">
                                                 <button
-                                                    onClick={() =>
-                                                        setOpenMenuId(openMenuId === pos.id ? null : pos.id)
+                                                    onClick={(event) =>
+                                                        toggleDesktopMenu(
+                                                            `position-${pos.id}`,
+                                                            event.currentTarget,
+                                                            [
+                                                                {
+                                                                    label: "Close position",
+                                                                    onClick: () => {
+                                                                        router.push(`/trade/close/${pos.id}`);
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                                {
+                                                                    label: "Modify position",
+                                                                    onClick: () => {
+                                                                        router.push(buildModifyPositionUrl(pos));
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                                {
+                                                                    label: "New order",
+                                                                    onClick: () => {
+                                                                        router.push(`/trade/new-order?symbol=${pos.pair}`);
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                                {
+                                                                    label: "Chart",
+                                                                    onClick: () => {
+                                                                        router.push(`/trade/charts?symbol=${pos.pair}`);
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                            ]
+                                                        )
                                                     }
                                                     className="p-2 rounded-md hover:bg-[var(--bg-glass)] transition"
                                                 >
@@ -399,45 +513,6 @@ export default function TradePage() {
                                                         <MoreHorizontal />
                                                     </div>
                                                 </button>
-
-                                                {openMenuId === pos.id && (
-                                                    <div
-                                                        ref={menuRef}
-                                                        className="absolute right-0 mt-2 w-48 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-lg shadow-lg z-50"
-                                                    >
-                                                        <ActionItem
-                                                            label="Close position"
-                                                            onClick={() => {
-                                                                router.push(`/trade/close/${pos.id}`);
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-
-                                                        <ActionItem
-                                                            label="Modify position"
-                                                            onClick={() => {
-                                                                router.push(buildModifyPositionUrl(pos));
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-
-                                                        <ActionItem
-                                                            label="New order"
-                                                            onClick={() => {
-                                                                router.push(`/trade/new-order?symbol=${pos.pair}`);
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-
-                                                        <ActionItem
-                                                            label="Chart"
-                                                            onClick={() => {
-                                                                router.push(`/trade/charts?symbol=${pos.pair}`);
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                )}
                                             </div>
 
 
@@ -463,10 +538,13 @@ export default function TradePage() {
                         </div>
 
                         <div className="w-full overflow-x-auto">
-                            <div className="min-w-[1050px]">
+                            <div className="min-w-[1050px] w-full">
 
                                 {/* Column Header */}
-                                <div className="grid grid-cols-[100px_150px_90px_70px_70px_90px_90px_90px_90px_90px_70px] px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]">
+                                <div
+                                    className="grid w-full px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]"
+                                    style={{ gridTemplateColumns: ordersGridTemplate }}
+                                >
                                     <div>ID</div>
                                     <div>TIME</div>
                                     <div>SYMBOL</div>
@@ -485,7 +563,8 @@ export default function TradePage() {
                                     pendingWithLive.map((order) => (
                                         <div
                                             key={order.orderId}
-                                            className="grid grid-cols-[100px_150px_90px_70px_70px_90px_90px_90px_90px_90px_70px] px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                                            className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                                            style={{ gridTemplateColumns: ordersGridTemplate }}
                                         >
                                             <div>{order.orderId.slice(0, 10)}</div>
 
@@ -528,59 +607,49 @@ export default function TradePage() {
                                             {/* ACTION COLUMN */}
                                             <div className="relative text-right">
                                                 <button
-                                                    onClick={() =>
-                                                        setOpenMenuId(
-                                                            openMenuId === order.orderId
-                                                                ? null
-                                                                : order.orderId
+                                                    onClick={(event) =>
+                                                        toggleDesktopMenu(
+                                                            `order-${order.orderId}`,
+                                                            event.currentTarget,
+                                                            [
+                                                                {
+                                                                    label: "Delete order",
+                                                                    onClick: () => {
+                                                                        setSelectedOrder(order);
+                                                                        setShowDeleteModal(true);
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                                {
+                                                                    label: "Modify order",
+                                                                    onClick: () => {
+                                                                        router.push(`/trade/modify-order/${order.orderId}`);
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                                {
+                                                                    label: "New order",
+                                                                    onClick: () => {
+                                                                        router.push(
+                                                                            `/trade/new-order?symbol=${order.symbol}&type=${encodeURIComponent(order.orderType)}`
+                                                                        );
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                                {
+                                                                    label: "Chart",
+                                                                    onClick: () => {
+                                                                        router.push(`/trade/charts?symbol=${order.symbol}`);
+                                                                        closeDesktopMenu();
+                                                                    },
+                                                                },
+                                                            ]
                                                         )
                                                     }
                                                     className="p-2 rounded-md hover:bg-[var(--bg-glass)] transition"
                                                 >
                                                     <MoreHorizontal size={18} />
                                                 </button>
-
-                                                {openMenuId === order.orderId && (
-                                                    <div
-                                                        ref={menuRef}
-                                                        className="absolute right-0 mt-2 w-48 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-lg shadow-lg z-50"
-                                                    >
-                                                        <ActionItem
-                                                            label="Delete order"
-                                                            onClick={() => {
-                                                                setSelectedOrder(order);
-                                                                setShowDeleteModal(true);
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-
-                                                        <ActionItem
-                                                            label="Modify order"
-                                                            onClick={() => {
-                                                                router.push(`/trade/modify-order/${order.orderId}`);
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-
-                                                        <ActionItem
-                                                            label="New order"
-                                                            onClick={() => {
-                                                                router.push(
-                                                                    `/trade/new-order?symbol=${order.symbol}&type=${encodeURIComponent(order.orderType)}`
-                                                                );
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-
-                                                        <ActionItem
-                                                            label="Chart"
-                                                            onClick={() => {
-                                                                router.push(`/trade/charts?symbol=${order.symbol}`);
-                                                                setOpenMenuId(null);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
                                     ))
@@ -618,6 +687,26 @@ export default function TradePage() {
                     setShowOrderSheet(false);
                 }}
             />
+            {openMenu &&
+                createPortal(
+                    <div
+                        ref={menuRef}
+                        className="fixed z-[800] w-48 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-lg shadow-lg"
+                        style={{
+                            top: openMenu.top,
+                            right: openMenu.right,
+                        }}
+                    >
+                        {openMenu.actions.map((action) => (
+                            <ActionItem
+                                key={action.label}
+                                label={action.label}
+                                onClick={action.onClick}
+                            />
+                        ))}
+                    </div>,
+                    document.body
+                )}
 
         </>
     );

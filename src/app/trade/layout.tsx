@@ -55,7 +55,7 @@ function TradeLayoutInner({
             </div>
 
             {/* ============ DESKTOP ============ */}
-<div className="hidden md:flex h-screen w-full bg-[var(--bg-plan)]">
+<div className="hidden md:flex h-screen w-full overflow-hidden bg-[var(--bg-plan)]">
 
   {/* Sidebar */}
   <div className="w-[68px] shrink-0 border-r border-[var(--border-soft)]">
@@ -68,14 +68,14 @@ function TradeLayoutInner({
       transition-all duration-300 ease-in-out
       ${quotesOpen ? "w-[340px]" : "w-0"}
       shrink-0 overflow-hidden
-      border-r border-[var(--border-soft)]
+      ${quotesOpen ? "border-r border-[var(--border-soft)]" : ""}
     `}
   >
     {quotesOpen && <TradeQuotesPanel />}
   </div>
 
   {/* Main Content */}
-  <main className="flex-1 overflow-y-auto bg-[var(--bg-card)]">
+  <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg-card)]">
     {children}
   </main>
 

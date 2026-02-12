@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type LucideIcon,
   BarChart3,
   Copy,
   Settings,
@@ -27,7 +28,7 @@ export default function TradeDesktopSidebar() {
   const isExact = (path: string) => pathname === path;
   return (
     <aside
-      className="hidden md:flex fixed 0 z-40 h-full w-[68px] flex-col items-center py-4 gap-5"
+      className="hidden md:flex z-40 h-full w-[68px] flex-col items-center py-4 gap-5"
       style={{
         background: "var(--bg-card)",
         borderRight: "1px solid var(--border-soft)",
@@ -96,7 +97,7 @@ function NavIcon({
   onClick,
   active,
 }: {
-  icon: any;
+  icon: LucideIcon;
   onClick?: () => void;
   active?: boolean;
 }) {

@@ -6,7 +6,6 @@ import {
   User,
   Lock,
   Mail,
-  KeyRound,
   ArrowLeft,
   Home,
   LucideIcon,
@@ -18,7 +17,6 @@ import {
 } from "@/hooks/useAuth";
 import { PremiumInput } from "../ui/TextInput";
 import { AuthShell } from "../auth/AuthCard";
-import { useVerifyEmail } from "@/hooks/useAuth";
 import { useResendVerifyEmail } from "@/hooks/useUser";
 import BackButton from "../ui/BackButton";
 import { useSaveDeviceToken } from "@/hooks/useDevice";
@@ -45,13 +43,7 @@ export default function LoginPage() {
 
   const tokenFromUrl = params.get("token");
 
-  const [step, setStep] = useState<Step>("login");
-
-  useEffect(() => {
-    if (tokenFromUrl) {
-      setStep("reset");
-    }
-  }, [tokenFromUrl]);
+  const [step, setStep] = useState<Step>(() => (tokenFromUrl ? "reset" : "login"));
 
   const [toast, setToast] = useState<string | null>(null);
 
@@ -198,11 +190,15 @@ export default function LoginPage() {
         setToast("Verification email sent successfully");
         setStep("login");
       },
-      onError: (err: any) => {
-        setToast(
-          err?.response?.data?.message ||
-          "Failed to send verification email"
-        );
+      onError: (err: unknown) => {
+        const message =
+          typeof err === "object" &&
+            err !== null &&
+            "response" in err &&
+            typeof (err as { response?: { data?: { message?: string } } }).response?.data?.message === "string"
+            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            : "Failed to send verification email";
+        
       },
     });
   };
@@ -228,7 +224,7 @@ export default function LoginPage() {
     }
   > = {
     login: {
-      title: "Sign in to ALS Trades",
+      title: "Welcome back",
       fields: [
         {
           key: "identity",
@@ -317,100 +313,109 @@ export default function LoginPage() {
   };
 
   const current = steps[step];
+  const isSubmitting =
+    (step === "login" && login.isPending) ||
+    (step === "forgot" && forgot.isPending) ||
+    (step === "reset" && reset.isPending) ||
+    (step === "verify" && resendVerifyEmail.isPending);
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4 overflow-hidden">
+    <div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4 py-8 overflow-hidden">
 
       {/* Ambient Light Layers */}
-      <div className="absolute -top-40 -left-40 h-[600px] w-[600px] rounded-full bg-[var(--primary)] opacity-20 blur-[160px]" />
-      <div className="absolute bottom-[-200px] right-[-200px] h-[700px] w-[700px] rounded-full bg-indigo-500 opacity-20 blur-[180px]" />
+      <div className="pointer-events-none absolute -top-40 -left-40 h-[560px] w-[560px] rounded-full bg-[var(--primary)] opacity-20 blur-[170px] animate-auth-orb-a" />
+      <div className="pointer-events-none absolute bottom-[-220px] right-[-220px] h-[640px] w-[640px] rounded-full bg-[var(--primary)] opacity-12 blur-[190px] animate-auth-orb-b" />
+
       <AuthShell>
-        <div className="flex gap-2">
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)] p-4 sm:p-6 shadow-[0_24px_64px_rgba(15,23,42,0.14)] animate-auth-card-in">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[linear-gradient(180deg,var(--primary-glow),transparent)] opacity-50" />
 
-          <BackButton to="/" />
-          <button
-            onClick={() => router.push("/")}
-            className=" inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] text-sm"
-          >
-            <Home size={18} />
-          </button>
-        </div>
-        <div className="space-y-8 animate-fadeIn">
-          {/* BRAND */}
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-semibold tracking-wide text-[var(--text-main)]">
-              ALS Trades
-            </h1>
+          <div className="relative z-10 space-y-6 animate-fadeIn">
+            <div className="flex items-center justify-between gap-2">
+              <BackButton to="/" />
+              <button
+                onClick={() => router.push("/")}
+                className="inline-flex items-center justify-center rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] h-10 w-10 transition hover:bg-[var(--bg-glass)]"
+                aria-label="Go home"
+              >
+                <Home size={18} />
+              </button>
+            </div>
 
-            <p className="text-sm text-[var(--text-muted)]">
-              Secure client access
-            </p>
-          </div>
+            {/* BRAND */}
+            <div className="text-center space-y-2">
+              <h1 className="text-[28px] leading-tight font-semibold tracking-wide text-[var(--text-main)]">
+                ALS Trades
+              </h1>
 
-
-          {/* BACK BUTTON */}
-          {current.back && (
-            <button
-              onClick={current.back}
-              className="flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--primary)]"
-            >
-              <ArrowLeft size={16} />
-              Back to login
-            </button>
-          )}
-
-          {/* FORM HEADER */}
-          <div className="text-center space-y-1">
-            <h2 className="text-xl font-semibold">
-              {current.title}
-            </h2>
-            {step === "login" && (
               <p className="text-sm text-[var(--text-muted)]">
-                Sign in to continue to your dashboard
+                Secure client access
               </p>
+            </div>
+
+            {/* BACK BUTTON */}
+            {current.back && (
+              <button
+                onClick={current.back}
+                className="flex items-center gap-1 text-sm text-[var(--text-muted)] hover:text-[var(--primary)]"
+              >
+                <ArrowLeft size={16} />
+                Back to login
+              </button>
             )}
-          </div>
 
-          {/* INPUTS */}
-          <div className="space-y-6">
-            {current.fields.map((field) => (
-              <PremiumInput
-                key={field.key}
-                label={field.label}
-                type={field.type}
-                value={form[field.key]}
-                onChange={(v) =>
-                  updateForm(field.key, v)
+            {/* FORM HEADER */}
+            <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] px-4 py-3 text-center space-y-1">
+              <h2 className="text-xl font-semibold text-[var(--text-main)]">
+                {current.title}
+              </h2>
+              {step === "login" && (
+                <p className="text-sm text-[var(--text-muted)]">
+                  Sign in to continue to your dashboard
+                </p>
+              )}
+            </div>
+
+            {/* INPUTS */}
+            <div className="space-y-5">
+              {current.fields.map((field) => (
+                <PremiumInput
+                  key={field.key}
+                  label={field.label}
+                  type={field.type}
+                  value={form[field.key]}
+                  onChange={(v) =>
+                    updateForm(field.key, v)
+                  }
+                  icon={field.icon}
+                />
+              ))}
+            </div>
+
+            {/* ACTION BUTTON */}
+            <button
+              onClick={current.onSubmit}
+              disabled={isSubmitting}
+              className={`w-full rounded-xl py-3.5 font-medium transition text-[var(--text-invert)]
+              ${step === "reset"
+                  ? "bg-emerald-600 hover:opacity-90"
+                  : "bg-[var(--primary)] hover:shadow-[0_0_32px_var(--primary-glow)]"
                 }
-                icon={field.icon}
-              />
-            ))}
+              disabled:opacity-60 disabled:cursor-not-allowed`}
+            >
+              {isSubmitting ? "Please wait..." : current.buttonText}
+            </button>
+
+
+            {/* FOOTER */}
+            {current.footer}
           </div>
-
-          {/* ACTION BUTTON */}
-          <button
-            onClick={current.onSubmit}
-            disabled={login.isPending}
-            className={`w-full rounded-lg py-3 font-medium transition text-[var(--text-main)]
-    ${step === "reset"
-                ? "bg-emerald-500 hover:opacity-90"
-                : "bg-[var(--primary)] hover:shadow-[0_0_30px_var(--primary-glow)]"
-              }
-    disabled:opacity-60 disabled:cursor-not-allowed
-  `}
-          >
-            {login.isPending ? "Signing in..." : current.buttonText}
-          </button>
-
-
-          {/* FOOTER */}
-          {current.footer}
         </div>
       </AuthShell>
 
       {/* SUCCESS TOAST */}
       {toast && (
-        <div className="fixed bottom-4 right-4 rounded-lg bg-[var(--primary)] text-[var(--text-main)] px-4 py-2 shadow-xl">
+        <div className="fixed bottom-4 right-4 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] px-4 py-2 shadow-xl">
           {toast}
         </div>
       )}
