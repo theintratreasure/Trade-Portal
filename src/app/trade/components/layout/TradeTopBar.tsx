@@ -67,8 +67,8 @@ export default function TradeTopBar({
   className={`text-[16px] font-medium ${
     subtitleClassName ?? "text-[var(--text-muted)]"
   }`}
->
-  {subtitle}
+            >
+              {subtitle}
 </span>
 
           )}

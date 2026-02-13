@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, memo, useMemo } from "react";
-import { ArrowDownUp, Calendar, DollarSign, RefreshCw } from "lucide-react";
+import { ArrowDownUp, Calendar, DollarSign } from "lucide-react";
 import { useRef, useEffect } from "react";
 import TopBarSlot from "../components/layout/TopBarSlot";
 import TradeTopBar from "../components/layout/TradeTopBar";
@@ -11,21 +11,13 @@ import { useTradeOrders } from "@/hooks/history/useTradeOrders";
 import { useTradeDeals } from "@/hooks/history/useTradeDeals";
 import HistoryActionSheet from "../components/history/HistoryActionSheet";
 import { useLongPress } from "@/lib/useLongPress";
+import type { HistoryFilterType } from "@/services/trade.service";
 
 
 /* ================= TYPES ================= */
 
 type TabType = "positions" | "orders" | "deals";
-
-type Order = {
-  id: string;
-  symbol: string;
-  type: "buy" | "sell";
-  lot: string;
-  price: string;
-  time: string;
-  status: string;
-};
+type SideFilter = "ALL" | "BUY" | "SELL";
 
 /* ================= TABS ================= */
 const LongPressRow = ({
@@ -119,27 +111,39 @@ const OrdersSummary = memo(
 export default function TradeHistory() {
   const [activeTab, setActiveTab] = useState<TabType>("orders");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [selectedSymbolKey, setSelectedSymbolKey] = useState<string | null>(null);
   const [selectedSymbolLabel, setSelectedSymbolLabel] = useState<string | null>(null);
+  const [symbolsCache, setSymbolsCache] = useState<{ key: string; label: string }[]>([]);
   const [symbolOpen, setSymbolOpen] = useState(false);
-  const [debugLastSelect, setDebugLastSelect] = useState<string | null>(null);
+  const [sideFilter, setSideFilter] = useState<SideFilter>("ALL");
+  const [sideOpen, setSideOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState<HistoryFilterType>("all");
+  const [dateOpen, setDateOpen] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [showSheet, setShowSheet] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [symbolsCache, setSymbolsCache] = useState<
-    { key: string; label: string }[]
-  >([]);
+  const prefetchingSymbolsRef = useRef(false);
 
   const toggleExpand = (id: string) => {
     setExpandedId((prev) => (prev === id ? null : id));
   };
-  const getProfitColor = (value: number) => {
-    if (value < 0) return "text-[var(--mt-red)]";
-    return "text-[var(--mt-blue)]";
-  };
-
   const onTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
   }, []);
+
+  const historyFilters = useMemo(() => {
+    const isCustomRangeReady = dateFilter !== "custom" || (fromDate && toDate);
+    const normalizedSymbol = selectedSymbolLabel
+      ? selectedSymbolLabel.trim().toUpperCase()
+      : null;
+    return {
+      symbol: normalizedSymbol,
+      side: sideFilter === "ALL" ? null : sideFilter,
+      filter: isCustomRangeReady && dateFilter !== "all" ? dateFilter : null,
+      from: dateFilter === "custom" ? fromDate || null : null,
+      to: dateFilter === "custom" ? toDate || null : null,
+    };
+  }, [dateFilter, fromDate, selectedSymbolLabel, sideFilter, toDate]);
 
   const { data: summary } = useTradeSummary();
   const {
@@ -147,7 +151,7 @@ export default function TradeHistory() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useTradePositions();
+  } = useTradePositions(historyFilters);
 
 
   const {
@@ -155,20 +159,14 @@ export default function TradeHistory() {
     fetchNextPage: fetchNextOrders,
     hasNextPage: hasNextOrders,
     isFetchingNextPage: isFetchingOrders,
-  } = useTradeOrders({
-    symbol: selectedSymbolKey ? selectedSymbolLabel ?? undefined : undefined,
-  });
-
-
-  const orderSummaryData =
-    ordersPages?.pages[0]?.summary;
+  } = useTradeOrders(historyFilters);
 
   const {
     data: dealsPages,
     fetchNextPage: fetchNextDeals,
     hasNextPage: hasNextDeals,
     isFetchingNextPage: isFetchingDeals,
-  } = useTradeDeals();
+  } = useTradeDeals(historyFilters);
 
 
 
@@ -181,10 +179,6 @@ export default function TradeHistory() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0].isIntersecting) return;
-
-        // 🔥 IMPORTANT: agar symbol filter laga hua hai
-        // toh next page fetch mat karo
-        if (selectedSymbolKey) return;
 
         if (activeTab === "positions" && hasNextPage) {
           fetchNextPage();
@@ -211,41 +205,8 @@ export default function TradeHistory() {
     fetchNextPage,
     fetchNextOrders,
     fetchNextDeals,
-    selectedSymbolKey,   // 👈 dependency add karna mat bhoolna
   ]);
 
-  useEffect(() => {
-    if (!loadMoreRef.current || activeTab !== "deals") return;
-    if (selectedSymbolKey) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextDeals) {
-          fetchNextDeals();
-        }
-      },
-      { threshold: 1 }
-    );
-
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [activeTab, hasNextDeals, fetchNextDeals, selectedSymbolKey]);
-  useEffect(() => {
-    if (!loadMoreRef.current || activeTab !== "orders") return;
-    if (selectedSymbolKey) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextOrders) {
-          fetchNextOrders();
-        }
-      },
-      { threshold: 1 }
-    );
-
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [activeTab, hasNextOrders, fetchNextOrders, selectedSymbolKey]);
 
   const rawOrders =
     ordersPages?.pages.flatMap((p) => p.orders) || [];
@@ -286,41 +247,19 @@ export default function TradeHistory() {
       .replace(/[^A-Z0-9]/g, "");
   }, []);
 
-  const isSymbolMatch = useCallback(
-    (item: any) => {
-      if (!selectedSymbolKey) return true;
-      const itemKey = toSymbolKey(resolveSymbol(item));
-      if (!itemKey) return false;
-      return (
-        itemKey === selectedSymbolKey ||
-        itemKey.startsWith(selectedSymbolKey) ||
-        itemKey.includes(selectedSymbolKey)
-      );
-    },
-    [resolveSymbol, selectedSymbolKey, toSymbolKey]
-  );
+  const selectedSymbolNormalized = toSymbolKey(selectedSymbolLabel ?? "");
 
   const allPositions = useMemo(() => {
-    return selectedSymbolKey
-      ? rawPositions.filter((p) => isSymbolMatch(p))
-      : rawPositions;
-  }, [rawPositions, selectedSymbolKey, isSymbolMatch]);
+    return rawPositions;
+  }, [rawPositions]);
 
   const allOrders = useMemo(() => {
-    return selectedSymbolKey
-      ? rawOrders.filter(
-        (o) => isSymbolMatch(o)
-      )
-      : rawOrders;
-  }, [rawOrders, selectedSymbolKey, isSymbolMatch]);
+    return rawOrders;
+  }, [rawOrders]);
 
   const allDeals = useMemo(() => {
-    return selectedSymbolKey
-      ? rawDeals.filter(
-        (d) => isSymbolMatch(d)
-      )
-      : rawDeals;
-  }, [rawDeals, selectedSymbolKey, isSymbolMatch]);
+    return rawDeals;
+  }, [rawDeals]);
 
   const allSymbols = useMemo(() => {
     const map = new Map<string, string>();
@@ -337,20 +276,63 @@ export default function TradeHistory() {
     rawDeals.forEach(addSymbol);
 
     return Array.from(map.entries()).map(([key, label]) => ({ key, label }));
-  }, [rawOrders, rawPositions, rawDeals, resolveSymbol, toSymbolKey]);
-
-  const symbolsForDropdown = selectedSymbolKey
-    ? symbolsCache
-    : allSymbols;
+  }, [
+    rawOrders,
+    rawPositions,
+    rawDeals,
+    resolveSymbol,
+    toSymbolKey,
+  ]);
 
   useEffect(() => {
-  if (!selectedSymbolKey && allSymbols.length > 0) {
-    setSymbolsCache(prev => {
-      if (prev.length === allSymbols.length) return prev;
-      return allSymbols;
+    if (allSymbols.length === 0) return;
+    setSymbolsCache((prev) => {
+      const merged = new Map<string, string>(prev.map((s) => [s.key, s.label]));
+      for (const s of allSymbols) merged.set(s.key, s.label);
+      const next = Array.from(merged.entries()).map(([key, label]) => ({ key, label }));
+
+      if (prev.length === next.length) {
+        let same = true;
+        for (let i = 0; i < prev.length; i += 1) {
+          if (prev[i]?.key !== next[i]?.key || prev[i]?.label !== next[i]?.label) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return prev;
+      }
+
+      return next;
     });
-  }
-}, [allSymbols, selectedSymbolKey]);
+  }, [allSymbols]);
+
+  const symbolsForDropdown = symbolsCache.length > 0 ? symbolsCache : allSymbols;
+
+  useEffect(() => {
+    if (!symbolOpen || selectedSymbolLabel) return;
+    if (prefetchingSymbolsRef.current) return;
+
+    prefetchingSymbolsRef.current = true;
+
+    (async () => {
+      try {
+        if (hasNextOrders) await fetchNextOrders();
+        if (hasNextPage) await fetchNextPage();
+        if (hasNextDeals) await fetchNextDeals();
+      } finally {
+        prefetchingSymbolsRef.current = false;
+      }
+    })();
+  }, [
+    symbolOpen,
+    selectedSymbolLabel,
+    hasNextOrders,
+    hasNextPage,
+    hasNextDeals,
+    fetchNextOrders,
+    fetchNextPage,
+    fetchNextDeals,
+  ]);
 
   const positionSummary = summary
     ? [
@@ -363,8 +345,6 @@ export default function TradeHistory() {
     : [];
 
   const symbolOrderSummary = useMemo(() => {
-    if (!selectedSymbolKey) return orderSummaryData || null;
-
     const totalOrders = allOrders.length;
     const totalFilled = allOrders.filter((o: any) =>
       ["FILLED", "CLOSED"].includes(String(o.status).toUpperCase())
@@ -374,17 +354,31 @@ export default function TradeHistory() {
     ).length;
 
     return { totalOrders, totalFilled, totalCancelled };
-  }, [allOrders, orderSummaryData, selectedSymbolKey]);
+  }, [allOrders]);
 
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const symbolDropdownRef = useRef<HTMLDivElement | null>(null);
+  const sideDropdownRef = useRef<HTMLDivElement | null>(null);
+  const dateDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        symbolDropdownRef.current &&
+        !symbolDropdownRef.current.contains(event.target as Node)
       ) {
         setSymbolOpen(false);
+      }
+      if (
+        sideDropdownRef.current &&
+        !sideDropdownRef.current.contains(event.target as Node)
+      ) {
+        setSideOpen(false);
+      }
+      if (
+        dateDropdownRef.current &&
+        !dateDropdownRef.current.contains(event.target as Node)
+      ) {
+        setDateOpen(false);
       }
     };
 
@@ -396,12 +390,19 @@ export default function TradeHistory() {
   useEffect(() => {
     setExpandedId(null);
 
-    // optional: scroll to top
     const container = document.querySelector("[data-history-scroll]");
     if (container) {
       container.scrollTop = 0;
     }
-  }, [selectedSymbolKey]);
+  }, [selectedSymbolLabel, sideFilter, dateFilter, fromDate, toDate, activeTab]);
+
+  const dateFilterLabel = useMemo(() => {
+    if (dateFilter === "all") return "All";
+    if (dateFilter === "today") return "Today";
+    if (dateFilter === "lastweek") return "Last Week";
+    if (dateFilter === "last3month") return "Last 3M";
+    return "Custom";
+  }, [dateFilter]);
 
 
   return (
@@ -413,28 +414,21 @@ export default function TradeHistory() {
           subtitle={selectedSymbolLabel ? selectedSymbolLabel : "All symbols"}
           showMenu
           right={
-            <div className="flex items-center gap-4">
-              <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center gap-3">
+              <div className="relative" ref={symbolDropdownRef}>
                 <button
                   onClick={() => setSymbolOpen((prev) => !prev)}
-                  className="flex items-center gap-1 font-semibold text-[14px] text-[var(--text-main)]"
+                  className="flex items-center gap-1 font-semibold text-[13px] text-[var(--text-main)]"
                 >
                   <DollarSign size={16} />
-                  <span className="text-[12px] uppercase">
-                    {selectedSymbolLabel ? selectedSymbolLabel : "ALL"}
-                  </span>
-
+                 
                 </button>
 
                 {symbolOpen && (
-                  <div className="absolute right-0 mt-2 w-22 bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md shadow-lg z-50 animate-dropdown">
-
-                    {/* ALL OPTION */}
+                  <div className="absolute right-0 mt-2 w-28 bg-[var(--bg-plan)] md:bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md shadow-lg z-50 animate-dropdown max-h-72 overflow-y-auto">
                     <div
                       onClick={() => {
-                        setSelectedSymbolKey(null);
                         setSelectedSymbolLabel(null);
-                        setDebugLastSelect("ALL | null");
                         setSymbolOpen(false);
                       }}
                       className="px-3 py-2 cursor-pointer hover:bg-[var(--bg-glass)] text-[13px]"
@@ -446,14 +440,12 @@ export default function TradeHistory() {
                       <div
                         key={sym.key}
                         onClick={() => {
-                          setSelectedSymbolKey(sym.key || null);
                           setSelectedSymbolLabel(sym.label);
-                          setDebugLastSelect(`${sym.label} | ${sym.key || "null"}`);
                           setSymbolOpen(false);
                         }}
-                        className={`px-3 py-2 cursor-pointer hover:bg-[var(--bg-glass)] text-[13px] ${selectedSymbolKey === sym.key
-                            ? "text-[var(--mt-blue)] font-semibold"
-                            : ""
+                        className={`px-3 py-2 cursor-pointer hover:bg-[var(--bg-glass)] text-[13px] ${selectedSymbolNormalized === sym.key
+                          ? "text-[var(--mt-blue)] font-semibold"
+                          : ""
                           }`}
                       >
                         {sym.label}
@@ -464,17 +456,100 @@ export default function TradeHistory() {
                 )}
               </div>
 
-              <ArrowDownUp size={18} />
-              <Calendar size={18} />
+              <div className="relative" ref={sideDropdownRef}>
+                <button
+                  onClick={() => setSideOpen((prev) => !prev)}
+                  className="flex items-center gap-1 font-semibold text-[13px] text-[var(--text-main)]"
+                >
+                  <ArrowDownUp size={16} />
+                </button>
+                {sideOpen && (
+                  <div className="absolute right-0 mt-2 w-24 bg-[var(--bg-plan)] md:bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md shadow-lg z-50 animate-dropdown">
+                    {(["ALL", "BUY", "SELL"] as SideFilter[]).map((option) => (
+                      <div
+                        key={option}
+                        onClick={() => {
+                          setSideFilter(option);
+                          setSideOpen(false);
+                        }}
+                        className={`px-3 py-2 cursor-pointer hover:bg-[var(--bg-glass)] text-[13px] ${sideFilter === option ? "text-[var(--mt-blue)] font-semibold" : ""}`}
+                      >
+                        {option}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={dateDropdownRef}>
+                <button
+                  onClick={() => setDateOpen((prev) => !prev)}
+                  className="flex items-center gap-1 font-semibold text-[13px] text-[var(--text-main)]"
+                >
+                  <Calendar size={16} />
+                </button>
+                {dateOpen && (
+                  <div className="absolute right-0 mt-2 w-52 bg-[var(--bg-plan)] md:bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md shadow-lg z-50 animate-dropdown p-2 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        className={`px-2 py-1 text-xs rounded border border-[var(--border-soft)] ${dateFilter === "all" ? "text-[var(--mt-blue)]" : ""}`}
+                        onClick={() => setDateFilter("all")}
+                      >
+                        All
+                      </button>
+                      <button
+                        className={`px-2 py-1 text-xs rounded border border-[var(--border-soft)] ${dateFilter === "today" ? "text-[var(--mt-blue)]" : ""}`}
+                        onClick={() => setDateFilter("today")}
+                      >
+                        Today
+                      </button>
+                      <button
+                        className={`px-2 py-1 text-xs rounded border border-[var(--border-soft)] ${dateFilter === "lastweek" ? "text-[var(--mt-blue)]" : ""}`}
+                        onClick={() => setDateFilter("lastweek")}
+                      >
+                        Last Week
+                      </button>
+                      <button
+                        className={`px-2 py-1 text-xs rounded border border-[var(--border-soft)] ${dateFilter === "last3month" ? "text-[var(--mt-blue)]" : ""}`}
+                        onClick={() => setDateFilter("last3month")}
+                      >
+                        Last 3 Month
+                      </button>
+                      <button
+                        className={`px-2 py-1 text-xs rounded border border-[var(--border-soft)] ${dateFilter === "custom" ? "text-[var(--mt-blue)]" : ""}`}
+                        onClick={() => setDateFilter("custom")}
+                      >
+                        Custom
+                      </button>
+                    </div>
+                    {dateFilter === "custom" && (
+                      <div className="space-y-2">
+                        <input
+                          type="date"
+                          value={fromDate}
+                          onChange={(e) => setFromDate(e.target.value)}
+                          className="w-full bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded px-2 py-1 text-xs"
+                        />
+                        <input
+                          type="date"
+                          value={toDate}
+                          onChange={(e) => setToDate(e.target.value)}
+                          className="w-full bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded px-2 py-1 text-xs"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           }
         />
       </TopBarSlot>
 
       {/* BODY */}
-      <div data-history-scroll className="px-2 md:px-4 pt-1 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)]  h-[calc(100vh-60px)] overflow-y-auto pb-7">
+      <div data-history-scroll className="px-2 md:px-5 pt-1 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100vh-60px)] overflow-y-auto pb-7 md:pb-10">
         {/* DEBUG PANEL */}
-      
+
         <HistoryTabs activeTab={activeTab} onChange={onTabChange} />
 
         <div className="transition-opacity duration-200">
@@ -504,7 +579,6 @@ export default function TradeHistory() {
 
               {/* ORDERS LIST */}
               {allOrders.map((order: any) => {
-                if (selectedSymbolKey && !isSymbolMatch(order)) return null;
                 const isBuy = order.side === "BUY";
 
                 return (
@@ -519,9 +593,9 @@ export default function TradeHistory() {
                     <div
                       onClick={() => toggleExpand(order.orderId)}
                       className={`
-    py-1 cursor-pointer active:bg-white/5
+    py-1 cursor-pointer active:bg-white/5 md:py-2 md:px-3 md:rounded-md md:bg-[var(--bg-plan)] md:mb-2
     ${expandedId !== order.orderId
-                          ? "border-b border-[var(--border-grey)]"
+                          ? "border-b border-[var(--border-grey)] md:border-[var(--border-soft)]"
                           : ""}
   `}>
                       <div className="flex justify-between">
@@ -558,7 +632,7 @@ export default function TradeHistory() {
                     </div>
 
                     {expandedId === order.orderId && (
-                      <div className="pb-3 text-[12px] mt-price-line border-b border-[var(--border-grey)] space-y-1 animate-fadeIn grid grid-cols-1 ">
+                      <div className="pb-3 text-[12px] mt-price-line border-b border-[var(--border-grey)] md:border-[var(--border-soft)] md:px-3 md:rounded-b-md md:bg-[var(--bg-plan)] space-y-1 animate-fadeIn grid grid-cols-1 ">
 
                         <div className="w-50">#{order.orderId.slice(0, 10)}</div>
 
@@ -651,8 +725,6 @@ export default function TradeHistory() {
 
               {/* POSITIONS LIST */}
               {allPositions.map((pos: any) => {
-                if (selectedSymbolKey && !isSymbolMatch(pos)) return null;
-
                 return (
                   <LongPressRow
                     key={pos.orderId}
@@ -665,9 +737,9 @@ export default function TradeHistory() {
                     <div
                       onClick={() => toggleExpand(pos.orderId)}
                       className={`
-    py-1 cursor-pointer active:bg-white/5
+    py-1 cursor-pointer active:bg-white/5 md:py-2 md:px-3 md:rounded-md md:bg-[var(--bg-plan)] md:mb-2
     ${expandedId !== pos.orderId
-                          ? "border-b border-[var(--border-grey)]"
+                          ? "border-b border-[var(--border-grey)] md:border-[var(--border-soft)]"
                           : ""}
   `}
                     >
@@ -717,7 +789,7 @@ export default function TradeHistory() {
 
                     {/* EXPANDED DETAILS */}
                     {expandedId === pos.orderId && (
-                      <div className="pb-3 border-b border-[var(--border-grey)] animate-fadeIn">
+                      <div className="pb-3 border-b border-[var(--border-grey)] md:border-[var(--border-soft)] md:px-3 md:rounded-b-md md:bg-[var(--bg-plan)] animate-fadeIn">
                         <div className="text-[12px] mt-price-line mt-font space-y-1 grid grid-cols-2">
 
                           <div className="mr-2">#{pos.orderId.slice(0, 10)}</div>
@@ -807,7 +879,6 @@ export default function TradeHistory() {
 
               {/* DEALS LIST */}
               {allDeals.map((deal: any) => {
-                if (selectedSymbolKey && !isSymbolMatch(deal)) return null;
                 const isBuy = deal.type.includes("BUY");
                 const pnlColor =
                   deal.pnl < 0
@@ -825,9 +896,9 @@ export default function TradeHistory() {
                     <div
                       onClick={() => toggleExpand(deal.tradeId + deal.date)}
                       className={`
-    py-1 cursor-pointer active:bg-white/5
+    py-1 cursor-pointer active:bg-white/5 md:py-2 md:px-3 md:rounded-md md:bg-[var(--bg-plan)] md:mb-2
     ${expandedId !== deal.tradeId + deal.date
-                          ? "border-b border-[var(--border-grey)]"
+                          ? "border-b border-[var(--border-grey)] md:border-[var(--border-soft)]"
                           : ""}
   `}
                     >
@@ -879,7 +950,7 @@ export default function TradeHistory() {
                     </div>
 
                     {expandedId === deal.tradeId + deal.date && (
-                      <div className=" pb-3 text-[12px] mt-price-line space-y-1 animate-fadeIn grid grid-cols-2 border-b border-[var(--border-grey)]">
+                      <div className=" pb-3 text-[12px] mt-price-line space-y-1 animate-fadeIn grid grid-cols-2 border-b border-[var(--border-grey)] md:border-[var(--border-soft)] md:px-3 md:rounded-b-md md:bg-[var(--bg-plan)]">
 
                         <div className="flex justify-between mr-2">
                           <span>Deal:</span>

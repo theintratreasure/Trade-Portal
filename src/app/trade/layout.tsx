@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { TradeSidebarProvider } from "./components/layout/TradeSidebarContext";
 import TradeBottomNav from "./components/layout/TradeBottomNav";
 import TradeSidebar from "./components/layout/TradeSidebar";
@@ -36,50 +36,51 @@ function TradeLayoutInner({
 }) {
     const { quotesOpen } = useTradeDesktop();
     const { data: account } = useTradeAccount();// comes from global state
+    const [isDesktop, setIsDesktop] = useState<boolean>(false);
+
+    useEffect(() => {
+        const mq = window.matchMedia("(min-width: 768px)");
+        const apply = () => setIsDesktop(mq.matches);
+        apply();
+        mq.addEventListener("change", apply);
+        return () => mq.removeEventListener("change", apply);
+    }, []);
 
     return (
         <div className="min-h-screen mt-font mt-numbers bg-[var(--bg-plan)] md:bg-[var(--bg-card)]">
+            {!isDesktop ? (
+                <div className="flex flex-col min-h-screen">
+                    <div id="trade-topbar-slot" />
 
-            {/* ============ MOBILE / TABLET ============ */}
-            <div className="md:hidden flex flex-col min-h-screen">
-                <div id="trade-topbar-slot" />
+                    <main className="flex-1 overflow-y-auto pb-[64px] mt-14">
+                        {children}
+                    </main>
 
-                <main className="flex-1 overflow-y-auto pb-[64px] md:pb-0 mt-14">
-                    {children}
-                </main>
+                    <TradeBottomNav />
+                    <TradeSidebar />
+                </div>
+            ) : (
+                <div className="flex h-screen w-full overflow-hidden bg-[var(--bg-plan)]">
+                    <div className="w-[68px] shrink-0 border-r border-[var(--border-soft)]">
+                        <TradeDesktopSidebar />
+                    </div>
 
-                <TradeBottomNav />
+                    <div
+                        className={`
+                          transition-all duration-300 ease-in-out
+                          ${quotesOpen ? "w-[340px]" : "w-0"}
+                          shrink-0 overflow-hidden
+                          ${quotesOpen ? "border-r border-[var(--border-soft)]" : ""}
+                        `}
+                    >
+                        {quotesOpen && <TradeQuotesPanel />}
+                    </div>
 
-                <TradeSidebar />
-
-            </div>
-
-            {/* ============ DESKTOP ============ */}
-<div className="hidden md:flex h-screen w-full overflow-hidden bg-[var(--bg-plan)]">
-
-  {/* Sidebar */}
-  <div className="w-[68px] shrink-0 border-r border-[var(--border-soft)]">
-    <TradeDesktopSidebar />
-  </div>
-
-  {/* Quotes Panel */}
-  <div
-    className={`
-      transition-all duration-300 ease-in-out
-      ${quotesOpen ? "w-[340px]" : "w-0"}
-      shrink-0 overflow-hidden
-      ${quotesOpen ? "border-r border-[var(--border-soft)]" : ""}
-    `}
-  >
-    {quotesOpen && <TradeQuotesPanel />}
-  </div>
-
-  {/* Main Content */}
-  <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg-card)]">
-    {children}
-  </main>
-
-</div>
+                    <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg-card)]">
+                        {children}
+                    </main>
+                </div>
+            )}
 
         </div>
     );
