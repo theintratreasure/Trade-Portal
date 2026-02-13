@@ -252,10 +252,10 @@ export default function TradePage() {
                 />
             </TopBarSlot>
 
-            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100vh-3.5rem)] md:h-full overflow-y-auto">
+            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100vh-3.5rem)] md:h-full overflow-y-auto pb-5 mb-5">
 
                 {/* ================= MOBILE (UNCHANGED) ================= */}
-                <div className="md:hidden pb-6">
+                <div className="md:hidden pb-6 mb-5">
 
                     <div className="space-y-[6px] ">
                         {accountStats.map((row) => (
@@ -343,7 +343,7 @@ export default function TradePage() {
                 </div>
 
                 {/* ================= DESKTOP ================= */}
-                <div className="hidden md:block pt-4">
+                <div className="hidden md:block pt-4 mb-5">
 
                     <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
                         {/* ===== ACCOUNT SUMMARY ===== */}

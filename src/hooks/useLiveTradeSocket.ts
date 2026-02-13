@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import tradeApi from "@/api/tradeApi";
 
-const LIVE_SOCKET_FLUSH_INTERVAL_MS = 90;
+const LIVE_SOCKET_FLUSH_INTERVAL_MS = 40;
 const LIVE_SOCKET_IDLE_CLOSE_MS = 15000;
 const LIVE_SOCKET_RECONNECT_MAX_MS = 5000;
+const LIVE_RECONCILE_INTERVAL_MS = 3000;
 
 type LiveAccount = {
   balance: number;
@@ -68,7 +70,17 @@ const shared = {
   account: null as LiveAccount | null,
   positionsMap: {} as Record<string, LivePosition>,
   pendingMap: {} as Record<string, LivePending>,
+  reconcileTimer: null as number | null,
+  reconcileInFlight: false,
 };
+
+export function removeLivePositionFromCache(positionId: string) {
+  if (!positionId) return;
+  if (shared.positionsMap[positionId]) {
+    delete shared.positionsMap[positionId];
+    scheduleEmit();
+  }
+}
 
 const toNumberOrUndefined = (value: unknown): number | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
@@ -98,6 +110,126 @@ function normalizePendingOrder(data: unknown): LivePending | null {
     currentPrice: toNumberOrUndefined(currentPriceRaw),
     status: String(statusRaw ?? "PENDING"),
   };
+}
+
+function normalizePosition(data: unknown): LivePosition | null {
+  if (!data || typeof data !== "object") return null;
+  const row = data as Record<string, unknown>;
+  const id = row.positionId ?? row.id ?? row._id;
+  if (!id) return null;
+
+  return {
+    accountId: String(row.accountId ?? ""),
+    positionId: String(id),
+    symbol: String(row.symbol ?? row.pair ?? row.instrument ?? "-"),
+    side: String(row.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
+    volume: Number(row.volume ?? row.lot ?? 0),
+    openPrice: Number(row.openPrice ?? row.entryPrice ?? row.price ?? 0),
+    currentPrice: Number(row.currentPrice ?? row.current_price ?? row.ltp ?? row.lastPrice ?? 0),
+    floatingPnL: Number(row.floatingPnL ?? row.pnl ?? row.profit ?? 0),
+    stopLoss: (row.stopLoss ?? row.stop_loss ?? null) as number | null,
+    takeProfit: (row.takeProfit ?? row.take_profit ?? null) as number | null,
+    swap: Number(row.swap ?? 0),
+    commission: Number(row.commission ?? 0),
+    openTime: row.openTime ? String(row.openTime) : undefined,
+  };
+}
+
+function isPendingActive(status: unknown): boolean {
+  const s = String(status ?? "PENDING").toUpperCase();
+  return s === "PENDING" || s === "PLACED" || s === "OPEN";
+}
+
+function isPositionActive(status: unknown): boolean {
+  const s = String(status ?? "OPEN").toUpperCase();
+  return !(s === "CLOSED" || s === "CLOSE" || s === "DELETED");
+}
+
+function hasPositionClosedMarkers(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const row = data as Record<string, unknown>;
+  const status = String(
+    row.status ?? row.state ?? row.positionStatus ?? row.position_status ?? ""
+  ).toUpperCase();
+  if (status && !isPositionActive(status)) return true;
+
+  if (row.isClosed === true) return true;
+  if (row.closed === true) return true;
+  if (row.closeTime || row.close_time || row.closedAt || row.closed_at) return true;
+  if (String(row.action ?? "").toUpperCase() === "CLOSE") return true;
+  return false;
+}
+
+function parsePositionsFromUnknown(data: unknown): LivePosition[] {
+  if (Array.isArray(data)) {
+    return data
+      .map((item) => normalizePosition(item))
+      .filter((item): item is LivePosition => Boolean(item));
+  }
+  if (!data || typeof data !== "object") return [];
+  const row = data as Record<string, unknown>;
+  const candidates = [
+    row.positions,
+    row.openPositions,
+    row.open_positions,
+    row.livePositions,
+    row.live_positions,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate
+        .map((item) => normalizePosition(item))
+        .filter((item): item is LivePosition => Boolean(item));
+    }
+  }
+  return [];
+}
+
+function parsePendingsFromUnknown(data: unknown): LivePending[] {
+  if (Array.isArray(data)) {
+    return data
+      .map((item) => normalizePendingOrder(item))
+      .filter((item): item is LivePending => Boolean(item));
+  }
+  if (!data || typeof data !== "object") return [];
+  const row = data as Record<string, unknown>;
+  const candidates = [
+    row.pending,
+    row.pendings,
+    row.pendingOrders,
+    row.pending_orders,
+    row.orders,
+    row.liveOrders,
+    row.live_orders,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate
+        .map((item) => normalizePendingOrder(item))
+        .filter((item): item is LivePending => Boolean(item));
+    }
+  }
+  return [];
+}
+
+function applyPositionSnapshot(items: LivePosition[]) {
+  const next: Record<string, LivePosition> = {};
+  for (const item of items) {
+    next[item.positionId] = item;
+  }
+  shared.positionsMap = next;
+  scheduleEmit();
+}
+
+function applyPendingSnapshot(items: LivePending[]) {
+  const next: Record<string, LivePending> = {};
+  for (const item of items) {
+    if (isPendingActive(item.status)) {
+      next[item.orderId] = item;
+    }
+  }
+  shared.pendingMap = next;
+  scheduleEmit();
 }
 
 function snapshot(): Snapshot {
@@ -130,6 +262,10 @@ function clearTimers() {
     window.clearTimeout(shared.idleCloseTimer);
     shared.idleCloseTimer = null;
   }
+  if (shared.reconcileTimer) {
+    window.clearInterval(shared.reconcileTimer);
+    shared.reconcileTimer = null;
+  }
 }
 
 function closeSocket() {
@@ -160,6 +296,43 @@ function scheduleReconnect() {
   }, delay);
 }
 
+async function reconcileFromRest() {
+  if (!shared.accountId || shared.reconcileInFlight || shared.listeners.size === 0) return;
+  shared.reconcileInFlight = true;
+  try {
+    const { data } = await tradeApi.get("/trade/positions", {
+      params: { page: 1, limit: 200 },
+    });
+    const rows = Array.isArray(data?.positions)
+      ? data.positions
+      : Array.isArray(data?.data?.positions)
+      ? data.data.positions
+      : [];
+
+    if (!Array.isArray(rows)) return;
+    const next: Record<string, LivePosition> = {};
+    for (const row of rows) {
+      const pos = normalizePosition(row);
+      if (!pos) continue;
+      next[pos.positionId] = pos;
+    }
+    shared.positionsMap = next;
+    scheduleEmit();
+  } catch {
+    // ignore reconcile errors; websocket remains primary source
+  } finally {
+    shared.reconcileInFlight = false;
+  }
+}
+
+function ensureReconcileLoop() {
+  if (shared.reconcileTimer) return;
+  shared.reconcileTimer = window.setInterval(() => {
+    void reconcileFromRest();
+  }, LIVE_RECONCILE_INTERVAL_MS);
+  void reconcileFromRest();
+}
+
 function bindSocket(socket: WebSocket, accountId: string) {
   socket.onopen = () => {
     shared.reconnectAttempts = 0;
@@ -174,25 +347,142 @@ function bindSocket(socket: WebSocket, accountId: string) {
   socket.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data) as SocketMessage;
+      const messageType = String(message.type ?? "").toLowerCase();
+      const payload =
+        message.data && typeof message.data === "object"
+          ? (message.data as Record<string, unknown>)
+          : null;
+
+      // Defensive close handling: if any message carries positionId + close marker,
+      // remove immediately even when backend uses an unexpected message type.
+      if (payload && payload.positionId) {
+        const pid = String(payload.positionId);
+        const likelyCloseEvent = messageType.includes("close") || messageType.includes("closed");
+        if (likelyCloseEvent || hasPositionClosedMarkers(payload)) {
+          delete shared.positionsMap[pid];
+          scheduleEmit();
+          return;
+        }
+      }
 
       if (message.type === "live_account" && message.data && typeof message.data === "object") {
+        shared.account = message.data as LiveAccount;
+        const positions = parsePositionsFromUnknown(message.data);
+        if (positions.length > 0) {
+          applyPositionSnapshot(positions);
+        }
+        const pendings = parsePendingsFromUnknown(message.data);
+        if (pendings.length > 0) {
+          applyPendingSnapshot(pendings);
+        }
+        scheduleEmit();
+        return;
+      }
+
+      // Generic snapshots fallback for unknown message types.
+      if (payload) {
+        const positions = parsePositionsFromUnknown(payload);
+        if (positions.length > 0) {
+          applyPositionSnapshot(positions);
+          return;
+        }
+        const pendings = parsePendingsFromUnknown(payload);
+        if (pendings.length > 0) {
+          applyPendingSnapshot(pendings);
+          return;
+        }
+      }
+
+      if (
+        (message.type === "live_accounts" || message.type === "account_snapshot") &&
+        message.data &&
+        typeof message.data === "object"
+      ) {
         shared.account = message.data as LiveAccount;
         scheduleEmit();
         return;
       }
 
       if (message.type === "live_position" && message.data && typeof message.data === "object") {
-        const row = message.data as LivePosition;
-        if (!row.positionId) return;
+        const row = normalizePosition(message.data);
+        if (!row || hasPositionClosedMarkers(message.data)) {
+          const id = (message.data as Record<string, unknown>)?.positionId;
+          if (id) delete shared.positionsMap[String(id)];
+          scheduleEmit();
+          return;
+        }
         shared.positionsMap[row.positionId] = row;
         scheduleEmit();
+        return;
+      }
+
+      if (
+        (message.type === "position_closed" ||
+          message.type === "live_position_closed" ||
+          message.type === "close_position") &&
+        message.data &&
+        typeof message.data === "object"
+      ) {
+        const id = (message.data as Record<string, unknown>)?.positionId;
+        if (id) {
+          delete shared.positionsMap[String(id)];
+          scheduleEmit();
+        }
+        return;
+      }
+
+      if (
+        (message.type === "live_positions" || message.type === "positions_snapshot") &&
+        message.data
+      ) {
+        const positions = parsePositionsFromUnknown(message.data);
+        applyPositionSnapshot(positions);
         return;
       }
 
       if (message.type === "live_pending") {
         const pending = normalizePendingOrder(message.data);
         if (!pending) return;
+        if (!isPendingActive(pending.status)) {
+          delete shared.pendingMap[pending.orderId];
+          scheduleEmit();
+          return;
+        }
         shared.pendingMap[pending.orderId] = pending;
+        scheduleEmit();
+        return;
+      }
+
+      if (
+        (message.type === "live_pendings" ||
+          message.type === "pending_snapshot" ||
+          message.type === "live_orders") &&
+        message.data
+      ) {
+        const pendings = parsePendingsFromUnknown(message.data);
+        applyPendingSnapshot(pendings);
+        return;
+      }
+
+      if (
+        message.type === "account_snapshot" &&
+        message.data &&
+        typeof message.data === "object"
+      ) {
+        const row = message.data as Record<string, unknown>;
+        if (row.account && typeof row.account === "object") {
+          shared.account = row.account as LiveAccount;
+        } else {
+          shared.account = message.data as LiveAccount;
+        }
+        const positions = parsePositionsFromUnknown(message.data);
+        if (positions.length > 0) {
+          applyPositionSnapshot(positions);
+        }
+        const pendings = parsePendingsFromUnknown(message.data);
+        if (pendings.length > 0) {
+          applyPendingSnapshot(pendings);
+        }
         scheduleEmit();
       }
     } catch (error) {
@@ -249,6 +539,7 @@ function ensureConnected(accountId: string) {
   const socket = new WebSocket(`${base}/account`);
   shared.socket = socket;
   bindSocket(socket, accountId);
+  ensureReconcileLoop();
 }
 
 function subscribe(listener: Listener) {

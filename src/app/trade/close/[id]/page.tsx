@@ -8,7 +8,7 @@ import TopBarSlot from "../../components/layout/TopBarSlot";
 import TradeTopBar from "../../components/layout/TradeTopBar";
 import LiveChart from "../../components/new-order/chart";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
-import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
+import { removeLivePositionFromCache, useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
 import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import { getTradeTokenFromStorageSync, splitPrice } from "../../components/function/splitPrice";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
@@ -63,6 +63,7 @@ export default function ClosePositionPage() {
       { positionId: id },
       {
         onSuccess: (res) => {
+          removeLivePositionFromCache(id);
           setToast({
             type: "success",
             message: `Position closed (${res.data.realizedPnL})`,
