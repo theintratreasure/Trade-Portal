@@ -14,7 +14,7 @@ import {
   saveTradeAccount,
   setDefaultRememberedTradeLogin,
 } from "@/lib/tradeLoginAccounts";
-import { setTradeTokenCookie } from "@/lib/tradeToken";
+import { setClientCookie, setTradeTokenCookie } from "@/lib/tradeToken";
 
 export default function TradeLogin() {
   const router = useRouter();
@@ -63,8 +63,12 @@ export default function TradeLogin() {
             const { tradeToken, accountId } = res;
 
             setTradeTokenCookie(tradeToken, 43200);
-            document.cookie = `sessionType=${res.sessionType}; path=/; max-age=43200`;
-            document.cookie = `accountId=${accountId}; path=/; max-age=43200`;
+            setClientCookie("sessionType", String(res.sessionType), 43200);
+            setClientCookie("accountId", String(accountId), 43200);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("tradeAccountId", String(accountId));
+              window.dispatchEvent(new Event("trade-account-change"));
+            }
 
             if (typeof window !== "undefined") {
               if (savePassword) {

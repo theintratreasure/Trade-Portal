@@ -22,7 +22,7 @@ import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { useLanguage } from "../components/LanguageProvider";
 import { translations } from "@/types/translations";
-import { clearTradeTokenCookie } from "@/lib/tradeToken";
+import { clearClientCookie, clearTradeTokenCookie } from "@/lib/tradeToken";
 
 export default function TradeSettingsPage() {
   const router = useRouter();
@@ -41,8 +41,12 @@ const t = translations[language];
 
   const handleLogout = () => {
     clearTradeTokenCookie();
-    document.cookie = "accountId=; path=/; max-age=0";
-    document.cookie = "sessionType=; path=/; max-age=0";
+    clearClientCookie("accountId");
+    clearClientCookie("sessionType");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("tradeAccountId");
+      window.dispatchEvent(new Event("trade-account-change"));
+    }
 
     window.location.href = "/trade-login";
   };

@@ -6,6 +6,21 @@ function safeDecode(value: string): string {
   }
 }
 
+function shouldUseSecureCookie(): boolean {
+  return typeof window !== "undefined" && window.location.protocol === "https:";
+}
+
+export function setClientCookie(name: string, value: string, maxAgeSeconds: number) {
+  if (typeof document === "undefined") return;
+  const secure = shouldUseSecureCookie() ? "; secure" : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSeconds}; samesite=lax${secure}`;
+}
+
+export function clearClientCookie(name: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=; path=/; max-age=0; samesite=lax`;
+}
+
 export function getCookieValue(name: string): string | null {
   if (typeof document === "undefined") return null;
 
@@ -41,10 +56,7 @@ export function getTradeTokenFromStorageSync(): string {
 
 export function setTradeTokenCookie(token: string, maxAgeSeconds = 43200) {
   if (typeof document === "undefined") return;
-
-  const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
-  const secure = isHttps ? "; secure" : "";
-  document.cookie = `tradeToken=${encodeURIComponent(token)}; path=/; max-age=${maxAgeSeconds}; samesite=lax${secure}`;
+  setClientCookie("tradeToken", token, maxAgeSeconds);
   if (typeof window !== "undefined") {
     localStorage.setItem("tradeToken", token);
   }
@@ -56,7 +68,7 @@ export function setTradeTokenCookie(token: string, maxAgeSeconds = 43200) {
 
 export function clearTradeTokenCookie() {
   if (typeof document === "undefined") return;
-  document.cookie = "tradeToken=; path=/; max-age=0; samesite=lax";
+  clearClientCookie("tradeToken");
   if (typeof window !== "undefined") {
     localStorage.removeItem("tradeToken");
     window.dispatchEvent(new Event("trade-token-change"));
