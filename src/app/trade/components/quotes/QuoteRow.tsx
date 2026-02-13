@@ -30,9 +30,9 @@ type SplitPrice = {
 function splitPrice(price?: string): SplitPrice {
   if (!price || isNaN(Number(price))) {
     return {
-      int: "0",
+      int: "--",
       normal: "",
-      big: "00",
+      big: "--",
     };
   }
 
@@ -72,6 +72,9 @@ function splitPrice(price?: string): SplitPrice {
 }
 
 function decimalDiff(bid: string, ask: string): string {
+  if (!Number.isFinite(Number(bid)) || !Number.isFinite(Number(ask))) {
+    return "---";
+  }
   const bidDec = bid.split(".")[1] ?? "0";
   const askDec = ask.split(".")[1] ?? "0";
 

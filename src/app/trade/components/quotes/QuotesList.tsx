@@ -40,7 +40,15 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
     () =>
       Object.values(liveQuotes).filter(
         (q): q is QuoteLiveState =>
-          Boolean(q && typeof q.symbol === "string" && q.symbol.length > 0)
+          Boolean(
+            q &&
+              typeof q.symbol === "string" &&
+              q.symbol.length > 0 &&
+              Number.isFinite(Number(q.bid)) &&
+              Number.isFinite(Number(q.ask)) &&
+              Number(q.bid) > 0 &&
+              Number(q.ask) > 0
+          )
       ),
     [liveQuotes]
   );

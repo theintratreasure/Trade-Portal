@@ -1,8 +1,9 @@
 import axios from "axios";
 import { clearTradeTokenCookie, getTradeTokenFromStorageSync } from "@/lib/tradeToken";
+import { normalizeApiBaseUrl } from "./baseUrl";
 
 const tradeApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_URL),
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

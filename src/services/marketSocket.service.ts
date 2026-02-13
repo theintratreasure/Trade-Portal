@@ -7,6 +7,7 @@ export class MarketSocket {
   private reconnectAttempts = 0;
   private onMessageCb: ((m: any) => void) | null = null;
   private tokenInUrl: string | null = null;
+  private shouldReconnect = false;
 
   constructor() {
     this.urlBase = process.env.NEXT_PUBLIC_SOKETAPIBASE_URL || "";
@@ -15,6 +16,7 @@ export class MarketSocket {
   connect(token: string, onMessage: (msg: any) => void) {
     this.onMessageCb = onMessage;
     this.tokenInUrl = token;
+    this.shouldReconnect = true;
 
     // close existing socket first (safe)
     if (this.socket) {
@@ -57,7 +59,9 @@ export class MarketSocket {
 
     this.socket.onclose = (ev) => {
       console.warn("[MarketSocket] closed", ev);
-      this.scheduleReconnect();
+      if (this.shouldReconnect) {
+        this.scheduleReconnect();
+      }
     };
 
     this.socket.onerror = (ev) => {
@@ -109,6 +113,7 @@ export class MarketSocket {
   }
 
   close() {
+    this.shouldReconnect = false;
     if (this.reconnectTimer) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
