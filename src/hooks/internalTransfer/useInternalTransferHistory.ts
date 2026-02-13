@@ -9,6 +9,10 @@ export const useInternalTransferHistory = (
     queryKey: ["internal-transfer-history", page, limit],
     queryFn: () =>
       internalTransferService.getTransferHistory({ page, limit }),
-    staleTime: 1000 * 30, // 30 seconds cache
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 15,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: (previousData) => previousData,
   });
 };

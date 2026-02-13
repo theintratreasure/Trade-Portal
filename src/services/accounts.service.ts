@@ -44,7 +44,6 @@ export const createAccount = async (payload: {
 /* My accounts */
 export const getMyAccounts = async (): Promise<Account[]> => {
   const res = await api.get("/accounts");
-  console.log("acc" , res.data.data)
   return res.data.data;
 };
 

@@ -86,20 +86,17 @@ export default function InternalFundTransfer() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-6">
-        <GlobalLoader />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[var(--bg-main)] p-4 md:p-6 space-y-6">
 
       <h1 className="text-2xl font-semibold">
         Internal Fund Transfer
       </h1>
+      {isLoading && (
+        <div className="text-xs text-[var(--text-muted)]">
+          Loading accounts...
+        </div>
+      )}
 
       {/* TRANSFER CARD */}
       <div className="card p-6 rounded-2xl space-y-6">
@@ -132,6 +129,7 @@ export default function InternalFundTransfer() {
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Enter amount"
               className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card)] px-4 py-3 text-sm"
+              disabled={isLoading}
             />
           </div>
         </div>
@@ -156,7 +154,7 @@ export default function InternalFundTransfer() {
         <div className="flex justify-end">
           <button
             onClick={handleTransfer}
-            disabled={isPending}
+            disabled={isPending || isLoading}
             className="px-6 py-3 rounded-xl text-sm font-medium bg-[var(--primary)] text-[var(--text-invert)] transition hover:opacity-90 disabled:opacity-50"
           >
             {isPending ? "Processing..." : "Transfer Funds"}
