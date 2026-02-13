@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import tradeApi from "@/api/tradeApi";
+import { buildSocketUrl } from "@/lib/socketUrl";
 
 const LIVE_SOCKET_FLUSH_INTERVAL_MS = 40;
 const LIVE_SOCKET_IDLE_CLOSE_MS = 15000;
@@ -535,8 +536,19 @@ function ensureConnected(accountId: string) {
     shared.socket = null;
   }
 
-  const base = process.env.NEXT_PUBLIC_SOKETAPIBASE_URL || "";
-  const socket = new WebSocket(`${base}/account`);
+  const socketUrl = buildSocketUrl("/account");
+  if (!socketUrl) {
+    scheduleReconnect();
+    return;
+  }
+
+  let socket: WebSocket;
+  try {
+    socket = new WebSocket(socketUrl);
+  } catch {
+    scheduleReconnect();
+    return;
+  }
   shared.socket = socket;
   bindSocket(socket, accountId);
   ensureReconcileLoop();

@@ -203,7 +203,7 @@ export default function TradePage() {
             to: pos.currentPrice?.toFixed(2) ?? "-",
             profit: pos.floatingPnL ?? 0,
             openTime: pos.openTime
-                ? new Date(Number(pos.openTime)).toLocaleString()
+                ? new Date(pos.openTime).toLocaleString()
                 : "-",
 
             swap: pos.swap?.toFixed(2) ?? "0.00",

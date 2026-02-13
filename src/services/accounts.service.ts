@@ -61,5 +61,5 @@ export const resetDemoAccount = async (id: string) => {
 
 export async function fetchTradeAccount() {
   const { data } = await tradeApi.get("/trade/account");
-  return data.data;
+  return data?.data ?? data?.account ?? data?.tradeAccount ?? data ?? null;
 }

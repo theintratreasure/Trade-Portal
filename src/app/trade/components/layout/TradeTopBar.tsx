@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import { Menu, ArrowLeft } from "lucide-react";
 import { useTradeSidebar } from "./TradeSidebarContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type TopBarProps = {
   title: string;
@@ -26,7 +26,33 @@ export default function TradeTopBar({
 }: TopBarProps) {
   const hasSubtitle = Boolean(subtitle);
   const { open } = useTradeSidebar();
-  const router = useRouter()
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleBack = () => {
+    if (onBackClick) {
+      onBackClick();
+      return;
+    }
+
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    if (pathname?.startsWith("/trade")) {
+      router.push("/trade/quotes");
+      return;
+    }
+
+    if (pathname?.startsWith("/dashboard")) {
+      router.push("/dashboard");
+      return;
+    }
+
+    router.push("/");
+  };
+
   return (
     <header className="fixed top-0 w-full z-[666] h-14 flex items-center justify-between px-3 bg-[var(--bg-plan)] border-b border-[var(--border-soft)]">
 
@@ -35,7 +61,7 @@ export default function TradeTopBar({
 
         {showBack && (
           <button
-            onClick={ () => router.back() }
+            onClick={handleBack}
             className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--bg-glass)] transition"
           >
             <ArrowLeft size={20} />

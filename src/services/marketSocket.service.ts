@@ -1,19 +1,21 @@
 // services/marketSocket.service.ts
+import { buildSocketUrl, getSocketBaseUrl } from "@/lib/socketUrl";
+
 export class MarketSocket {
   private socket: WebSocket | null = null;
   private pendingSubscriptions: Set<string> = new Set();
   private urlBase: string;
   private reconnectTimer: number | null = null;
   private reconnectAttempts = 0;
-  private onMessageCb: ((m: any) => void) | null = null;
+  private onMessageCb: ((m: unknown) => void) | null = null;
   private tokenInUrl: string | null = null;
   private shouldReconnect = false;
 
   constructor() {
-    this.urlBase = process.env.NEXT_PUBLIC_SOKETAPIBASE_URL || "";
+    this.urlBase = getSocketBaseUrl();
   }
 
-  connect(token: string, onMessage: (msg: any) => void) {
+  connect(token: string, onMessage: (msg: unknown) => void) {
     this.onMessageCb = onMessage;
     this.tokenInUrl = token;
     this.shouldReconnect = true;
@@ -25,10 +27,11 @@ export class MarketSocket {
     }
 
     const encoded = encodeURIComponent(token);
-    const url = `${this.urlBase}/market?token=${encoded}`;
+    const base = this.urlBase || getSocketBaseUrl();
+    const url = `${buildSocketUrl("/market")}?token=${encoded}`;
 
     try {
-      this.socket = new WebSocket(url);
+      this.socket = new WebSocket(url || `${base}/market?token=${encoded}`);
     } catch (e) {
       console.warn("[MarketSocket] websocket creation failed", e);
       this.scheduleReconnect();

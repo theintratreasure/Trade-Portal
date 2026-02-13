@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 type Props = {
@@ -12,11 +12,12 @@ type Props = {
 
 export default function BackButton({
   to,
-  fallback = "/",
+  fallback,
   label,
   className = "",
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleBack = () => {
     // If custom route is provided → always go there
@@ -25,11 +26,19 @@ export default function BackButton({
       return;
     }
 
+    const contextualFallback =
+      fallback ??
+      (pathname?.startsWith("/trade")
+        ? "/trade/quotes"
+        : pathname?.startsWith("/dashboard")
+        ? "/dashboard"
+        : "/");
+
     // Otherwise behave like real back button
     if (window.history.length > 1) {
       router.back();
     } else {
-      router.push(fallback);
+      router.push(contextualFallback);
     }
   };
 
