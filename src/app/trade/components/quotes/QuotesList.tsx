@@ -4,25 +4,35 @@
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import QuoteRow from "./QuoteRow";
 import { QuoteLiveState } from "@/types/market";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 type Props = {
   onSelect: (symbol: string) => void;
   viewMode: "advanced" | "simple";
 };
 
-function getTradeTokenFromStorage(): string | null {
-  if (typeof window === "undefined") return null;
-  const local = localStorage.getItem("accessToken");
-  if (local) return local;
-  const cookie = document.cookie
-    .split("; ")
-    .find((r) => r.trim().startsWith("tradeToken="));
-  return cookie ? cookie.split("=")[1] : null;
-}
-
 export default function QuotesList({ onSelect, viewMode }: Props) {
-  const token = useMemo(() => getTradeTokenFromStorage() ?? undefined, []);
+  const [token, setToken] = useState<string | undefined>(() => {
+    const next = getTradeTokenFromStorageSync();
+    return next || undefined;
+  });
+
+  useEffect(() => {
+    const syncToken = () => {
+      const next = getTradeTokenFromStorageSync();
+      setToken(next || undefined);
+    };
+
+    syncToken();
+    window.addEventListener("focus", syncToken);
+    window.addEventListener("trade-token-change", syncToken);
+    return () => {
+      window.removeEventListener("focus", syncToken);
+      window.removeEventListener("trade-token-change", syncToken);
+    };
+  }, []);
+
   const liveQuotes = useMarketQuotes(token);
 
   // filter out undefined entries (TypeScript-safe)

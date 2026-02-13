@@ -1,3 +1,5 @@
+import { getTradeTokenFromStorageSync as readTradeToken } from "@/lib/tradeToken";
+
 export type SplitPrice = {
   int: string;
   normal: string;
@@ -33,11 +35,5 @@ export function splitPrice(price?: string): SplitPrice {
   return { int: intPart, normal: decimals, big: "" };
 }
 export function getTradeTokenFromStorageSync(): string {
-  if (typeof window === "undefined") return "";
-  const local = localStorage.getItem("accessToken");
-  if (local) return local;
-  const cookie = document.cookie
-    .split("; ")
-    .find((c) => c.trim().startsWith("tradeToken="));
-  return cookie ? cookie.split("=")[1] : "";
+  return readTradeToken();
 }

@@ -46,7 +46,8 @@ export default function LiveChart({
     }, [priceScaleWidth]);
 
     useEffect(() => {
-        if (!isFinite(bid) || !isFinite(ask)) return;
+        // Ignore bootstrap/invalid values so chart scale never gets polluted by 0.
+        if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask <= 0) return;
 
         setBidTicks((p) => [...p.slice(-MAX_POINTS + 1), bid]);
         setAskTicks((p) => [...p.slice(-MAX_POINTS + 1), ask]);
@@ -66,13 +67,12 @@ export default function LiveChart({
     const bids = bidTicks.slice(-len);
     const asks = askTicks.slice(-len);
 
-    const all = [
-  ...bids,
-  ...asks,
-  ...(sl !== undefined ? [sl] : []),
-  ...(tp !== undefined ? [tp] : []),
-  ...(pendingPrice !== undefined ? [pendingPrice] : []),
-];
+    const overlays = [sl, tp, pendingPrice].filter(
+        (value): value is number =>
+            typeof value === "number" && Number.isFinite(value) && value > 0
+    );
+
+    const all = [...bids, ...asks, ...overlays];
 
     const rawMax = Math.max(...all);
     const rawMin = Math.min(...all);
@@ -106,9 +106,16 @@ export default function LiveChart({
 
     const bidY = scaleY(currentBid);
     const askY = scaleY(currentAsk);
-    const slY = sl !== undefined ? scaleY(sl) : null;
-    const tpY = tp !== undefined ? scaleY(tp) : null;
-    const pendingY = pendingPrice !== undefined ? scaleY(pendingPrice) : null;
+    const slValue = typeof sl === "number" && Number.isFinite(sl) && sl > 0 ? sl : undefined;
+    const tpValue = typeof tp === "number" && Number.isFinite(tp) && tp > 0 ? tp : undefined;
+    const pendingValue =
+        typeof pendingPrice === "number" && Number.isFinite(pendingPrice) && pendingPrice > 0
+            ? pendingPrice
+            : undefined;
+
+    const slY = slValue !== undefined ? scaleY(slValue) : null;
+    const tpY = tpValue !== undefined ? scaleY(tpValue) : null;
+    const pendingY = pendingValue !== undefined ? scaleY(pendingValue) : null;
 
     const levels = Array.from({ length: gridCount }, (_, i) => {
         const price = max - (range / (gridCount - 1)) * i;
@@ -151,7 +158,7 @@ export default function LiveChart({
                             <line x1={0} x2={width} y1={slY} y2={slY} stroke="var(--warning)" strokeWidth="1.5" />
                             <text x={4} y={slY - 6} fill="var(--warning)" fontSize="11" fontWeight="600">SL</text>
                             <text x={width - 4} y={slY - 6} fill="var(--warning)" fontSize="11" fontWeight="600" textAnchor="end">
-                                {sl?.toFixed(3)}
+                                {slValue?.toFixed(3)}
                             </text>
                         </>
                     )}
@@ -161,7 +168,7 @@ export default function LiveChart({
                             <line x1={0} x2={width} y1={tpY} y2={tpY} stroke="var(--success)" strokeWidth="1.5" />
                             <text x={4} y={tpY - 6} fill="var(--success)" fontSize="11" fontWeight="600">TP</text>
                             <text x={width - 4} y={tpY - 6} fill="var(--success)" fontSize="11" fontWeight="600" textAnchor="end">
-                                {tp?.toFixed(3)}
+                                {tpValue?.toFixed(3)}
                             </text>
                         </>
                     )}
@@ -171,7 +178,7 @@ export default function LiveChart({
                             <line x1={0} x2={width} y1={pendingY} y2={pendingY} stroke="#6b7280" strokeWidth="1.5" strokeDasharray="6 4" />
                             <text x={4} y={pendingY - 6} fill="#6b7280" fontSize="11" fontWeight="600">PRICE</text>
                             <text x={width - 4} y={pendingY - 6} fill="#6b7280" fontSize="11" fontWeight="600" textAnchor="end">
-                                {pendingPrice?.toFixed(3)}
+                                {pendingValue?.toFixed(3)}
                             </text>
                         </>
                     )}
@@ -226,7 +233,7 @@ export default function LiveChart({
                         textAlign: "right",
                     }}
                 >
-                    {sl?.toFixed(3)}
+                    {slValue?.toFixed(3)}
                 </div>
             )}
 
@@ -241,7 +248,7 @@ export default function LiveChart({
                         textAlign: "right",
                     }}
                 >
-                    {tp?.toFixed(3)}
+                    {tpValue?.toFixed(3)}
                 </div>
             )}
 
@@ -256,7 +263,7 @@ export default function LiveChart({
                         textAlign: "right",
                     }}
                 >
-                    {pendingPrice?.toFixed(3)}
+                    {pendingValue?.toFixed(3)}
                 </div>
             )}
         </div>

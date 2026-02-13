@@ -8,6 +8,7 @@ import { Toast } from "@/app/components/ui/Toast";
 import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
 import { useParams } from "next/navigation";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 type Props = {
     open: boolean;
@@ -15,15 +16,6 @@ type Props = {
     symbol: string;
     token?: string;
 };
-function getTradeTokenFromStorageSync(): string {
-    if (typeof window === "undefined") return "";
-    const local = localStorage.getItem("accessToken");
-    if (local) return local;
-    const cookie = document.cookie
-        .split("; ")
-        .find((c) => c.trim().startsWith("tradeToken="));
-    return cookie ? cookie.split("=")[1] : "";
-}
 export default function DesktopOrderModal({
     open,
     onClose,

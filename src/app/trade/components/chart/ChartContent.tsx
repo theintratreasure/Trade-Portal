@@ -6,16 +6,7 @@ import TopBarSlot from "../layout/TopBarSlot";
 import TradeTopBar from "../layout/TradeTopBar";
 import TradeExecutionSheet from "./TradeExecutionSheet";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
-
-function getTradeTokenFromStorageSync(): string {
-  if (typeof window === "undefined") return "";
-  const local = localStorage.getItem("accessToken");
-  if (local) return local;
-  const cookie = document.cookie
-    .split("; ")
-    .find((c) => c.trim().startsWith("tradeToken="));
-  return cookie ? cookie.split("=")[1] : "";
-}
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 function normalizeSymbol(tvSymbol: string) {
   if (!tvSymbol) return "";

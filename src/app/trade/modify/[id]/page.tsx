@@ -12,6 +12,7 @@ import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import { useModifyPosition } from "@/hooks/trade/useModifyPosition";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { FilePlus, FileX } from "lucide-react";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 type SplitPrice = {
   int: string;
   normal: string;
@@ -45,15 +46,6 @@ function splitPrice(price?: string): SplitPrice {
   }
 
   return { int: intPart, normal: decimals, big: "" };
-}
-function getTradeTokenFromStorageSync(): string {
-  if (typeof window === "undefined") return "";
-  const local = localStorage.getItem("accessToken");
-  if (local) return local;
-  const cookie = document.cookie
-    .split("; ")
-    .find((c) => c.trim().startsWith("tradeToken="));
-  return cookie ? cookie.split("=")[1] : "";
 }
 export default function ModifyPositionPage() {
   const { id } = useParams<{ id: string }>();
@@ -311,7 +303,7 @@ export default function ModifyPositionPage() {
           />
         </div>
 
-        <div className="fixed bottom-0 z-[99] w-full p-5 bg-[var(--bg-plan)] border-t border-[var(--border-soft)]">
+        <div className="fixed z-[99] w-full p-5 bg-[var(--bg-plan)] border-t border-[var(--border-soft)] bottom-[calc(64px+env(safe-area-inset-bottom))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:bottom-0 md:pb-5">
           <button
             onClick={handleModify}
             disabled={isPending}

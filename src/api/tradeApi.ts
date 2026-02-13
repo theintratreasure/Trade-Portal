@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearTradeTokenCookie, getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 const tradeApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -12,11 +13,7 @@ const tradeApi = axios.create({
 tradeApi.interceptors.request.use(
   (config) => {
     if (typeof document !== "undefined") {
-      const token = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("tradeToken="))
-        ?.split("=")[1];
-
+      const token = getTradeTokenFromStorageSync();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -31,7 +28,7 @@ tradeApi.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      document.cookie = "tradeToken=; path=/; max-age=0";
+      clearTradeTokenCookie();
       window.location.href = "/trade-login";
     }
 

@@ -14,6 +14,7 @@ import {
   saveTradeAccount,
   setDefaultRememberedTradeLogin,
 } from "@/lib/tradeLoginAccounts";
+import { setTradeTokenCookie } from "@/lib/tradeToken";
 
 export default function TradeLogin() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function TradeLogin() {
           onSuccess: (res) => {
             const { tradeToken, accountId } = res;
 
-            document.cookie = `tradeToken=${tradeToken}; path=/; max-age=43200`;
+            setTradeTokenCookie(tradeToken, 43200);
             document.cookie = `sessionType=${res.sessionType}; path=/; max-age=43200`;
             document.cookie = `accountId=${accountId}; path=/; max-age=43200`;
 

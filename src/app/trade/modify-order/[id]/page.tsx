@@ -226,7 +226,7 @@ export default function ModifyPendingOrderPage() {
         tp={takeProfit ?? undefined}
       />
 
-      <div className="fixed bottom-16 w-full p-4 border-t border-[var(--border-soft)]">
+      <div className="fixed w-full p-4 border-t border-[var(--border-soft)] bottom-[calc(64px+env(safe-area-inset-bottom))] pb-[calc(1rem+env(safe-area-inset-bottom))] md:bottom-0 md:pb-4">
         <button
           onClick={handleModify}
           disabled={isPending}

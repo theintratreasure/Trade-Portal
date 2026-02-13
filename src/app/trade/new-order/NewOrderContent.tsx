@@ -12,6 +12,7 @@ import LiveChart from "../components/new-order/chart";
 import { useWatchlist } from "@/hooks/watchlist/useWatchlist";
 import { useMarketOrder, usePendingOrder } from "@/hooks/trade/useTrade";
 import { Toast } from "@/app/components/ui/Toast";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 type OrderResult = {
     status: "loading" | "success" | "error";
     message?: string;
@@ -70,17 +71,9 @@ function splitPrice(price?: string): SplitPrice {
         big: "",
     };
 }
-function getTradeTokenFromStorageSync(): string {
-    if (typeof window === "undefined") return "";
-    const local = localStorage.getItem("accessToken");
-    if (local) return local;
-    const cookie = document.cookie
-        .split("; ")
-        .find((c) => c.trim().startsWith("tradeToken="));
-    return cookie ? cookie.split("=")[1] : "";
-}
-
 export default function NewOrderPage() {
+    const MIN_LOT = 0;
+    const MAX_LOT = 100;
     const search = useSearchParams();
     const router = useRouter();
     const symbol = search.get("symbol") || "";
@@ -200,7 +193,22 @@ export default function NewOrderPage() {
         }
     }, [selectedType]);
 
-    const [volume, setVolume] = useState<number>(0.01);
+    const [volumeInput, setVolumeInput] = useState("0.01");
+
+    const volume = useMemo(() => {
+        const parsed = Number(volumeInput);
+        if (!Number.isFinite(parsed)) return 0;
+        return Number(Math.min(MAX_LOT, Math.max(MIN_LOT, parsed)).toFixed(2));
+    }, [volumeInput]);
+
+    const adjustVolume = (delta: number) => {
+        setVolumeInput((prev) => {
+            const current = prev === "" ? 0 : Number(prev);
+            const safeCurrent = Number.isFinite(current) ? current : 0;
+            const next = Math.min(MAX_LOT, Math.max(MIN_LOT, safeCurrent + delta));
+            return next.toFixed(2);
+        });
+    };
 
 
     const midPrice = useMemo(() => {
@@ -223,6 +231,7 @@ export default function NewOrderPage() {
     }
 
     const marketReady = !!live;
+    const isPendingMode = orderType !== "MARKET EXECUTION";
     const bidColor =
         live?.bidDir === "up"
             ? "text-[var(--mt-blue)]"
@@ -495,7 +504,7 @@ export default function NewOrderPage() {
 
             </div> */}
 
-            <div className="md:hidden relative min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col  md:px-6 ">
+            <div className="md:hidden relative min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col overflow-y-auto pb-[calc(180px+env(safe-area-inset-bottom))] md:px-6 ">
 
                 {/* MARKET EXECUTION */}
                 <div className="relative border-b border-gray-800 py-3">
@@ -541,12 +550,7 @@ export default function NewOrderPage() {
                                 <button
                                     key={i}
                                     className="px-2 py-1 rounded text-1xl hover:bg-gray-800 transition-colors"
-                                    onClick={() =>
-                                        setVolume((prev) => {
-                                            const next = +(prev + v).toFixed(2);
-                                            return next < 0.01 ? 0.01 : next;
-                                        })
-                                    }
+                                    onClick={() => adjustVolume(v)}
                                 >
                                     {v}
                                 </button>
@@ -554,14 +558,39 @@ export default function NewOrderPage() {
                     </div>
 
                     <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={volume}
+                        type="text"
+                        inputMode="decimal"
+                        value={volumeInput}
                         onChange={(e) => {
-                            const val = Number(e.target.value);
-                            if (isNaN(val)) return;
-                            setVolume(val < 0.01 ? 0.01 : Number(val.toFixed(2)));
+                            const raw = e.target.value.trim();
+                            if (raw === "") {
+                                setVolumeInput("");
+                                return;
+                            }
+
+                            if (!/^\d*\.?\d{0,2}$/.test(raw)) return;
+
+                            const parsed = Number(raw);
+                            if (!Number.isFinite(parsed)) return;
+                            if (parsed > MAX_LOT) {
+                                setVolumeInput(MAX_LOT.toFixed(2));
+                                return;
+                            }
+
+                            setVolumeInput(raw);
+                        }}
+                        onBlur={() => {
+                            if (volumeInput === "") {
+                                setVolumeInput("0.01");
+                                return;
+                            }
+                            const parsed = Number(volumeInput);
+                            if (!Number.isFinite(parsed)) {
+                                setVolumeInput("0.01");
+                                return;
+                            }
+                            const normalized = Math.min(MAX_LOT, Math.max(MIN_LOT, parsed));
+                            setVolumeInput(normalized.toFixed(2));
                         }}
                         className="w-20 bg-transparent text-center text-1xl font-bold text-[var(--text-main)] outline-none border-b border-gray-700"
                     />
@@ -574,9 +603,7 @@ export default function NewOrderPage() {
                                 <button
                                     key={i}
                                     className="px-2 py-1 rounded text-1xl hover:bg-blue-900/50 transition-colors"
-                                    onClick={() =>
-                                        setVolume((prev) => +(prev + v).toFixed(2))
-                                    }
+                                    onClick={() => adjustVolume(v)}
                                 >
                                     +{v}
                                 </button>
@@ -632,7 +659,7 @@ export default function NewOrderPage() {
                 </div>
 
 
-                {orderType !== "MARKET EXECUTION" && (
+                {isPendingMode && (
                     <div className="flex items-center justify-center px-6 py-2">
 
                         <div className="flex items-center gap-3 w-full">
@@ -812,7 +839,7 @@ export default function NewOrderPage() {
 
                 </div>
 
-                {orderType !== "MARKET EXECUTION" && (
+                {isPendingMode && (
                     <div className="relative px-3 py-3 border-t border-gray-800">
 
                         {/* Selector Row */}
@@ -870,18 +897,20 @@ export default function NewOrderPage() {
 
 
                 <Suspense>
-                    <LiveChart
+                    <LiveChart 
                         key={symbol}
-                        bid={Number(live?.bid ?? 0)}
-                        ask={Number(live?.ask ?? 0)}
+                        bid={live?.bid ? Number(live.bid) : Number.NaN}
+                        ask={live?.ask ? Number(live.ask) : Number.NaN}
                         sl={sl === "" ? undefined : Number(sl)}
                         tp={tp === "" ? undefined : Number(tp)}
                         pendingPrice={price === "" ? undefined : Number(price)}
+                        height={isPendingMode ? 220 : 280}
+                        gridCount={isPendingMode ? 5 : 7}
                     />
                 </Suspense>
 
 
-                {orderType === "MARKET EXECUTION" && (
+                {!isPendingMode && (
                     <div className="text-center text-xs text-gray-400 py-2 px-6">
                         Attention! The trade will be executed at market conditions,
                         difference with requested price may be significant!
@@ -889,7 +918,7 @@ export default function NewOrderPage() {
                 )}
 
 
-                <div className="fixed md:absolute bottom-0 md:bottom-22 left-0 right-0 z-40 border-t border-gray-800 bg-[var(--bg-plan)]">
+                <div className="fixed md:absolute left-0 right-0 z-40 border-t border-gray-800 bg-[var(--bg-plan)] bottom-[calc(64px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] md:bottom-22 md:pb-0">
                     {orderType === "MARKET EXECUTION" ? (
                         <div className="grid grid-cols-2">
                             <button
@@ -942,7 +971,7 @@ export default function NewOrderPage() {
                         className="
         w-[92%] max-w-md
         rounded-2xl
-        bg-[var(--bg-card)]
+        bg-[var(--bg-plan)]
         border border-[var(--border-soft)]
         shadow-2xl
         p-6
@@ -958,14 +987,14 @@ export default function NewOrderPage() {
                         <div className="space-y-6">
 
                             <div>
-                                <label className="block text-xs text-[var(--text-muted)] mb-2 uppercase tracking-wide">
+                                <label className="block text-xs text-[var(--text-main)] mb-2 uppercase tracking-wide">
                                     Date
                                 </label>
                                 <input
                                     type="date"
                                     className="
               w-full
-              bg-[var(--bg-plan)]
+              bg-[var(--bg-main)]
               border border-[var(--border-soft)]
               rounded-lg
               px-3 py-2
@@ -987,7 +1016,7 @@ export default function NewOrderPage() {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-[var(--text-muted)] mb-2 uppercase tracking-wide">
+                                <label className="block text-xs text-[var(--text-main)] mb-2 uppercase tracking-wide">
                                     Time
                                 </label>
                                 <input
@@ -995,7 +1024,7 @@ export default function NewOrderPage() {
                                     step="60"
                                     className="
               w-full
-              bg-[var(--bg-plan)]
+              bg-[var(--bg-main)]
               border border-[var(--border-soft)]
               rounded-lg
               px-3 py-2
@@ -1022,7 +1051,7 @@ export default function NewOrderPage() {
                             <button
                                 className="
             px-4 py-2
-            text-[var(--text-muted)]
+            text-[var(--text-main)]
             hover:text-[var(--text-main)]
             transition
           "

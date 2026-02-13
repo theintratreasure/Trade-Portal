@@ -278,7 +278,7 @@ export default function ClosePositionPage() {
         </div>
 
         {/* BUTTON AREA */}
-        <div className="fixed bottom-0 z-[99] w-full bg-[var(--bg-plan)] p-4 md:p-6 border-t border-[var(--border-soft)]">
+        <div className="fixed z-[99] w-full bg-[var(--bg-plan)] p-4 md:p-6 border-t border-[var(--border-soft)] bottom-[calc(64px+env(safe-area-inset-bottom))] pb-[calc(1rem+env(safe-area-inset-bottom))] md:bottom-0 md:pb-6">
 
           <button
             onClick={handleClose}

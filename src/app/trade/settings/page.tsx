@@ -22,6 +22,7 @@ import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { useLanguage } from "../components/LanguageProvider";
 import { translations } from "@/types/translations";
+import { clearTradeTokenCookie } from "@/lib/tradeToken";
 
 export default function TradeSettingsPage() {
   const router = useRouter();
@@ -39,7 +40,7 @@ const t = translations[language];
   });
 
   const handleLogout = () => {
-    document.cookie = "tradeToken=; path=/; max-age=0";
+    clearTradeTokenCookie();
     document.cookie = "accountId=; path=/; max-age=0";
     document.cookie = "sessionType=; path=/; max-age=0";
 

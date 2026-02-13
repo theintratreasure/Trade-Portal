@@ -6,27 +6,17 @@ import {
   addToWatchlist,
   removeFromWatchlist,
 } from "@/services/watchlist.service";
-
-/* WATCHLIST */
-function getTradeTokenFromStorage(): string | null {
-  if (typeof window === "undefined") return null;
-  const local = localStorage.getItem("accessToken");
-  if (local) return local;
-  const cookie = document.cookie.split("; ").find((r) => r.trim().startsWith("tradeToken="));
-  return cookie ? cookie.split("=")[1] : null;
-}
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 export function useWatchlist() {
+  const token = getTradeTokenFromStorageSync();
+
   return useQuery({
-    queryKey: ["watchlist"],
+    queryKey: ["watchlist", token || null],
     queryFn: async () => {
-      const token = getTradeTokenFromStorage();
-      // helpful debug log to show whether token is present
-      console.debug("[useWatchlist] token present?", !!token);
-      const result = await fetchWatchlist(50, token ?? undefined);
-      console.debug("[useWatchlist] fetch result length:", result?.length ?? "no result");
-      return result;
+      return fetchWatchlist(50, token || undefined);
     },
+    enabled: Boolean(token),
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,

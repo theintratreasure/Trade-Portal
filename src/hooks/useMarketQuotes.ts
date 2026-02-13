@@ -7,6 +7,7 @@ import { QuoteLiveState } from "@/types/market";
 import { useWatchlist } from "./watchlist/useWatchlist";
 
 type QuoteMap = Record<string, QuoteLiveState | undefined>;
+const QUOTES_FLUSH_INTERVAL_MS = 120;
 
 function getNumber(...values: unknown[]): number | undefined {
   for (const v of values) {
@@ -20,18 +21,18 @@ function getNumber(...values: unknown[]): number | undefined {
 export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
   const socketRef = useRef<MarketSocket | null>(null);
   const bufferRef = useRef<QuoteMap>({});
-  const rafRef = useRef<number | null>(null);
+  const flushTimerRef = useRef<number | null>(null);
   const subscribedRef = useRef<Set<string>>(new Set());
 
   const [quotes, setQuotes] = useState<QuoteMap>({});
   const { data: watchlist } = useWatchlist();
 
   const scheduleFlush = useCallback(() => {
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
+    if (flushTimerRef.current) return;
+    flushTimerRef.current = window.setTimeout(() => {
+      flushTimerRef.current = null;
       setQuotes({ ...bufferRef.current });
-    });
+    }, QUOTES_FLUSH_INTERVAL_MS);
   }, []);
 
   useEffect(() => {
@@ -42,6 +43,11 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       }
       subscribedRef.current.clear();
       bufferRef.current = {};
+      if (flushTimerRef.current) {
+        window.clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      queueMicrotask(() => setQuotes({}));
       return;
     }
 
@@ -245,9 +251,9 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       socketRef.current = null;
       subscribedOnConnect.clear();
       bufferRef.current = {};
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+      if (flushTimerRef.current) {
+        window.clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
       }
       setQuotes({});
     };

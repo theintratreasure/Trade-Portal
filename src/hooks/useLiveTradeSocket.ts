@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+const LIVE_SOCKET_FLUSH_INTERVAL_MS = 120;
 
 type LiveAccount = {
   balance: number;
@@ -76,18 +77,38 @@ const normalizePendingOrder = (data: any): LivePending | null => {
 
 export const useLiveTradeSocket = (accountId?: string) => {
   const wsRef = useRef<WebSocket | null>(null);
+  const flushTimerRef = useRef<number | null>(null);
+  const accountBufferRef = useRef<LiveAccount | null>(null);
+  const positionsBufferRef = useRef<Record<string, LivePosition>>({});
+  const pendingBufferRef = useRef<Record<string, LivePending>>({});
 
   const [account, setAccount] = useState<LiveAccount | null>(null);
-  const [positions, setPositions] = useState<
-    Record<string, LivePosition>
-  >({});
-  const [pendingOrders, setPendingOrders] = useState<
-    Record<string, LivePending>
-  >({});
+  const [positions, setPositions] = useState<LivePosition[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<LivePending[]>([]);
+
+  const scheduleFlush = () => {
+    if (flushTimerRef.current) return;
+    flushTimerRef.current = window.setTimeout(() => {
+      flushTimerRef.current = null;
+      setAccount(accountBufferRef.current);
+      setPositions(Object.values(positionsBufferRef.current));
+      setPendingOrders(Object.values(pendingBufferRef.current));
+    }, LIVE_SOCKET_FLUSH_INTERVAL_MS);
+  };
 
 
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId) {
+      accountBufferRef.current = null;
+      positionsBufferRef.current = {};
+      pendingBufferRef.current = {};
+      queueMicrotask(() => {
+        setAccount(null);
+        setPositions([]);
+        setPendingOrders([]);
+      });
+      return;
+    }
 
     const ws = new WebSocket(
       `${process.env.NEXT_PUBLIC_SOKETAPIBASE_URL}/account`
@@ -109,23 +130,20 @@ export const useLiveTradeSocket = (accountId?: string) => {
         const message = JSON.parse(event.data);
 
         if (message.type === "live_account") {
-          setAccount(message.data);
+          accountBufferRef.current = message.data;
+          scheduleFlush();
         }
 
         if (message.type === "live_position") {
-          setPositions((prev) => ({
-            ...prev,
-            [message.data.positionId]: message.data,
-          }));
+          positionsBufferRef.current[message.data.positionId] = message.data;
+          scheduleFlush();
         }
         if (message.type === "live_pending") {
           const normalized = normalizePendingOrder(message.data);
           if (!normalized) return;
 
-          setPendingOrders((prev) => ({
-            ...prev,
-            [normalized.orderId]: normalized,
-          }));
+          pendingBufferRef.current[normalized.orderId] = normalized;
+          scheduleFlush();
         }
 
       } catch (err) {
@@ -141,12 +159,16 @@ export const useLiveTradeSocket = (accountId?: string) => {
 
     return () => {
       ws.close();
+      if (flushTimerRef.current) {
+        window.clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
     };
   }, [accountId]);
 
   return {
     account,
-    positions: Object.values(positions),
-    pending: Object.values(pendingOrders),
+    positions,
+    pending: pendingOrders,
   };
 };

@@ -19,6 +19,7 @@ import PositionActionSheet from "../components/trade/PositionActionSheet";
 import MobilePendingOrderItem from "../components/trade/MobilePendingOrderItem";
 import ActionItem from "../components/trade/ActionItem";
 import { useRouter } from "next/navigation";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 type AccountStat = {
     label: string;
@@ -80,16 +81,6 @@ function buildModifyPositionUrl(pos: Position): string {
         takeProfit: pos.takeProfit == null ? "" : String(pos.takeProfit),
     });
     return `/trade/modify/${pos.id}?${params.toString()}`;
-}
-
-function getTradeTokenFromStorageSync(): string {
-    if (typeof window === "undefined") return "";
-    const local = localStorage.getItem("accessToken");
-    if (local) return local;
-    const cookie = document.cookie
-        .split("; ")
-        .find((c) => c.trim().startsWith("tradeToken="));
-    return cookie ? cookie.split("=")[1] : "";
 }
 
 export default function TradePage() {
