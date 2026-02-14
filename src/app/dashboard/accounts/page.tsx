@@ -31,9 +31,9 @@ export default function MyAccountsPage() {
         ((data as AccountItem[] | undefined)?.filter((a) => a.account_type === tab) ?? []);
 
     return (
-        <div className="min-h-screen bg-[var(--bg-main)] pb-28 md:pb-6">
+        <div className="min-h-screen bg-[var(--bg-main)] pb-28 md:pb-10">
             {/* ================= HEADER ================= */}
-            <div className="px-2 py-2 md:p-6 space-y-3 md:space-y-4">
+            <div className="mx-auto w-full max-w-6xl px-2 py-2 md:px-6 md:py-6 space-y-3 md:space-y-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <h1 className="text-lg md:text-2xl font-semibold">
                         My accounts
@@ -66,17 +66,10 @@ export default function MyAccountsPage() {
                         </button>
                     ))}
                 </div>
-
-                {/* ================= TOOLBAR (DESKTOP ONLY) ================= */}
-                <div className="hidden md:flex items-center justify-end">
-
-
-
-                </div>
             </div>
 
             {/* ================= ACCOUNTS ================= */}
-            <div className="px-2 md:px-6 space-y-3 md:space-y-4">
+            <div className="mx-auto w-full max-w-6xl px-2 md:px-6 space-y-3 md:space-y-4">
                 {accounts.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-[var(--border-soft)] p-4 md:p-6 text-center text-xs md:text-sm text-[var(--text-muted)]">
                         No {tab === "live" ? "real" : "demo"} accounts found.
@@ -86,6 +79,13 @@ export default function MyAccountsPage() {
                         <AccountRow key={acc._id} account={acc} />
                     ))
                 )}
+
+                <div className="mt-4 md:mt-6">
+                    <TipBanner
+                        title="Account limit"
+                        message="You can create up to 7 trading accounts in total. If you reach the limit, please contact support to manage or upgrade your accounts."
+                    />
+                </div>
             </div>
 
             {/* ================= MOBILE STICKY CTA ================= */}
@@ -99,12 +99,6 @@ export default function MyAccountsPage() {
                     <Plus size={16} />
                     Open account
                 </button>
-            </div>
-            <div className="px-2 md:px-6 mt-4">
-                <TipBanner
-                    title="Account limit"
-                    message="You can create up to 7 trading accounts in total. If you reach the limit, please contact support to manage or upgrade your accounts."
-                />
             </div>
         </div>
     );

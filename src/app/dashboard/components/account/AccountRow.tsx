@@ -245,23 +245,23 @@ export default function AccountRow({
 
             {/* ================= DESKTOP VIEW ================= */}
             <div className="hidden lg:block px-6 py-5">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     {/* LEFT */}
-                    <div className="flex min-w-0 items-center gap-3 xl:gap-4">
+                    <div className="flex min-w-0 items-center gap-3 lg:gap-4">
                         <span className="rounded bg-[var(--bg-glass)] text-[var(--success)] px-2 py-0.5 text-xs">
                             {account.account_type === "live" ? "Live" : "Demo"}
                         </span>
 
                         <div className="min-w-0 font-medium">
                             <span className="break-all">{account.account_number}</span>
-                            <span className="block text-sm text-[var(--text-muted)] uppercase xl:ml-2 xl:inline xl:text-lg">
+                            <span className="block text-sm text-[var(--text-muted)] uppercase lg:ml-2 lg:inline lg:text-base">
                                 {account.plan_name}
                             </span>
                         </div>
                     </div>
 
                     {/* CENTER */}
-                    <div className="text-left text-lg font-semibold xl:text-xl">
+                    <div className="text-left text-lg font-semibold lg:text-xl">
                         $ {account.balance.toFixed(2)}{" "}
                         <span className="text-sm font-normal">
                             {account.currency}
@@ -269,14 +269,14 @@ export default function AccountRow({
                     </div>
 
                     {/* RIGHT */}
-                    <div ref={actionsWrapRef} className="relative flex w-full items-center gap-2 flex-wrap xl:w-auto xl:justify-end">
+                    <div ref={actionsWrapRef} className="relative flex w-full flex-wrap items-center justify-start gap-2 lg:w-auto lg:justify-end">
                         <button
                             onClick={() =>
                                 router.push(
                                     `/trade-login?account=${encodeURIComponent(account.account_number)}`
                                 )
                             }
-                            className="rounded-md bg-yellow-400 px-3 xl:px-4 py-2 text-sm font-medium text-black"
+                            className="rounded-md bg-yellow-400 px-3 lg:px-4 py-2 text-sm font-medium text-black"
                         >
                             Trade
                         </button>
@@ -287,7 +287,7 @@ export default function AccountRow({
                                     onClick={() =>
                                         router.push(`/dashboard/payments/deposit?account=${account._id}`)
                                     }
-                                    className="rounded-md bg-[var(--bg-glass)] px-3 xl:px-4 py-2 text-sm"
+                                    className="rounded-md bg-[var(--bg-glass)] px-3 lg:px-4 py-2 text-sm"
                                 >
                                     Deposit
                                 </button>
@@ -296,7 +296,7 @@ export default function AccountRow({
                                     onClick={() =>
                                         router.push(`/dashboard/payments/withdraw?account=${account._id}`)
                                     }
-                                    className="rounded-md bg-[var(--bg-glass)] px-3 xl:px-4 py-2 text-sm"
+                                    className="rounded-md bg-[var(--bg-glass)] px-3 lg:px-4 py-2 text-sm"
                                 >
                                     Withdraw
                                 </button>
