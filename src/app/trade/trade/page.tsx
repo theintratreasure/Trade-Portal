@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
     ArrowDownUp,
     MoreHorizontal,
@@ -20,6 +21,7 @@ import MobilePendingOrderItem from "../components/trade/MobilePendingOrderItem";
 import ActionItem from "../components/trade/ActionItem";
 import { useRouter } from "next/navigation";
 import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
+import tradeApi from "@/api/tradeApi";
 
 type AccountStat = {
     label: string;
@@ -96,16 +98,110 @@ export default function TradePage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const { account, positions, pending } = useLiveTradeSocket(accountId);
     const [token] = useState<string>(() => getTradeTokenFromStorageSync());
+
+    const { data: restFallback } = useQuery({
+        queryKey: ["trade-live-fallback", accountId ?? null],
+        enabled: Boolean(token || accountId),
+        refetchInterval: 3000,
+        staleTime: 1000,
+        gcTime: 10_000,
+        retry: 1,
+        queryFn: async () => {
+            const [accountRes, positionsRes, ordersRes] = await Promise.all([
+                tradeApi.get("/trade/account"),
+                tradeApi.get("/trade/positions", { params: { page: 1, limit: 200 } }),
+                tradeApi.get("/trade/orders", { params: { page: 1, limit: 200 } }),
+            ]);
+
+            const accountRow =
+                accountRes.data?.data ??
+                accountRes.data?.account ??
+                accountRes.data?.tradeAccount ??
+                accountRes.data ??
+                null;
+
+            const positionsRows = Array.isArray(positionsRes.data?.positions)
+                ? positionsRes.data.positions
+                : Array.isArray(positionsRes.data?.data?.positions)
+                    ? positionsRes.data.data.positions
+                    : [];
+
+            const ordersRows = Array.isArray(ordersRes.data?.orders)
+                ? ordersRes.data.orders
+                : Array.isArray(ordersRes.data?.data?.orders)
+                    ? ordersRes.data.data.orders
+                    : [];
+
+            return {
+                account: accountRow,
+                positions: positionsRows,
+                orders: ordersRows,
+            };
+        },
+    });
+
+    const effectiveAccount = account ?? restFallback?.account ?? null;
+
+    const socketOrRestPositions = useMemo(() => {
+        if (positions.length > 0) return positions;
+
+        const rows = Array.isArray(restFallback?.positions) ? restFallback.positions : [];
+        return rows
+            .filter((row: Record<string, unknown>) => {
+                const status = String(row?.status ?? "OPEN").toUpperCase();
+                return status !== "CLOSED";
+            })
+            .map((row: Record<string, unknown>) => ({
+                accountId: String(row?.accountId ?? accountId ?? ""),
+                positionId: String(row?.orderId ?? row?.positionId ?? row?.id ?? row?._id ?? ""),
+                symbol: String(row?.symbol ?? "-"),
+                side: String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY",
+                volume: Number(row?.qty ?? row?.volume ?? 0),
+                openPrice: Number(row?.openPrice ?? 0),
+                currentPrice: Number(row?.currentPrice ?? row?.closePrice ?? row?.openPrice ?? 0),
+                floatingPnL: Number(row?.profitLoss ?? row?.floatingPnL ?? 0),
+                stopLoss: (row?.stopLoss ?? null) as number | null,
+                takeProfit: (row?.takeProfit ?? null) as number | null,
+                swap: Number(row?.swap ?? 0),
+                commission: Number(row?.commission ?? 0),
+                openTime: row?.openTime ? String(row.openTime) : undefined,
+            }));
+    }, [accountId, positions, restFallback]);
+
+    const socketOrRestPending = useMemo(() => {
+        if (pending.length > 0) return pending;
+
+        const rows = Array.isArray(restFallback?.orders) ? restFallback.orders : [];
+        return rows
+            .filter((row: Record<string, unknown>) => {
+                const status = String(row?.status ?? "").toUpperCase();
+                return status === "PENDING" || status === "PLACED" || status === "OPEN";
+            })
+            .map((row: Record<string, unknown>) => ({
+                orderId: String(row?.orderId ?? row?.id ?? row?._id ?? ""),
+                symbol: String(row?.symbol ?? "-"),
+                side: String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY",
+                orderType: String(row?.orderType ?? row?.type ?? "MARKET"),
+                price: Number(row?.price ?? row?.openPrice ?? 0),
+                volume: Number(row?.qty ?? row?.volume ?? 0),
+                stopLoss: (row?.stopLoss ?? null) as number | null,
+                takeProfit: (row?.takeProfit ?? null) as number | null,
+                createdAt: Number(new Date(String(row?.openTime ?? row?.createdAt ?? 0)).getTime()),
+                currentPrice: undefined,
+                status: String(row?.status ?? "PENDING"),
+            }));
+    }, [pending, restFallback]);
+
     const pendingSymbols = useMemo(
         () =>
             Array.from(
                 new Set(
-                    pending
+                    socketOrRestPending
                         .map((order) => order?.symbol)
                         .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
                 )
             ),
-        [pending]
+        [socketOrRestPending]
     );
     const quotes = useMarketQuotes(token, pendingSymbols);
     const [openMenu, setOpenMenu] = useState<DesktopMenuState | null>(null);
@@ -167,23 +263,23 @@ export default function TradePage() {
 
 
     const marginLevel =
-        account && account.usedMargin > 0
-            ? ((account.equity / account.usedMargin) * 100).toFixed(2)
+        effectiveAccount && effectiveAccount.usedMargin > 0
+            ? ((effectiveAccount.equity / effectiveAccount.usedMargin) * 100).toFixed(2)
             : "0.00";
 
-    const accountStats: AccountStat[] = account
+    const accountStats: AccountStat[] = effectiveAccount
         ? [
-            { label: "Balance", value: account.balance.toFixed(2) },
-            { label: "Equity", value: account.equity.toFixed(2) },
-            { label: "Margin", value: account.usedMargin.toFixed(2) },
-            { label: "Free margin", value: account.freeMargin.toFixed(2) },
+            { label: "Balance", value: effectiveAccount.balance.toFixed(2) },
+            { label: "Equity", value: effectiveAccount.equity.toFixed(2) },
+            { label: "Margin", value: effectiveAccount.usedMargin.toFixed(2) },
+            { label: "Free margin", value: effectiveAccount.freeMargin.toFixed(2) },
             { label: "Margin Level (%)", value: marginLevel },
         ]
         : [];
 
     const pnl =
-        account
-            ? account.equity - account.balance
+        effectiveAccount
+            ? effectiveAccount.equity - effectiveAccount.balance
             : 0;
     const formattedPnl = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
     const pnlColorClass =
@@ -194,7 +290,7 @@ export default function TradePage() {
                 : "text-[var(--text-muted)]";
 
     const livePositions: Position[] = useMemo(() => {
-        return positions.map((pos) => ({
+        return socketOrRestPositions.map((pos) => ({
             id: pos.positionId,
             pair: pos.symbol,
             type: pos.side.toLowerCase(),
@@ -210,10 +306,10 @@ export default function TradePage() {
             stopLoss: pos.stopLoss ?? null,
             takeProfit: pos.takeProfit ?? null,
         }));
-    }, [positions]);
+    }, [socketOrRestPositions]);
 
     const pendingWithLive = useMemo<PendingOrder[]>(() => {
-        return pending.map((order) => {
+        return socketOrRestPending.map((order) => {
             const directCurrentPrice = order.currentPrice;
             const liveQuote = order.symbol ? quotes[order.symbol] : undefined;
             const side = String(order.side ?? "").toUpperCase();
@@ -223,7 +319,7 @@ export default function TradePage() {
                 currentPrice: directCurrentPrice ?? quoteCurrentPrice ?? "-",
             } as PendingOrder;
         });
-    }, [pending, quotes]);
+    }, [socketOrRestPending, quotes]);
 
     const router = useRouter();
     const positionsGridTemplate =
@@ -347,35 +443,35 @@ export default function TradePage() {
 
                     <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
                         {/* ===== ACCOUNT SUMMARY ===== */}
-                        {account && (
+                        {effectiveAccount && (
                             <div className="px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
                                 <div className="flex flex-wrap items-center gap-8 text-[13px]">
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Balance:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {account.balance.toFixed(2)}
+                                            {effectiveAccount.balance.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Equity:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {account.equity.toFixed(2)}
+                                            {effectiveAccount.equity.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Used Margin:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {account.usedMargin.toFixed(2)}
+                                            {effectiveAccount.usedMargin.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Free Margin:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {account.freeMargin.toFixed(2)}
+                                            {effectiveAccount.freeMargin.toFixed(2)}
                                         </span>
                                     </div>
 
@@ -399,8 +495,8 @@ export default function TradePage() {
 
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
-                            <div className="font-semibold text-[14px]">
-                                Positions ({positions.length})
+                                <div className="font-semibold text-[14px]">
+                                Positions ({socketOrRestPositions.length})
                             </div>
                         </div>
 
@@ -524,7 +620,7 @@ export default function TradePage() {
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
                             <div className="font-semibold text-[14px]">
-                                Orders ({pending.length})
+                                Orders ({socketOrRestPending.length})
                             </div>
                         </div>
 

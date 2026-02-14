@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Wallet,
   ArrowLeftRight,
-  FileText,
   Layers,
   Gift,
   Headphones,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { ComponentType } from "react";
 
 const items = [
   { label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
@@ -40,6 +40,11 @@ const bottomItems = [
   { label: "Support", icon: Headphones, href: "/dashboard/support" },
 ];
 
+type TradingAccount = {
+  _id: string;
+  account_type?: string;
+};
+
 export default function Sidebar({
   open,
   collapsed,
@@ -58,25 +63,41 @@ export default function Sidebar({
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   const isPaymentActive = pathname.startsWith("/dashboard/payments");
+  const userInitial = String(user?.name || "T").trim().charAt(0).toUpperCase();
+
+  const typedAccounts = (Array.isArray(accounts) ? accounts : []) as TradingAccount[];
 
   useEffect(() => {
-    if (!isPaymentActive) setPaymentOpen(false);
-  }, [pathname]);
+    const routes = new Set<string>([
+      ...items.map((item) => item.href),
+      ...paymentItems.map((item) => item.href),
+      ...bottomItems.map((item) => item.href),
+      "/trade",
+    ]);
+    routes.forEach((route) => {
+      router.prefetch(route);
+    });
+  }, [router]);
+
+  const navigateTo = (href: string) => {
+    onClose?.();
+    router.push(href);
+  };
 
   // Function to get first live account, fallback to first demo account
   const getFirstTradingAccount = () => {
-    if (!accounts || accounts.length === 0) return null;
+    if (!typedAccounts || typedAccounts.length === 0) return null;
 
     // First priority: first LIVE account
-    const firstLive = accounts.find((acc: any) => acc.account_type === "live");
+    const firstLive = typedAccounts.find((acc) => acc.account_type === "live");
     if (firstLive) return firstLive._id;
 
     // Fallback: first DEMO account
-    const firstDemo = accounts.find((acc: any) => acc.account_type === "demo");
+    const firstDemo = typedAccounts.find((acc) => acc.account_type === "demo");
     if (firstDemo) return firstDemo._id;
 
     // Last resort: first account of any type
-    return accounts[0]._id;
+    return typedAccounts[0]._id;
   };
 
   const NavButton = ({
@@ -84,19 +105,24 @@ export default function Sidebar({
     icon: Icon,
     active,
     onClick,
-  }: any) => (
+  }: {
+    label: string;
+    icon: ComponentType<{ size?: number; className?: string }>;
+    active: boolean;
+    onClick: () => void;
+  }) => (
     <div className="relative group">
       <button
         onClick={onClick}
         className={`
-          flex items-center gap-3 w-full rounded-xl px-3 py-2.5
+          flex items-center gap-3 w-full rounded-xl px-3 py-2.5 transition-all duration-200
           ${active
-            ? "bg-[var(--bg-glass)] text-[var(--primary)]"
-            : "text-[var(--text-muted)] hover:bg-[var(--bg-glass)]"
+            ? "bg-[var(--bg-glass)] text-[var(--primary)] shadow-[inset_3px_0_0_var(--primary)]"
+            : "text-[var(--text-muted)] hover:bg-[var(--bg-glass)] hover:text-[var(--text-main)]"
           }
         `}
       >
-        <span className="h-9 w-9 flex items-center justify-center rounded-lg">
+        <span className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-glass)] border border-[var(--border-soft)]">
           <Icon size={18} />
         </span>
 
@@ -105,7 +131,7 @@ export default function Sidebar({
 
       {/* TOOLTIP */}
       {collapsed && (
-        <span className="pointer-events-none absolute left-full top-1/2 ml-3 -translate-y-1/2 rounded-md bg-black px-2 py-1 text-xs text-[var(--text-main)] opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
+        <span className="pointer-events-none absolute left-full top-1/2 ml-3 -translate-y-1/2 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-main)] opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-[130] shadow-lg">
           {label}
         </span>
       )}
@@ -123,33 +149,29 @@ export default function Sidebar({
 
       <aside
         className={`
-    fixed md:static z-[100] h-screen transition-all duration-300
-    ${collapsed ? "w-20" : "w-64"}
-    bg-[var(--bg-card)]
+    fixed md:relative z-[120] h-screen transition-all duration-300 flex flex-col overflow-x-visible
+    ${collapsed ? "w-20" : "w-72"}
+    bg-[var(--bg-card)]/95 backdrop-blur-md
     border-r border-[var(--border-glass)]
     ${open ? "left-0" : "-left-full md:left-0"}
   `}
       >
 
-
         <div className="flex items-center justify-between px-4 py-5 border-b border-[var(--border-soft)] relative">
-
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/5 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/15 via-[var(--primary)]/5 to-transparent pointer-events-none" />
 
           {!collapsed && (
             <div className="relative z-10">
-              <p className="text-lg uppercase tracking-wider text-[var(--text-main)] font-bold">
-                {user?.name}
+              <p className="text-[15px] uppercase tracking-wider text-[var(--text-main)] font-bold truncate max-w-[180px]">
+                {user?.name || "Trader"}
               </p>
-              <p className="text-xs font-semibold text-[var(--text-muted)]">
-                Dashboard
-              </p>
+              <p className="text-[11px] font-semibold text-[var(--text-muted)] tracking-wide">Dashboard</p>
             </div>
           )}
 
           <button
             onClick={onToggleCollapse}
-            className="relative z-10 rounded-lg p-2 hover:bg-[var(--bg-glass)] transition"
+            className="relative z-10 rounded-lg p-2 border border-[var(--border-soft)] bg-[var(--bg-glass)] hover:bg-[var(--primary)]/10 transition"
           >
             <ChevronLeft
               size={18}
@@ -158,8 +180,11 @@ export default function Sidebar({
           </button>
         </div>
 
-
-        <nav className="mt-4 pl-2 space-y-1">
+        <nav
+          className={`mt-4 px-2 space-y-1 flex-1 ${
+            collapsed ? "overflow-visible" : "overflow-y-auto"
+          }`}
+        >
           {items.map((item) => (
             <NavButton
               key={item.label}
@@ -170,8 +195,7 @@ export default function Sidebar({
                   : pathname.startsWith(item.href)
               }
               onClick={() => {
-                router.push(item.href);
-                onClose?.();
+                navigateTo(item.href);
               }}
             />
           ))}
@@ -185,15 +209,15 @@ export default function Sidebar({
             <button
               onClick={() => !collapsed && setPaymentOpen((v) => !v)}
               className={`
-                flex items-center justify-between w-full rounded-xl px-3 py-2.5
+                flex items-center justify-between w-full rounded-xl px-3 py-2.5 transition-all duration-200
                 ${isPaymentActive
-                  ? "bg-[var(--bg-glass)] text-[var(--primary)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--bg-glass)]"
+                  ? "bg-[var(--bg-glass)] text-[var(--primary)] shadow-[inset_3px_0_0_var(--primary)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--bg-glass)] hover:text-[var(--text-main)]"
                 }
               `}
             >
               <div className="flex items-center gap-3">
-                <span className="h-9 w-9 flex items-center justify-center">
+                <span className="h-9 w-9 flex items-center justify-center rounded-lg bg-[var(--bg-glass)] border border-[var(--border-soft)]">
                   <CreditCard size={18} />
                 </span>
                 {!collapsed && <span className="text-sm">Payments</span>}
@@ -207,22 +231,28 @@ export default function Sidebar({
                 />
               )}
             </button>
+            {collapsed && (
+              <span className="pointer-events-none absolute left-full top-1/2 ml-3 -translate-y-1/2 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-main)] opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-[130] shadow-lg">
+                Payments
+              </span>
+            )}
 
             {/* DROPDOWN */}
             {paymentOpen && (
               <div
                 className={`
                    ${collapsed
-                    ? "absolute left-26 top-0 ml-2 z-[110]"
-                    : "relative ml-3 mt-1 z-[110]"
+                    ? "absolute left-12 top-0 ml-2 z-[9999]"
+                    : "relative ml-3 mt-1 z-[9999]"
                   }
-      overflow-visible
+      overflow-x-hidden
       rounded-xl
-      bg-[var(--bg-card)]
-      shadow-lg
+      bg-[var(--bg-card)] border border-[var(--border-soft)]
+      shadow-none
       transition-all duration-300
       animate-dropdown
-      min-w-[200px]
+      w-[196px] max-w-[calc(100vw-120px)]
+      z-[140]
     `}
               >
                 <div className="flex flex-col py-1">
@@ -234,9 +264,8 @@ export default function Sidebar({
                       <button
                         key={sub.label}
                         onClick={() => {
-                          router.push(sub.href);
                           setPaymentOpen(false);
-                          onClose?.();
+                          navigateTo(sub.href);
                         }}
                         className={`
   group relative flex items-center gap-3 w-full rounded-xl px-3 py-2.5
@@ -280,11 +309,10 @@ export default function Sidebar({
                   onClick={() => {
                     const accountId = getFirstTradingAccount();
                     if (accountId) {
-                      router.push(`/trade`);
+                      navigateTo(`/trade`);
                     } else {
-                      router.push(item.href);
+                      navigateTo(item.href);
                     }
-                    onClose?.();
                   }}
                 />
               );
@@ -296,13 +324,34 @@ export default function Sidebar({
                 {...item}
                 active={pathname.startsWith(item.href)}
                 onClick={() => {
-                  router.push(item.href);
-                  onClose?.();
+                  navigateTo(item.href);
                 }}
               />
             );
           })}
         </nav>
+
+        <div className="mx-2 mb-2 mt-2 border border-[var(--border-soft)] bg-[var(--bg-glass)] rounded-xl px-3 py-2.5">
+          {collapsed ? (
+            <div className="h-9 w-9 rounded-full bg-[var(--primary)]/15 border border-[var(--border-soft)] text-[var(--primary)] font-bold flex items-center justify-center">
+              {userInitial}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-[var(--primary)]/15 border border-[var(--border-soft)] text-[var(--primary)] font-bold flex items-center justify-center">
+                {userInitial}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--text-main)] truncate">
+                  {user?.name || "Trader"}
+                </p>
+                <p className="text-xs text-[var(--text-muted)] truncate">
+                  {user?.email || "Broker Portal"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </aside>
     </>
   );

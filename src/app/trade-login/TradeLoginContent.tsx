@@ -113,7 +113,7 @@ export default function TradeLogin() {
 
             <div className="relative z-10 space-y-6">
               <div className="flex items-center justify-between gap-2">
-                <BackButton to="/" />
+                <BackButton  />
                 <button
                   onClick={() => router.push("/")}
                   className="inline-flex items-center justify-center rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] h-10 w-10 transition hover:bg-[var(--bg-glass)]"

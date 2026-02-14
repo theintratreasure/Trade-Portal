@@ -117,7 +117,7 @@ export default function TransactionsPage() {
                   </td>
 
                   <td className="px-3 py-3 whitespace-nowrap">
-                    ₹ {tx.amount.toLocaleString()}
+                    $ {tx.amount.toLocaleString()}
                   </td>
 
                   <td className="px-3 py-3">
