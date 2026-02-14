@@ -29,12 +29,11 @@ export default function PaymentTabs() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const activeIndex = tabs.findIndex(tab =>
-    pathname.includes(tab.key)
-  );
+  const matchedIndex = tabs.findIndex((tab) => pathname.includes(tab.key));
+  const activeIndex = matchedIndex >= 0 ? matchedIndex : 0;
 
   return (
-    <div className="relative flex rounded-xl bg-[var(--bg-glass)] p-1">
+    <div className="relative flex overflow-hidden rounded-xl bg-[var(--bg-glass)] p-1">
       {/* Sliding Active Background */}
       <motion.div
         layout
@@ -53,15 +52,15 @@ export default function PaymentTabs() {
           <button
             key={key}
             onClick={() => router.push(path)}
-            className={`relative z-10 flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors
+            className={`relative z-10 flex min-w-0 flex-1 items-center justify-center gap-1 rounded-lg px-0.5 py-2 text-[10px] font-medium transition-colors min-[360px]:px-1 min-[360px]:text-xs
               ${
                 active
                   ? "text-[var(--text-invert)]"
                   : "text-[var(--text-muted)]"
               }`}
           >
-            <Icon size={16} />
-            {label}
+            <Icon size={14} className="shrink-0 min-[360px]:h-4 min-[360px]:w-4" />
+            <span className="truncate">{label}</span>
           </button>
         );
       })}

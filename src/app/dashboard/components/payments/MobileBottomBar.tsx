@@ -10,7 +10,7 @@ export default function MobileBottomBar() {
         md:hidden
         border-t border-[var(--border-soft)]
         bg-[var(--bg-main)]
-        px-4 py-3
+        px-2 min-[360px]:px-4 py-3
         safe-area-bottom
       "
     >
