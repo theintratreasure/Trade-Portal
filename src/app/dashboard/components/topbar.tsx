@@ -255,10 +255,15 @@ export default function Topbar({
                     setUserPinned(false);
                   }}
                 />
-                {/* <MenuItem icon={Settings} label="Reset Password" onClick={() => {
-                  setUserHover(false);
-                  setUserPinned(false);
-                }}/> */}
+                <MenuItem
+                  icon={Settings}
+                  label="Change Password"
+                  page="change-password"
+                  onClick={() => {
+                    setUserHover(false);
+                    setUserPinned(false);
+                  }}
+                />
                 <MenuItem icon={Gift} label="Referral Link" page="referal" onClick={() => {
                   setUserHover(false);
                   setUserPinned(false);

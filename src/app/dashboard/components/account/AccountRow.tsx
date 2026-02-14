@@ -124,14 +124,14 @@ export default function AccountRow({
     return (
         <div className="card">
             {/* ================= MOBILE VIEW ================= */}
-            <div className="lg:hidden p-1 md:p-4 space-y-4">
+            <div className="lg:hidden p-2 md:p-4 space-y-3">
                 {/* HEADER */}
                 <div className="flex items-center justify-between">
-                    <div className="flex gap-2 text-xs">
-                        <span className="rounded bg-[var(--bg-glass)] text-[var(--success)] px-2 py-0.5">
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                        <span className="rounded bg-[var(--bg-glass)] text-[var(--success)] px-1.5 py-0.5">
                             {account.account_type === "live" ? "Live" : "Demo"}
                         </span>
-                        <span className="ml-2 text-lg text-[var(--text-muted)]">
+                        <span className="ml-1 max-w-[42vw] truncate text-xs uppercase tracking-wide text-[var(--text-muted)]">
                             {account.plan_name}
                         </span>
                     </div>
@@ -145,21 +145,21 @@ export default function AccountRow({
                 </div>
 
                 {/* ACCOUNT NUMBER */}
-                <div className="text-sm font-medium">
+                <div className="text-xs font-medium break-all">
                     {account.account_number}
                 </div>
 
                 {/* BALANCE */}
-                <div className="text-3xl font-semibold">
+                <div className="text-xl sm:text-2xl font-semibold leading-none">
                     {account.balance.toFixed(2)}{" "}
-                    <span className="text-base font-normal">
+                    <span className="text-xs font-normal">
                         {account.currency}
                     </span>
                 </div>
 
                 {/* ACTIONS */}
                 <div
-                    className={`grid gap-3 text-center text-xs ${isDemo ? "grid-cols-4" : "grid-cols-3"
+                    className={`grid gap-2 text-center ${isDemo ? "grid-cols-4" : "grid-cols-5"
                         }`}
                 >
                     <Action
@@ -227,14 +227,14 @@ export default function AccountRow({
 
                 {/* DETAILS */}
                 {open && (
-                    <div className="mt-4">
+                    <div className="mt-3">
                         {isLoading ? (
-                            <div className="text-sm text-[var(--text-muted)]">
+                            <div className="text-xs text-[var(--text-muted)]">
                                 Loading account details…
                             </div>
                         ) : (
                             data && (
-                                <div className="rounded-xl bg-[var(--bg-glass)] p-4">
+                                <div className="rounded-xl bg-[var(--bg-glass)] p-2.5">
                                     <AccountDetails data={data} />
                                 </div>
                             )
@@ -480,14 +480,14 @@ function Action({
                 }`}
         >
             <div
-                className={`flex h-12 w-12 items-center justify-center rounded-full ${active
+                className={`flex h-9 w-9 items-center justify-center rounded-full [&_svg]:h-4 [&_svg]:w-4 ${active
                     ? "bg-yellow-400 text-black"
                     : "bg-[var(--bg-glass)]"
                     }`}
             >
                 {icon}
             </div>
-            <span className="text-[11px]">{label}</span>
+            <span className="text-[10px] leading-tight">{label}</span>
         </div>
     );
 }

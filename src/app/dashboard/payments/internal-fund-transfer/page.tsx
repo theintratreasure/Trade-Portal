@@ -87,7 +87,7 @@ export default function InternalFundTransfer() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-[var(--bg-main)] p-2 md:p-6 space-y-4 md:space-y-6">
 
       <h1 className="text-2xl font-semibold">
         Internal Fund Transfer
@@ -99,9 +99,9 @@ export default function InternalFundTransfer() {
       )}
 
       {/* TRANSFER CARD */}
-      <div className="card p-6 rounded-2xl space-y-6">
+      <div className="card p-3 md:p-6 rounded-2xl space-y-4 md:space-y-6">
 
-        <div className="grid md:grid-cols-3 gap-4 items-end">
+        <div className="grid md:grid-cols-3 gap-3 md:gap-4 items-end">
 
           <Select
             label="From Account"
@@ -163,7 +163,7 @@ export default function InternalFundTransfer() {
       </div>
 
      {/* HISTORY CARD */}
-<div className="card p-6 rounded-2xl space-y-6">
+<div className="card p-3 md:p-6 rounded-2xl space-y-4 md:space-y-6">
 
   <h2 className="text-lg font-semibold">
     Transfer History

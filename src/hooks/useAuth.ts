@@ -8,6 +8,7 @@ import {
   LoginPayload,
   ForgotPasswordPayload,
   ResetPasswordPayload,
+  ChangePasswordPayload,
   RefreshTokenPayload,
   LogoutPayload,
 } from "@/services/auth.service";
@@ -63,6 +64,12 @@ export const useVerifyEmail = () =>
   useMutation({
     mutationFn: (payload: { token: string }) =>
       authService.verifyEmail(payload),
+  });
+
+export const useChangePassword = () =>
+  useMutation({
+    mutationFn: (payload: ChangePasswordPayload) =>
+      authService.changePassword(payload),
   });
 
   

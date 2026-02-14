@@ -110,12 +110,6 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 pt-1 md:pt-4">
           <Stat icon={Wallet} label="Wallet Balance" value={formatMoney(overview?.walletBalance)} />
           <Stat
-            icon={TrendingUp}
-            label="Open Profit"
-            value={formatSignedMoney(overview?.openProfit)}
-            positive={Number(overview?.openProfit ?? 0) >= 0}
-          />
-          <Stat
             icon={TrendingDown}
             label="Drawdown"
             value={`${Number(overview?.drawdownPercent ?? 0).toFixed(2)}%`}

@@ -128,9 +128,9 @@ export default function DepositForm() {
     return (
         <>
         
-            <div className="card p-8 max-w-md mx-auto animate-dropdown">
+            <div className="card p-3 md:p-6 max-w-md mx-auto animate-dropdown">
                 {/* 🏷️ Header */}
-                <div className="text-center mb-8">
+                <div className="text-center mb-5 md:mb-8">
                     <div className="w-16 h-16 bg-[var(--primary-glow)] rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <Banknote className="w-8 h-8 text-[var(--primary)]" />
                     </div>
@@ -144,7 +144,7 @@ export default function DepositForm() {
 
                 {/* ⚠️ Error */}
                 {error && (
-                    <div className="bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] p-4 rounded-xl mb-6 flex items-center gap-3">
+                    <div className="bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] p-3 rounded-xl mb-4 md:mb-6 flex items-center gap-3">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
                         <span className="text-sm">{error}</span>
                     </div>
@@ -184,7 +184,7 @@ export default function DepositForm() {
                         </div></>
 
                 /* 💰 Amount */}
-                <div className="space-y-2 mb-6">
+                <div className="space-y-2 mb-4 md:mb-6">
                     <label className="text-sm font-medium text-[var(--text-main)] flex items-center gap-2">
                         Deposit Amount
                     </label>
@@ -198,7 +198,7 @@ export default function DepositForm() {
                             pattern="[0-9]*"
                             min={10}
                             placeholder="1000"
-                            className="w-full input-field pl-10 pr-4 py-3 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] focus:ring-2 focus:ring-[var(--primary-glow)] focus:border-[var(--primary)] transition-all duration-200 text-[var(--text-main)] text-lg font-medium"
+                            className="w-full input-field pl-10 pr-4 py-2.5 md:py-3 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] focus:ring-2 focus:ring-[var(--primary-glow)] focus:border-[var(--primary)] transition-all duration-200 text-[var(--text-main)] text-base md:text-lg font-medium"
                             value={amount || ""}
                             onChange={(e) => {
                                 const onlyDigits = e.target.value.replace(/[^0-9]/g, "");
@@ -215,7 +215,7 @@ export default function DepositForm() {
                 </div>
 
                 {/* 📸 Proof */}
-                <div className="space-y-2 mb-8">
+                <div className="space-y-2 mb-5 md:mb-8">
                     <label className="text-sm font-medium text-[var(--text-main)] flex items-center gap-2">
                         Payment Proof
                         {file && (
@@ -224,7 +224,7 @@ export default function DepositForm() {
                             </span>
                         )}
                     </label>
-                    <div className="relative border-2 border-dashed border-[var(--border-glass)] rounded-2xl p-6 hover:border-[var(--primary)]/50 transition-all duration-200 hover:bg-[var(--primary-glow)] cursor-pointer group">
+                    <div className="relative border-2 border-dashed border-[var(--border-glass)] rounded-2xl p-4 md:p-6 hover:border-[var(--primary)]/50 transition-all duration-200 hover:bg-[var(--primary-glow)] cursor-pointer group">
                         <input
                             type="file"
                             accept="image/*"
@@ -251,7 +251,7 @@ export default function DepositForm() {
                 <button
                     onClick={handleSubmit}
                     disabled={!selectedAccount || amount < 50 || !file || createDeposit.isPending || upload.isPending || isSubmitting}
-                    className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-invert)] font-semibold py-4 px-6 rounded-2xl text-lg shadow-xl hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 border-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-invert)] font-semibold py-3 md:py-4 px-4 md:px-6 rounded-2xl text-base md:text-lg shadow-xl hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 border-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                     {createDeposit.isPending || upload.isPending || isSubmitting
                         ? <>

@@ -1,5 +1,4 @@
 import api from "@/api/axios";
-import axios from "axios";
 
 /* ---------- TYPES ---------- */
 
@@ -43,15 +42,20 @@ export type LogoutPayload = {
 export type VerifyEmailPayload = {
   token: string;
 };
+
+export type ChangePasswordPayload = {
+  oldPassword: string;
+  newPassword: string;
+};
 /* ---------- SERVICE ---------- */
 
 export const authService = {
-  signup: async (payload: any) => {
+  signup: async (payload: SignupPayload) => {
     const { data } = await api.post("/auth/signup", payload);
     return data;
   },
 
-  verifySignupOtp: async (payload: any) => {
+  verifySignupOtp: async (payload: VerifyOtpPayload) => {
     const { data } = await api.post("/auth/verify-otp", payload);
     return data;
   },
@@ -102,6 +106,11 @@ export const authService = {
 
   verifyEmail: async (payload: VerifyEmailPayload) => {
     const { data } = await api.post("/auth/verify-email", payload);
+    return data;
+  },
+
+  changePassword: async (payload: ChangePasswordPayload) => {
+    const { data } = await api.post("/auth/change-password", payload);
     return data;
   },
 };

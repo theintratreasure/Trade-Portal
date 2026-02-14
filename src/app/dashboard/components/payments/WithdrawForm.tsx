@@ -81,7 +81,7 @@ export default function WithdrawForm() {
     };
 
     return (
-        <div className="card p-4 sm:p-6 space-y-5 w-full">
+        <div className="card p-3 md:p-6 space-y-4 md:space-y-5 w-full">
             {/* ACCOUNT */}
             <Select
                 label="Select Account"

@@ -7,12 +7,12 @@ import MobileBottomBar from "../../components/payments/MobileBottomBar";
 
 export default function WithdrawPage() {
   return (
-    <div className="bg-[var(--bg-main)] min-h-screen space-y-6 p-4 sm:p-6 pb-28 sm:pb-6">
+    <div className="bg-[var(--bg-main)] min-h-screen space-y-4 md:space-y-6 p-2 md:p-6 pb-24 md:pb-6">
       <h1 className="text-xl sm:text-2xl font-semibold">
         Withdraw Funds
       </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <WithdrawForm />
 
         <div className="space-y-4">

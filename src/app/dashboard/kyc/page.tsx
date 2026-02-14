@@ -114,7 +114,7 @@ export default function KycPage() {
   }, [status, myKyc, documentType, front, back, selfie, submitting]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 md:flex-row lg:gap-10 lg:px-6 lg:py-14">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 md:gap-8 px-2 md:px-4 lg:px-6 py-4 md:py-10 lg:py-14 min-w-0">
       {/* LEFT PANEL */}
       <section
         className="
@@ -126,7 +126,7 @@ export default function KycPage() {
         {/* subtle top gradient strip */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[var(--primary)]/40 via-[var(--primary)] to-[var(--primary)]/40" />
 
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-soft)] px-6 py-5">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border-soft)] px-3 md:px-6 py-3 md:py-5">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
               Account verification
@@ -141,7 +141,7 @@ export default function KycPage() {
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-5">{leftView}</div>
+        <div className="px-3 md:px-6 pb-4 md:pb-6 pt-4 md:pt-5 min-w-0">{leftView}</div>
       </section>
 
       {/* RIGHT PANEL */}

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,7 +44,7 @@ export default function DashboardLayout({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // ❌ Skip all web notification logic inside Android/iOS app
+    // âŒ Skip all web notification logic inside Android/iOS app
     if (Capacitor.isNativePlatform()) return;
 
     if ("Notification" in window) {
@@ -96,7 +96,7 @@ export default function DashboardLayout({
       )}
 
       <div className="flex h-full">
-        {/* SIDEBAR — FIXED HEIGHT */}
+        {/* SIDEBAR â€” FIXED HEIGHT */}
         <div
           className={`${isTradePage ? "hidden" : "block"} h-full`}
         >
@@ -115,9 +115,9 @@ export default function DashboardLayout({
             <Topbar onMenuClick={() => setSidebarOpen(true)} />
           </div>
 
-          {/* CONTENT — ONLY THIS SCROLLS */}
+          {/* CONTENT â€” ONLY THIS SCROLLS */}
           <main
-            className={`flex-1 overflow-y-auto ${isTradePage ? "p-0" : "p-4"
+            className={`flex-1 overflow-y-auto ${isTradePage ? "p-0" : "p-2 md:p-4"
               }`}
           >
             {children}
@@ -129,3 +129,4 @@ export default function DashboardLayout({
   );
 
 }
+

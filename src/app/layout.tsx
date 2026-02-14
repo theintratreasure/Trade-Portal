@@ -11,6 +11,7 @@ import ChunkErrorBoundary from "./components/ChunkErrorBoundary";
 import BackHandler from "./components/BackHandler";
 import CapacitorStatusBar from "./components/CapacitorStatusBar";
 import PushRegister from "./components/PushRegister";
+import NetworkStatusGuard from "./components/NetworkStatusGuard";
 
 const mtFont = Roboto({
   subsets: ["latin"],
@@ -98,6 +99,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased mt-font`}
       >
         <AppProviders>
+        <NetworkStatusGuard />
         <CapacitorStatusBar />
         {/* <PushRegister /> */}
         <InstallPrompt />
