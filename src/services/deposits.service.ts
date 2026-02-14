@@ -1,6 +1,6 @@
 import api from "@/api/axios";
 
-export type DepositMethod = "UPI" | "BANK" | "CRYPTO";
+export type DepositMethod = "UPI" | "BANK" | "CRYPTO" | "USDT";
 
 export interface DepositPayload {
   account: string;

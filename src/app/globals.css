@@ -93,6 +93,21 @@ body {
   overflow: hidden;
 }
 
+/* Safari text auto-resize guard */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Prevent iOS double-tap zoom behavior on interactive controls */
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
 /* ----------------------------------
    PREMIUM SCROLLBAR (GLOBAL)
    ⚠️ No color / UI logic changed

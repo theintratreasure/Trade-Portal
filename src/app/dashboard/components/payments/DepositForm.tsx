@@ -1,292 +1,493 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CheckCircle, AlertCircle, Upload, CreditCard, Banknote, Bitcoin } from "lucide-react";
-import { useCreateDeposit } from "@/hooks/deposits/useCreateDeposit";
-import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
-import { useMyAccounts } from "@/hooks/useMyAccounts";
-import { getClientIp } from "../../../../../utils/getClientIp";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, Upload, CreditCard, Banknote, Bitcoin } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+
+import Select from "@/app/components/ui/Select";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { Toast } from "@/app/components/ui/Toast";
+
+import { useCreateDeposit } from "@/hooks/deposits/useCreateDeposit";
+import { useMyAccounts } from "@/hooks/useMyAccounts";
 import { useActivePaymentMethods } from "@/hooks/useActivePaymentMethods";
-import { useSearchParams } from "next/navigation";
-import Select from "@/app/components/ui/Select";
+import { useConversionRates } from "@/hooks/useConversion";
+import type { PaymentMethod } from "@/services/paymentMethods.service";
+import { uploadToCloudinary, type CloudinaryUploadResult } from "@/services/cloudinary.service";
 
-type DepositMethod = "UPI" | "BANK" | "CRYPTO";
+import { getClientIp } from "../../../../../utils/getClientIp";
+import type { CurrencyCode } from "@/services/conversion.service";
+
+type DepositMethod = "UPI" | "BANK" | "CRYPTO" | "USDT";
+
+const normalizeType = (value: unknown) => String(value || "").trim().toUpperCase();
+
 export default function DepositForm() {
-    const { data: accounts = [] } = useMyAccounts();
-    const createDeposit = useCreateDeposit();
-    const upload = useCloudinaryUpload();
-    const searchParams = useSearchParams();
+  const { data: accounts = [] } = useMyAccounts();
+  const { data: paymentMethods = [] } = useActivePaymentMethods();
+  const { data: ratesData } = useConversionRates();
 
-    const [method, setMethod] = useState<DepositMethod>("UPI");
-    const [accountId, setAccountId] = useState("");
-    const [amount, setAmount] = useState<number>(0);
-    const { data: paymentMethods = [] } = useActivePaymentMethods();
-    const [file, setFile] = useState<File | null>(null);
-    const [error, setError] = useState("");
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+  const createDeposit = useCreateDeposit();
 
-    const selectedAccount = accounts.find((a) => a._id === accountId);
-    const paymentMethodOptions = paymentMethods.reduce(
-        (acc: { value: string; label: string }[], pm: any) => {
-            const type = pm?.type;
-            if (!type) return acc;
-            if (acc.some((o) => o.value === type)) return acc;
-            acc.push({
-                value: type,
-                label: pm?.title || type,
-            });
-            return acc;
-        },
-        []
-    );
-    const methodIcons = {
-        UPI: <Banknote className="w-5 h-5" />,
-        BANK: <CreditCard className="w-5 h-5" />,
-        CRYPTO: <Bitcoin className="w-5 h-5" />
-    };
+  const searchParams = useSearchParams();
 
-    const resetForm = () => {
-        setAccountId("");
-        setAmount(0);
-        setMethod("UPI");
-        setFile(null);
-        setError("");
-    };
+  const [method, setMethod] = useState<DepositMethod>("UPI");
+  const [accountId, setAccountId] = useState("");
+  const [amountInput, setAmountInput] = useState("");
+  const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [proofCache, setProofCache] = useState<CloudinaryUploadResult | null>(null);
+  const [isProofUploading, setIsProofUploading] = useState(false);
+  const [ipAddress, setIpAddress] = useState("UNKNOWN");
+  const [error, setError] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const proofUploadPromiseRef = useRef<Promise<CloudinaryUploadResult> | null>(null);
 
-    useEffect(() => {
-        if (accountId) return;
-        const fromQuery = searchParams.get("account") || searchParams.get("accountId");
-        if (!fromQuery) return;
-        const exists = accounts.some((a) => a._id === fromQuery);
-        if (exists) setAccountId(fromQuery);
-    }, [accounts, accountId, searchParams]);
+  const selectedAccount = accounts.find((a) => a._id === accountId);
 
-    const handleSubmit = async () => {
-        setError("");
+  const availableMethods = useMemo(() => {
+    const methodSet = new Set<DepositMethod>();
+    methodSet.add("USDT");
 
-        if (!selectedAccount) {
-            setError("Please select an account");
-            return;
+    paymentMethods.forEach((pm: PaymentMethod) => {
+      const t = normalizeType(pm?.type);
+      if (t === "UPI") methodSet.add("UPI");
+      if (t === "BANK") methodSet.add("BANK");
+      if (t === "USDT") methodSet.add("USDT");
+      if (["CRYPTO", "BTC"].includes(t) || pm?.crypto_address || pm?.crypto_network) {
+        methodSet.add("CRYPTO");
+      }
+    });
+
+    const result = Array.from(methodSet);
+    return result.length > 0 ? result : (["UPI", "BANK", "USDT", "CRYPTO"] as DepositMethod[]);
+  }, [paymentMethods]);
+
+  const methodOptions = useMemo(
+    () =>
+      availableMethods.map((m) => ({
+        value: m,
+        label:
+          m === "UPI"
+            ? "UPI"
+            : m === "BANK"
+              ? "Bank"
+              : m === "USDT"
+                ? "USDT"
+                : "Crypto (BTCUSDT)",
+      })),
+    [availableMethods]
+  );
+
+  useEffect(() => {
+    if (availableMethods.includes(method)) return;
+    setMethod(availableMethods[0] || "UPI");
+  }, [availableMethods, method]);
+
+  useEffect(() => {
+    if (accountId) return;
+    const fromQuery = searchParams.get("account") || searchParams.get("accountId");
+    if (!fromQuery) return;
+    const exists = accounts.some((a) => a._id === fromQuery);
+    if (exists) setAccountId(fromQuery);
+  }, [accounts, accountId, searchParams]);
+
+  const sourceCurrency: CurrencyCode =
+    method === "UPI" || method === "BANK"
+      ? "INR"
+      : method === "CRYPTO"
+        ? "BTC"
+        : "USDT";
+  const numericAmount = Number(amountInput || 0);
+  const isValidAmount = Number.isFinite(numericAmount) && numericAmount > 0;
+  const isConversionRequired = sourceCurrency !== "USDT";
+
+  useEffect(() => {
+    if (!isValidAmount) {
+      setConvertedAmount(null);
+      return;
+    }
+
+    if (sourceCurrency === "USDT") {
+      setConvertedAmount(numericAmount);
+      return;
+    }
+
+    const rates = ratesData?.data;
+    if (!rates) {
+      setConvertedAmount(null);
+      return;
+    }
+
+    if (sourceCurrency === "INR") {
+      const usdt = numericAmount / Number(rates.usdtInr || 1);
+      setConvertedAmount(Number(usdt.toFixed(8)));
+      return;
+    }
+
+    if (sourceCurrency === "BTC") {
+      const usdt = numericAmount * Number(rates.btcUsdt || 0);
+      setConvertedAmount(Number(usdt.toFixed(8)));
+      return;
+    }
+
+    setConvertedAmount(null);
+  }, [isValidAmount, numericAmount, ratesData, sourceCurrency]);
+
+  const convertedUsdt = convertedAmount ?? 0;
+
+  const canSubmit =
+    !!selectedAccount &&
+    isValidAmount &&
+    !!file &&
+    !createDeposit.isPending &&
+    !isSubmitting &&
+    (!isConversionRequired || convertedUsdt > 0) &&
+    !!convertedAmount;
+
+  const resetForm = () => {
+    setAccountId("");
+    setMethod("UPI");
+    setAmountInput("");
+    setConvertedAmount(null);
+    setFile(null);
+    setProofCache(null);
+    proofUploadPromiseRef.current = null;
+    setIsProofUploading(false);
+    setError("");
+  };
+
+  const handleSubmit = () => {
+    setError("");
+
+    if (!selectedAccount) {
+      setError("Please select an account");
+      return;
+    }
+
+    if (!isValidAmount) {
+      setError("Enter valid amount");
+      return;
+    }
+
+    if (isConversionRequired && convertedUsdt <= 0) {
+      setError("Unable to convert amount right now. Please try again.");
+      return;
+    }
+
+    if (!file) {
+      setError("Upload payment proof");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image is too large. Please upload file under 10MB.");
+      return;
+    }
+
+    setShowConfirm(true);
+  };
+
+  const compressImage = useCallback(async (srcFile: File): Promise<File> => {
+    if (srcFile.size <= 1.2 * 1024 * 1024) return srcFile;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(srcFile);
+
+      img.onload = () => {
+        const maxSide = 1280;
+        const ratio = Math.min(maxSide / img.width, maxSide / img.height, 1);
+        const targetW = Math.round(img.width * ratio);
+        const targetH = Math.round(img.height * ratio);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          resolve(srcFile);
+          return;
         }
 
-        if (!amount || amount <= 0) {
-            setError("Enter valid deposit amount (minimum ₹10)");
-            return;
-        }
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(url);
+            if (!blob) {
+              resolve(srcFile);
+              return;
+            }
+            resolve(new File([blob], srcFile.name.replace(/\.(png|jpg|jpeg|webp)$/i, "") + ".jpg", { type: "image/jpeg" }));
+          },
+          "image/jpeg",
+          0.78
+        );
+      };
 
-        if (!file) {
-            setError("Upload payment proof");
-            return;
-        }
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(srcFile);
+      };
+      img.src = url;
+    });
+  }, []);
 
-        setShowConfirm(true);
+  const uploadProofNow = useCallback(async (currentFile: File): Promise<CloudinaryUploadResult> => {
+    const optimized = await compressImage(currentFile);
+    return uploadToCloudinary(optimized, "deposits");
+  }, [compressImage]);
+
+  const getProofWithTimeout = useCallback(
+    async (currentFile: File): Promise<CloudinaryUploadResult> => {
+      if (proofCache) return proofCache;
+
+      if (!proofUploadPromiseRef.current) {
+        proofUploadPromiseRef.current = uploadProofNow(currentFile);
+      }
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("Upload is slow. Please check internet and try again.")),
+          25000
+        );
+      });
+
+      const proof = await Promise.race([proofUploadPromiseRef.current, timeoutPromise]);
+      setProofCache(proof as CloudinaryUploadResult);
+      return proof as CloudinaryUploadResult;
+    },
+    [proofCache, uploadProofNow]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!file) return;
+
+    setProofCache(null);
+    setIsProofUploading(true);
+    const p = uploadProofNow(file);
+    proofUploadPromiseRef.current = p;
+
+    p
+      .then((proof) => {
+        if (!cancelled) setProofCache(proof);
+      })
+      .catch(() => {
+        if (!cancelled) setProofCache(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsProofUploading(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
+  }, [file, uploadProofNow]);
 
-    const confirmDeposit = async () => {
-        setShowConfirm(false);
-        setIsSubmitting(true);
-        setError("");
-
-        try {
-            /* Upload proof */
-            const proof = await upload.mutateAsync({
-                file: file as File,
-                folder: "deposits",
-            });
-
-            /*  Fetch client IP */
-            const ipAddress = await getClientIp();
-
-            /*  Create deposit */
-            await createDeposit.mutateAsync({
-                account: selectedAccount!._id,
-                amount,
-                method,
-                proof,
-                ipAddress,
-            });
-
-            // 🎉 Success - Reset & Show Toast
-            resetForm();
-            setToast({ message: "Deposit submitted successfully", type: "success" });
-            setTimeout(() => setToast(null), 3000);
-
-        } catch (err: any) {
-            setError(err?.response?.data?.message || "Deposit failed. Please try again.");
-        } finally {
-            setIsSubmitting(false);
-        }
+  useEffect(() => {
+    let cancelled = false;
+    getClientIp()
+      .then((ip) => {
+        if (!cancelled && ip) setIpAddress(ip);
+      })
+      .catch(() => {
+        if (!cancelled) setIpAddress("UNKNOWN");
+      });
+    return () => {
+      cancelled = true;
     };
-    const liveAccounts = accounts.filter(
-        (acc) => acc.account_type === "live"
-    );
+  }, []);
 
-    return (
-        <>
-        
-            <div className="card p-3 md:p-6 max-w-md mx-auto animate-dropdown">
-                {/* 🏷️ Header */}
-                <div className="text-center mb-5 md:mb-8">
-                    <div className="w-16 h-16 bg-[var(--primary-glow)] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <Banknote className="w-8 h-8 text-[var(--primary)]" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-[var(--text-main)] mb-1">
-                        Add Funds
-                    </h1>
-                    <p className="text-sm text-[var(--text-muted)]">
-                        Securely deposit to your account
-                    </p>
-                </div>
+  const confirmDeposit = async () => {
+    setShowConfirm(false);
+    setIsSubmitting(true);
+    setError("");
 
-                {/* ⚠️ Error */}
-                {error && (
-                    <div className="bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] p-3 rounded-xl mb-4 md:mb-6 flex items-center gap-3">
-                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                        <span className="text-sm">{error}</span>
-                    </div>
-                )}
+    try {
+      const proof = await getProofWithTimeout(file as File);
 
+      await createDeposit.mutateAsync({
+        account: selectedAccount!._id,
+        amount: Number(convertedUsdt.toFixed(8)),
+        method,
+        proof,
+        ipAddress,
+      });
 
+      resetForm();
+      setToast({ message: "Deposit submitted successfully", type: "success" });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: unknown) {
+      const row = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(row?.response?.data?.message || row?.message || "Deposit failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-                {/* 💳 Account Select */
-                    <><div className="space-y-2 mb-6">
-                        <label className="text-sm font-medium text-[var(--text-main)] flex items-center gap-2">
-                            <CreditCard className="w-4 h-4" />
-                            Select Account
-                        </label>
-                        <Select
-                            value={accountId}
-                            onChange={setAccountId}
-                            options={liveAccounts.map((acc) => ({
-                                value: acc._id,
-                                label: `${acc.account_number} Balance: $${Number(
-                                    acc.balance
-                                ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })}`,
-                            }))}
-                        />
+  const liveAccounts = accounts.filter((acc) => acc.account_type === "live");
 
-                    </div>
-                        <div className="space-y-2 mb-6">
-                            <label className="text-sm font-medium text-[var(--text-main)] flex items-center gap-2">
-                                Payment Method
-                            </label>
-                            <Select
-                                value={method}
-                                onChange={(v) => setMethod(v as DepositMethod)}
-                                options={paymentMethodOptions} />
-                        </div></>
+  return (
+    <>
+      <div className="card mx-auto max-w-md animate-dropdown p-3 md:p-6">
+        <div className="mb-5 text-center md:mb-8">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--primary-glow)]">
+            <Banknote className="h-8 w-8 text-[var(--primary)]" />
+          </div>
+          <h1 className="mb-1 text-2xl font-bold text-[var(--text-main)]">Add Funds</h1>
+          <p className="text-sm text-[var(--text-muted)]">Deposit with live conversion preview</p>
+        </div>
 
-                /* 💰 Amount */}
-                <div className="space-y-2 mb-4 md:mb-6">
-                    <label className="text-sm font-medium text-[var(--text-main)] flex items-center gap-2">
-                        Deposit Amount
-                    </label>
-                    <div className="relative">
-                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-                            $
-                        </div>
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            min={10}
-                            placeholder="1000"
-                            className="w-full input-field pl-10 pr-4 py-2.5 md:py-3 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] focus:ring-2 focus:ring-[var(--primary-glow)] focus:border-[var(--primary)] transition-all duration-200 text-[var(--text-main)] text-base md:text-lg font-medium"
-                            value={amount || ""}
-                            onChange={(e) => {
-                                const onlyDigits = e.target.value.replace(/[^0-9]/g, "");
-                                setAmount(onlyDigits ? Number(onlyDigits) : 0);
-                            }}
-                            onKeyDown={(e) => {
-                                if (["e", "E", "+", "-", ".", ","].includes(e.key)) {
-                                    e.preventDefault();
-                                }
-                            }}
-                        />
+        {error && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-[var(--error)]/30 bg-[var(--error)]/10 p-3 text-[var(--error)] md:mb-6">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
 
-                    </div>
-                </div>
+        <div className="mb-6 space-y-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
+            <CreditCard className="h-4 w-4" />
+            Select Account
+          </label>
+          <Select
+            value={accountId}
+            onChange={setAccountId}
+            options={liveAccounts.map((acc) => ({
+              value: acc._id,
+              label: `${acc.account_number} Balance: $${Number(acc.balance).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`,
+            }))}
+          />
+        </div>
 
-                {/* 📸 Proof */}
-                <div className="space-y-2 mb-5 md:mb-8">
-                    <label className="text-sm font-medium text-[var(--text-main)] flex items-center gap-2">
-                        Payment Proof
-                        {file && (
-                            <span className="ml-auto px-2 py-1 bg-[var(--success)]/10 text-[var(--success)] text-xs rounded-full border border-[var(--success)]/20">
-                                Selected
-                            </span>
-                        )}
-                    </label>
-                    <div className="relative border-2 border-dashed border-[var(--border-glass)] rounded-2xl p-4 md:p-6 hover:border-[var(--primary)]/50 transition-all duration-200 hover:bg-[var(--primary-glow)] cursor-pointer group">
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => setFile(e.target.files?.[0] || null)}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <div className="flex flex-col items-center justify-center text-center">
-                            <div className="w-12 h-12 bg-[var(--bg-glass)] rounded-2xl flex items-center justify-center mb-3 group-hover:bg-[var(--primary)]/10 transition-all duration-200">
-                                <Upload className="w-6 h-6 text-[var(--text-muted)] group-hover:text-[var(--primary)] transition-all duration-200" />
-                            </div>
-                            <p className="text-sm font-medium text-[var(--text-main)] mb-1">
-                                {file ? `✅ ${file.name.slice(0, 20)}${file.name.length > 20 ? "..." : ""}` : "Click to upload screenshot"}
-                            </p>
-                            <p className="text-xs text-[var(--text-muted)]">
-                                PNG, JPG, GIF (Max 5MB)
-                            </p>
-                        </div>
-                    </div>
-                </div>
+        <div className="mb-6 space-y-2">
+          <label className="text-sm font-medium text-[var(--text-main)]">Payment Method</label>
+          <Select value={method} onChange={(v) => setMethod(v as DepositMethod)} options={methodOptions} />
+        </div>
 
+        {method === "CRYPTO" && (
+          <div className="mb-4 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-glass)] px-3 py-2 text-xs text-[var(--text-muted)]">
+            <p className="inline-flex items-center gap-2">
+              <Bitcoin className="h-4 w-4" />
+              Crypto pair: <span className="font-semibold text-[var(--text-main)]">BTCUSDT</span>
+            </p>
+          </div>
+        )}
 
-
-                {/* 🚀 Submit */}
-                <button
-                    onClick={handleSubmit}
-                    disabled={!selectedAccount || amount < 50 || !file || createDeposit.isPending || upload.isPending || isSubmitting}
-                    className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-[var(--text-invert)] font-semibold py-3 md:py-4 px-4 md:px-6 rounded-2xl text-base md:text-lg shadow-xl hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2 border-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                    {createDeposit.isPending || upload.isPending || isSubmitting
-                        ? <>
-                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Processing...
-                        </>
-                        : <>
-                            Deposit ${amount.toLocaleString()}
-                            <Banknote className="w-5 h-5" />
-                        </>
-                    }
-                </button>
+        <div className="mb-4 space-y-2 md:mb-6">
+          <label className="text-sm font-medium text-[var(--text-main)]">Amount ({sourceCurrency})</label>
+          <div className="relative">
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+              {sourceCurrency === "INR" ? "INR" : sourceCurrency === "BTC" ? "BTC" : "USDT"}
             </div>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder={sourceCurrency === "BTC" ? "0.01" : sourceCurrency === "USDT" ? "100" : "9100"}
+              className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] py-2.5 pl-10 pr-4 text-base font-medium text-[var(--text-main)] transition-all duration-200 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary-glow)] md:py-3 md:text-lg"
+              value={amountInput}
+              onChange={(e) => {
+                const cleaned = e.target.value.replace(/[^0-9.]/g, "");
+                const dotCount = (cleaned.match(/\./g) || []).length;
+                if (dotCount > 1) return;
+                setAmountInput(cleaned);
+              }}
+            />
+          </div>
 
-
-
-
-
-            {/* 🔍 Confirm Modal */}
-            {showConfirm && (
-                <ConfirmModal
-                    title="Confirm Deposit"
-                    description={`You are about to deposit ₹${amount.toLocaleString()} via ${method} to account ****${selectedAccount?.account_number?.slice(-4)}. This action cannot be undone.`}
-                    onConfirm={confirmDeposit}
-                    onCancel={() => setShowConfirm(false)}
-                    loading={isSubmitting}
-                />
+          <div className="rounded-lg border border-[var(--border-soft)] bg-[var(--bg-glass)] px-3 py-2 text-xs text-[var(--text-muted)]">
+            {!ratesData?.data && isConversionRequired ? (
+              <span>Loading conversion rates...</span>
+            ) : (
+              <>
+                <p>
+                  You entered {numericAmount || 0} {sourceCurrency}. Converted deposit amount: <span className="font-semibold text-[var(--text-main)]">{convertedUsdt.toFixed(4)} USDT</span>
+                </p>
+                {ratesData?.data && (
+                  <p className="mt-1 text-[10px] opacity-80">
+                    Rate: 1 USDT = INR {ratesData.data.usdtInr} | 1 BTC = {ratesData.data.btcUsdt} USDT
+                  </p>
+                )}
+              </>
             )}
+          </div>
+        </div>
 
-            {/* 🎉 Success Toast */}
-            {toast && (
-                <Toast message={toast.message} type={toast.type} />
+        <div className="mb-5 space-y-2 md:mb-8">
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
+            Payment Proof
+            {file && (
+              <span className="ml-auto rounded-full border border-[var(--success)]/20 bg-[var(--success)]/10 px-2 py-1 text-xs text-[var(--success)]">
+                Selected
+              </span>
             )}
+          </label>
+          <div className="group relative cursor-pointer rounded-2xl border-2 border-dashed border-[var(--border-glass)] p-4 transition-all duration-200 hover:border-[var(--primary)]/50 hover:bg-[var(--primary-glow)] md:p-6">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--bg-glass)] transition-all duration-200 group-hover:bg-[var(--primary)]/10">
+                <Upload className="h-6 w-6 text-[var(--text-muted)] transition-all duration-200 group-hover:text-[var(--primary)]" />
+              </div>
+              <p className="mb-1 text-sm font-medium text-[var(--text-main)]">
+                {file ? `${file.name.slice(0, 20)}${file.name.length > 20 ? "..." : ""}` : "Click to upload screenshot"}
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">PNG, JPG, GIF (Max 5MB)</p>
+            </div>
+          </div>
+        </div>
 
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-0 bg-[var(--primary)] px-4 py-3 text-base font-semibold text-[var(--text-invert)] shadow-xl transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--primary-hover)] hover:shadow-2xl disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none md:px-6 md:py-4 md:text-lg"
+        >
+          {createDeposit.isPending || isSubmitting ? (
+            <>
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Processing...
+            </>
+          ) : (
+            <>
+              Deposit ${convertedUsdt.toFixed(2)}
+              <Banknote className="h-5 w-5" />
+            </>
+          )}
+        </button>
+        {isProofUploading && (
+          <p className="mt-2 text-center text-[11px] text-[var(--text-muted)]">
+            Uploading screenshot in background... You can proceed meanwhile.
+          </p>
+        )}
+        {!isProofUploading && file && proofCache && (
+          <p className="mt-2 text-center text-[11px] text-[var(--success)]">
+            Screenshot uploaded. Ready to proceed.
+          </p>
+        )}
+      </div>
 
-        </>
-    );
+      {showConfirm && (
+        <ConfirmModal
+          title="Confirm Deposit"
+          description={`Entered ${numericAmount || 0} ${sourceCurrency} -> ${convertedUsdt.toFixed(4)} USDT via ${method} to account ****${selectedAccount?.account_number?.slice(-4)}.`}
+          onConfirm={confirmDeposit}
+          onCancel={() => setShowConfirm(false)}
+          loading={isSubmitting}
+        />
+      )}
+
+      {toast && <Toast message={toast.message} type={toast.type} />}
+    </>
+  );
 }
