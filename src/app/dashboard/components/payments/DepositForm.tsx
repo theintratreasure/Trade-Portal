@@ -19,6 +19,13 @@ import { getClientIp } from "../../../../../utils/getClientIp";
 import type { CurrencyCode } from "@/services/conversion.service";
 
 type DepositMethod = "UPI" | "BANK" | "CRYPTO" | "USDT";
+type PaymentMethodOption = {
+  value: string;
+  label: string;
+  method: DepositMethod;
+  sourceCurrency: CurrencyCode;
+  network?: string;
+};
 
 const normalizeType = (value: unknown) => String(value || "").trim().toUpperCase();
 
@@ -31,7 +38,7 @@ export default function DepositForm() {
 
   const searchParams = useSearchParams();
 
-  const [method, setMethod] = useState<DepositMethod>("UPI");
+  const [selectedMethodKey, setSelectedMethodKey] = useState("");
   const [accountId, setAccountId] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const [convertedAmount, setConvertedAmount] = useState<number | null>(null);
@@ -46,45 +53,81 @@ export default function DepositForm() {
   const proofUploadPromiseRef = useRef<Promise<CloudinaryUploadResult> | null>(null);
 
   const selectedAccount = accounts.find((a) => a._id === accountId);
+  const methodOptions = useMemo<PaymentMethodOption[]>(() => {
+    const options = paymentMethods
+      .map((pm: PaymentMethod, index) => {
+        const t = normalizeType(pm?.type);
+        const fallbackValue = `${t || "METHOD"}-${index}`;
+        const network = String(pm?.crypto_network || "").trim().toUpperCase();
+        const title = String(pm?.title || "").trim();
 
-  const availableMethods = useMemo(() => {
-    const methodSet = new Set<DepositMethod>();
-    methodSet.add("USDT");
+        if (t === "UPI") {
+          return {
+            value: pm._id || fallbackValue,
+            label: title || "UPI",
+            method: "UPI" as const,
+            sourceCurrency: "INR" as const,
+          };
+        }
 
-    paymentMethods.forEach((pm: PaymentMethod) => {
-      const t = normalizeType(pm?.type);
-      if (t === "UPI") methodSet.add("UPI");
-      if (t === "BANK") methodSet.add("BANK");
-      if (t === "USDT") methodSet.add("USDT");
-      if (["CRYPTO", "BTC"].includes(t) || pm?.crypto_address || pm?.crypto_network) {
-        methodSet.add("CRYPTO");
-      }
-    });
+        if (t === "BANK") {
+          return {
+            value: pm._id || fallbackValue,
+            label: title || "Bank Transfer",
+            method: "BANK" as const,
+            sourceCurrency: "INR" as const,
+          };
+        }
 
-    const result = Array.from(methodSet);
-    return result.length > 0 ? result : (["UPI", "BANK", "USDT", "CRYPTO"] as DepositMethod[]);
+        const isCryptoLike = t === "CRYPTO" || t === "BTC" || !!pm?.crypto_address || !!pm?.crypto_network;
+        if (isCryptoLike) {
+          const refText = `${title} ${network}`.toUpperCase();
+          const cryptoCurrency: CurrencyCode =
+            refText.includes("USDT") || refText.includes("TETHER") ? "USDT" : "BTC";
+          return {
+            value: pm._id || fallbackValue,
+            label: title || (network ? `Crypto (${network})` : "Crypto"),
+            method: "CRYPTO" as const,
+            sourceCurrency: cryptoCurrency,
+            network,
+          };
+        }
+
+        return {
+          value: pm._id || fallbackValue,
+          label: title || "USDT",
+          method: "USDT" as const,
+          sourceCurrency: "USDT" as const,
+        };
+      })
+      .filter(Boolean);
+
+    if (options.length > 0) return options;
+    return [
+      {
+        value: "fallback-usdt",
+        label: "USDT",
+        method: "USDT",
+        sourceCurrency: "USDT",
+      },
+    ];
   }, [paymentMethods]);
 
-  const methodOptions = useMemo(
-    () =>
-      availableMethods.map((m) => ({
-        value: m,
-        label:
-          m === "UPI"
-            ? "UPI"
-            : m === "BANK"
-              ? "Bank"
-              : m === "USDT"
-                ? "USDT"
-                : "Crypto (BTCUSDT)",
-      })),
-    [availableMethods]
+  const selectedMethodOption = useMemo(
+    () => methodOptions.find((opt) => opt.value === selectedMethodKey) || methodOptions[0],
+    [methodOptions, selectedMethodKey]
   );
 
+  const method = selectedMethodOption?.method || "USDT";
+  const sourceCurrency: CurrencyCode = selectedMethodOption?.sourceCurrency || "USDT";
+  const selectedMethodLabel = selectedMethodOption?.label || method;
+
   useEffect(() => {
-    if (availableMethods.includes(method)) return;
-    setMethod(availableMethods[0] || "UPI");
-  }, [availableMethods, method]);
+    if (!methodOptions.length) return;
+    const exists = methodOptions.some((opt) => opt.value === selectedMethodKey);
+    if (exists) return;
+    setSelectedMethodKey(methodOptions[0].value);
+  }, [methodOptions, selectedMethodKey]);
 
   useEffect(() => {
     if (accountId) return;
@@ -94,12 +137,6 @@ export default function DepositForm() {
     if (exists) setAccountId(fromQuery);
   }, [accounts, accountId, searchParams]);
 
-  const sourceCurrency: CurrencyCode =
-    method === "UPI" || method === "BANK"
-      ? "INR"
-      : method === "CRYPTO"
-        ? "BTC"
-        : "USDT";
   const numericAmount = Number(amountInput || 0);
   const isValidAmount = Number.isFinite(numericAmount) && numericAmount > 0;
   const isConversionRequired = sourceCurrency !== "USDT";
@@ -149,7 +186,7 @@ export default function DepositForm() {
 
   const resetForm = () => {
     setAccountId("");
-    setMethod("UPI");
+    setSelectedMethodKey(methodOptions[0]?.value || "");
     setAmountInput("");
     setConvertedAmount(null);
     setFile(null);
@@ -369,15 +406,25 @@ export default function DepositForm() {
 
         <div className="mb-6 space-y-2">
           <label className="text-sm font-medium text-[var(--text-main)]">Payment Method</label>
-          <Select value={method} onChange={(v) => setMethod(v as DepositMethod)} options={methodOptions} />
+          <Select value={selectedMethodOption?.value || ""} onChange={setSelectedMethodKey} options={methodOptions} />
         </div>
 
         {method === "CRYPTO" && (
           <div className="mb-4 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-glass)] px-3 py-2 text-xs text-[var(--text-muted)]">
-            <p className="inline-flex items-center gap-2">
-              <Bitcoin className="h-4 w-4" />
-              Crypto pair: <span className="font-semibold text-[var(--text-main)]">BTCUSDT</span>
-            </p>
+            {sourceCurrency === "BTC" ? (
+              <p className="inline-flex items-center gap-2">
+                <Bitcoin className="h-4 w-4" />
+                Crypto pair: <span className="font-semibold text-[var(--text-main)]">BTCUSDT</span>
+              </p>
+            ) : (
+              <p className="inline-flex items-center gap-2">
+                <Bitcoin className="h-4 w-4" />
+                USDT wallet deposit (no conversion)
+                {selectedMethodOption?.network ? (
+                  <span className="font-semibold text-[var(--text-main)]">- {selectedMethodOption.network}</span>
+                ) : null}
+              </p>
+            )}
           </div>
         )}
 
@@ -408,9 +455,11 @@ export default function DepositForm() {
             ) : (
               <>
                 <p>
-                  You entered {numericAmount || 0} {sourceCurrency}. Converted deposit amount: <span className="font-semibold text-[var(--text-main)]">{convertedUsdt.toFixed(4)} USDT</span>
+                  You entered {numericAmount || 0} {sourceCurrency}.{" "}
+                  {isConversionRequired ? "Converted deposit amount:" : "Deposit amount:"}{" "}
+                  <span className="font-semibold text-[var(--text-main)]">{convertedUsdt.toFixed(4)} USDT</span>
                 </p>
-                {ratesData?.data && (
+                {ratesData?.data && isConversionRequired && (
                   <p className="mt-1 text-[10px] opacity-80">
                     Rate: 1 USDT = INR {ratesData.data.usdtInr} | 1 BTC = {ratesData.data.btcUsdt} USDT
                   </p>
@@ -480,7 +529,7 @@ export default function DepositForm() {
       {showConfirm && (
         <ConfirmModal
           title="Confirm Deposit"
-          description={`Entered ${numericAmount || 0} ${sourceCurrency} -> ${convertedUsdt.toFixed(4)} USDT via ${method} to account ****${selectedAccount?.account_number?.slice(-4)}.`}
+          description={`Entered ${numericAmount || 0} ${sourceCurrency} -> ${convertedUsdt.toFixed(4)} USDT via ${selectedMethodLabel} to account ****${selectedAccount?.account_number?.slice(-4)}.`}
           onConfirm={confirmDeposit}
           onCancel={() => setShowConfirm(false)}
           loading={isSubmitting}
