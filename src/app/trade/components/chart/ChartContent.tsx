@@ -8,6 +8,15 @@ import TradeExecutionSheet from "./TradeExecutionSheet";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
+declare global {
+  interface Window {
+    TradingView?: {
+      widget: new (options: Record<string, unknown>) => unknown;
+    };
+    __tradingViewScriptPromise?: Promise<void>;
+  }
+}
+
 function normalizeSymbol(tvSymbol: string) {
   if (!tvSymbol) return "";
   // strip exchange prefix if present and uppercase
@@ -25,6 +34,31 @@ function resolveSymbol(s: string) {
     return `BINANCE:${s}`;
   }
   return `FX:${s}`;
+}
+
+function loadTradingViewLibrary(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.TradingView?.widget) return Promise.resolve();
+  if (window.__tradingViewScriptPromise) return window.__tradingViewScriptPromise;
+
+  window.__tradingViewScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("tradingview-tvjs");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Failed to load TradingView library")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "tradingview-tvjs";
+    script.src = "https://s3.tradingview.com/tv.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load TradingView library"));
+    document.head.appendChild(script);
+  });
+
+  return window.__tradingViewScriptPromise;
 }
 
 /* --- Small UI icons used in header --- */
@@ -55,7 +89,6 @@ export default function ChartContent() {
   const uid = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetHostIdRef = useRef(`tradingview_chart_${uid.replace(/[:]/g, "_")}`);
-  const bootedRef = useRef(false);
   const searchParams = useSearchParams();
   const paramSymbol = searchParams.get("symbol");
 
@@ -83,8 +116,6 @@ export default function ChartContent() {
       const norm = normalizeSymbol(paramSymbol);
       queueMicrotask(() => {
         setCurrentSymbol(norm);
-        // don't immediately overwrite displaySymbol; widget will load that symbol and we poll iframe to detect it.
-        // but set displaySymbol so quotes are checked immediately
         setDisplaySymbol(norm);
       });
     }
@@ -116,61 +147,62 @@ export default function ChartContent() {
     return () => window.removeEventListener("resize", handle);
   }, []);
 
-  // Load TradingView widget once (StrictMode-safe).
+  // Load/refresh TradingView widget safely.
   useEffect(() => {
-    if (bootedRef.current) return;
-    if (!containerRef.current) return;
-    bootedRef.current = true;
+    let cancelled = false;
     const containerEl = containerRef.current;
+    if (!containerEl) return;
 
-    containerEl.innerHTML = "";
-    const widgetHost = document.createElement("div");
-    widgetHost.id = widgetHostIdRef.current;
-    widgetHost.style.width = "100%";
-    widgetHost.style.height = "100%";
-    containerEl.appendChild(widgetHost);
+    const renderWidget = async () => {
+      try {
+        await loadTradingViewLibrary();
+      } catch (error) {
+        console.error("[ChartContent] TradingView script load failed", error);
+        return;
+      }
+      if (cancelled || !containerRef.current || !window.TradingView?.widget) return;
 
-   let chartBg = "#ffffff";
-if (theme === "dark") {
-  chartBg = isDesktop ? "#111827" : "#000000";
-}
+      const host = containerRef.current;
+      host.innerHTML = "";
+      const widgetNode = document.createElement("div");
+      widgetNode.id = widgetHostIdRef.current;
+      widgetNode.style.width = "100%";
+      widgetNode.style.height = "100%";
+      host.appendChild(widgetNode);
 
+      const chartBg = theme === "dark" ? (isDesktop ? "#111827" : "#000000") : "#ffffff";
 
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.type = "text/javascript";
-    script.async = true;
+      new window.TradingView.widget({
+        autosize: true,
+        symbol: resolveSymbol(currentSymbol),
+        interval: "15",
+        timezone: "Asia/Kolkata",
+        theme: theme === "light" ? "light" : "dark",
+        style: "1",
+        locale: "en",
+        hide_side_toolbar: false,
+        allow_symbol_change: true,
+        container_id: widgetHostIdRef.current,
+        studies: [],
+        withdateranges: true,
+        details: true,
+        backgroundColor: chartBg,
+        overrides: {
+          "paneProperties.background": chartBg,
+          "paneProperties.backgroundType": "solid",
+          "paneProperties.vertGridProperties.color": theme === "light" ? "#e5e7eb" : "#1f2937",
+          "paneProperties.horzGridProperties.color": theme === "light" ? "#e5e7eb" : "#1f2937",
+          "scalesProperties.textColor": theme === "light" ? "#111827" : "#d1d5db",
+          "mainSeriesProperties.candleStyle.upColor": "#22c55e",
+          "mainSeriesProperties.candleStyle.downColor": "#ef4444",
+        },
+      });
+    };
 
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: resolveSymbol(currentSymbol),
-      interval: "15",
-      timezone: "Asia/Kolkata",
-      theme: theme === "light" ? "light" : "dark",
-      style: "1",
-      locale: "en",
-      hide_side_toolbar: false,
-      allow_symbol_change: true,
-      container_id: widgetHostIdRef.current,
-      studies: [],
-      withdateranges: true,
-      details: true,
-      backgroundColor: chartBg,
-      overrides: {
-        "paneProperties.background": chartBg,
-        "paneProperties.backgroundType": "solid",
-        "paneProperties.vertGridProperties.color": theme === "light" ? "#e5e7eb" : "#1f2937",
-        "paneProperties.horzGridProperties.color": theme === "light" ? "#e5e7eb" : "#1f2937",
-        "scalesProperties.textColor": theme === "light" ? "#111827" : "#d1d5db",
-        "mainSeriesProperties.candleStyle.upColor": "#22c55e",
-        "mainSeriesProperties.candleStyle.downColor": "#ef4444",
-      },
-    });
-
-    containerEl.appendChild(script);
-
+    void renderWidget();
     return () => {
-      // Don't teardown embed script on dev StrictMode passive cleanup.
+      cancelled = true;
+      containerEl.innerHTML = "";
     };
   }, [currentSymbol, theme, isDesktop]);
 

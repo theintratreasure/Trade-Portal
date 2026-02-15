@@ -125,6 +125,16 @@ const formatOpenTime24 = (value: string | number | null | undefined) => {
     });
 };
 
+const toSafeNumber = (value: unknown, fallback = 0) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+};
+
+const toFixedSafe = (value: unknown, digits = 2, fallback = "0.00") => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(digits) : fallback;
+};
+
 function buildModifyPositionUrl(pos: Position): string {
     const params = new URLSearchParams({
         symbol: pos.pair ?? "",
@@ -314,24 +324,28 @@ export default function TradePage() {
     }, [openMenu]);
 
 
+    const accountBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.balance);
+    const accountEquity = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.equity);
+    const accountUsedMargin = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.usedMargin);
+    const accountFreeMargin = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.freeMargin);
     const marginLevel =
-        effectiveAccount && effectiveAccount.usedMargin > 0
-            ? ((effectiveAccount.equity / effectiveAccount.usedMargin) * 100).toFixed(2)
+        effectiveAccount && accountUsedMargin > 0
+            ? ((accountEquity / accountUsedMargin) * 100).toFixed(2)
             : "0.00";
 
     const accountStats: AccountStat[] = effectiveAccount
         ? [
-            { label: "Balance", value: effectiveAccount.balance.toFixed(2) },
-            { label: "Equity", value: effectiveAccount.equity.toFixed(2) },
-            { label: "Margin", value: effectiveAccount.usedMargin.toFixed(2) },
-            { label: "Free margin", value: effectiveAccount.freeMargin.toFixed(2) },
+            { label: "Balance", value: accountBalance.toFixed(2) },
+            { label: "Equity", value: accountEquity.toFixed(2) },
+            { label: "Margin", value: accountUsedMargin.toFixed(2) },
+            { label: "Free margin", value: accountFreeMargin.toFixed(2) },
             { label: "Margin Level (%)", value: marginLevel },
         ]
         : [];
 
     const pnl =
         effectiveAccount
-            ? effectiveAccount.equity - effectiveAccount.balance
+            ? accountEquity - accountBalance
             : 0;
     const formattedPnl = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
     const pnlColorClass =
@@ -346,17 +360,17 @@ export default function TradePage() {
             id: pos.positionId,
             pair: pos.symbol,
             type: pos.side.toLowerCase(),
-            lot: pos.volume ?? 0,
-            from: pos.openPrice?.toFixed(2) ?? "-",
-            to: pos.currentPrice?.toFixed(2) ?? "-",
-            profit: pos.floatingPnL ?? 0,
+            lot: toSafeNumber(pos.volume),
+            from: toFixedSafe(pos.openPrice, 2, "-"),
+            to: toFixedSafe(pos.currentPrice, 2, "-"),
+            profit: toSafeNumber(pos.floatingPnL),
             openTime: pos.openTime
                 ? formatOpenTime24(pos.openTime)
                 : "-",
 
-            swap: pos.swap?.toFixed(2) ?? "0.00",
-            stopLoss: pos.stopLoss ?? null,
-            takeProfit: pos.takeProfit ?? null,
+            swap: toFixedSafe(pos.swap),
+            stopLoss: pos.stopLoss == null ? null : toSafeNumber(pos.stopLoss, 0),
+            takeProfit: pos.takeProfit == null ? null : toSafeNumber(pos.takeProfit, 0),
         }));
     }, [socketOrRestPositions]);
 
@@ -502,28 +516,28 @@ export default function TradePage() {
                                     <div>
                                         <span className="text-[var(--text-muted)]">Balance:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {effectiveAccount.balance.toFixed(2)}
+                                            {accountBalance.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Equity:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {effectiveAccount.equity.toFixed(2)}
+                                            {accountEquity.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Used Margin:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {effectiveAccount.usedMargin.toFixed(2)}
+                                            {accountUsedMargin.toFixed(2)}
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Free Margin:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {effectiveAccount.freeMargin.toFixed(2)}
+                                            {accountFreeMargin.toFixed(2)}
                                         </span>
                                     </div>
 
