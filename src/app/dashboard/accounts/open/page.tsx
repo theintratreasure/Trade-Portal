@@ -60,22 +60,14 @@ export default function OpenAccountPage() {
       });
     } catch (err: unknown) {
       setConfirmOpen(false);
-      const status = (err as { response?: { status?: number } })?.response?.status;
-
-      if (status === 400) {
-        setErrorMsg("You have reached the account creation limit.");
-      } else {
-        setErrorMsg("Something went wrong. Please try again.");
-      }
+      const row = err as { response?: { data?: { message?: string } }; message?: string };
+      const apiMessage = row?.response?.data?.message || row?.message || "Something went wrong. Please try again.";
+      setErrorMsg(apiMessage);
     }
   };
 
   const allPlans = data || [];
-  const demoEligiblePlans = allPlans.filter((plan) => plan.is_demo_allowed !== false);
-  const filteredPlans =
-    accountType === "demo"
-      ? (demoEligiblePlans.length > 0 ? demoEligiblePlans : allPlans)
-      : allPlans;
+  const filteredPlans = allPlans;
   const currentStep = !selectedPlan ? 2 : confirmOpen || createAccount.isPending ? 3 : 3;
 
   return (
@@ -280,8 +272,8 @@ export default function OpenAccountPage() {
         />
       )}
 
-      {errorMsg && <Toast message={errorMsg} type="error" />}
-      {toast && <Toast message={toast.message} type="success" />}
+      {errorMsg && <Toast message={errorMsg} type="error" onClose={() => setErrorMsg(null)} />}
+      {toast && <Toast message={toast.message} type="success" onClose={() => setToast(null)} />}
     </div>
   );
 }

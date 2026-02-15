@@ -149,7 +149,7 @@ export default function KycPage() {
         <KycFaq />
       </aside>
 
-      {toast && <Toast message={toast.message} type={toast.type} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

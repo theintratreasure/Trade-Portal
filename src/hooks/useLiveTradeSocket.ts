@@ -132,7 +132,11 @@ function normalizePosition(data: unknown): LivePosition | null {
     takeProfit: (row.takeProfit ?? row.take_profit ?? null) as number | null,
     swap: Number(row.swap ?? 0),
     commission: Number(row.commission ?? 0),
-    openTime: row.openTime ? String(row.openTime) : undefined,
+    openTime: row.openTime
+      ? String(row.openTime)
+      : row.open_time
+      ? String(row.open_time)
+      : undefined,
   };
 }
 
@@ -213,8 +217,9 @@ function parsePendingsFromUnknown(data: unknown): LivePending[] {
   return [];
 }
 
-function applyPositionSnapshot(items: LivePosition[]) {
-  const next: Record<string, LivePosition> = {};
+function applyPositionMerge(items: LivePosition[]) {
+  if (items.length === 0) return;
+  const next: Record<string, LivePosition> = { ...shared.positionsMap };
   for (const item of items) {
     next[item.positionId] = item;
   }
@@ -317,7 +322,14 @@ async function reconcileFromRest() {
       if (!pos) continue;
       next[pos.positionId] = pos;
     }
-    shared.positionsMap = next;
+    const currentSize = Object.keys(shared.positionsMap).length;
+    const nextSize = Object.keys(next).length;
+    // If REST returns a partial list, avoid shrinking visible positions abruptly.
+    if (currentSize > nextSize && nextSize > 0) {
+      shared.positionsMap = { ...shared.positionsMap, ...next };
+    } else {
+      shared.positionsMap = next;
+    }
     scheduleEmit();
   } catch {
     // ignore reconcile errors; websocket remains primary source
@@ -370,7 +382,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
         shared.account = message.data as LiveAccount;
         const positions = parsePositionsFromUnknown(message.data);
         if (positions.length > 0) {
-          applyPositionSnapshot(positions);
+          applyPositionMerge(positions);
         }
         const pendings = parsePendingsFromUnknown(message.data);
         if (pendings.length > 0) {
@@ -384,7 +396,8 @@ function bindSocket(socket: WebSocket, accountId: string) {
       if (payload) {
         const positions = parsePositionsFromUnknown(payload);
         if (positions.length > 0) {
-          applyPositionSnapshot(positions);
+          // Unknown message types may send partial arrays; merge to avoid flicker.
+          applyPositionMerge(positions);
           return;
         }
         const pendings = parsePendingsFromUnknown(payload);
@@ -437,7 +450,9 @@ function bindSocket(socket: WebSocket, accountId: string) {
         message.data
       ) {
         const positions = parsePositionsFromUnknown(message.data);
-        applyPositionSnapshot(positions);
+        // In practice these events can be partial batches, so merge to avoid
+        // shrinking UI list to a single position intermittently.
+        applyPositionMerge(positions);
         return;
       }
 
@@ -478,7 +493,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
         }
         const positions = parsePositionsFromUnknown(message.data);
         if (positions.length > 0) {
-          applyPositionSnapshot(positions);
+          applyPositionMerge(positions);
         }
         const pendings = parsePendingsFromUnknown(message.data);
         if (pendings.length > 0) {

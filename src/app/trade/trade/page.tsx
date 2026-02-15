@@ -73,6 +73,58 @@ type DesktopMenuState = {
     actions: DesktopMenuAction[];
 };
 
+const formatDateTime24 = (value: string | number | Date | null | undefined) => {
+    if (!value) return "-";
+    const raw = typeof value === "string" ? value.trim() : value;
+    let parsed: number | string | Date = raw;
+
+    if (typeof raw === "string" && /^\d+$/.test(raw)) {
+        const n = Number(raw);
+        parsed = raw.length <= 10 || n < 1_000_000_000_000 ? n * 1000 : n;
+    } else if (typeof raw === "number") {
+        parsed = raw < 1_000_000_000_000 ? raw * 1000 : raw;
+    }
+
+    const dt = new Date(parsed);
+    if (Number.isNaN(dt.getTime())) return "-";
+    return dt.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+};
+
+const formatOpenTime24 = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === "") return "-";
+
+    const raw = typeof value === "string" ? value.trim() : value;
+    let parsed: string | number | Date = raw;
+
+    if (typeof raw === "string" && /^\d+$/.test(raw)) {
+        const n = Number(raw);
+        parsed = raw.length <= 10 || n < 1_000_000_000_000 ? n * 1000 : n;
+    } else if (typeof raw === "number") {
+        parsed = raw < 1_000_000_000_000 ? raw * 1000 : raw;
+    }
+
+    const dt = new Date(parsed);
+    if (Number.isNaN(dt.getTime())) return String(value);
+
+    return dt.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+};
+
 function buildModifyPositionUrl(pos: Position): string {
     const params = new URLSearchParams({
         symbol: pos.pair ?? "",
@@ -164,7 +216,7 @@ export default function TradePage() {
                 takeProfit: (row?.takeProfit ?? null) as number | null,
                 swap: Number(row?.swap ?? 0),
                 commission: Number(row?.commission ?? 0),
-                openTime: row?.openTime ? String(row.openTime) : undefined,
+                openTime: row?.openTime ?? row?.open_time,
             }));
     }, [accountId, positions, restFallback]);
 
@@ -299,7 +351,7 @@ export default function TradePage() {
             to: pos.currentPrice?.toFixed(2) ?? "-",
             profit: pos.floatingPnL ?? 0,
             openTime: pos.openTime
-                ? new Date(pos.openTime).toLocaleString()
+                ? formatOpenTime24(pos.openTime)
                 : "-",
 
             swap: pos.swap?.toFixed(2) ?? "0.00",
@@ -656,7 +708,7 @@ export default function TradePage() {
                                             <div>{order.orderId.slice(0, 10)}</div>
 
                                             <div>
-                                                {new Date(order.createdAt).toLocaleString()}
+                                                {formatDateTime24(order.createdAt)}
                                             </div>
 
                                             <div className="font-semibold">

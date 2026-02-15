@@ -214,7 +214,7 @@ export default function Support() {
         </div>
       </div>
 
-      {toast && <Toast message={toast.message} type={toast.type} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

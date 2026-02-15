@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useCallback, useId } from "react";
+import { useSearchParams } from "next/navigation";
 import TopBarSlot from "../layout/TopBarSlot";
 import TradeTopBar from "../layout/TradeTopBar";
 import TradeExecutionSheet from "./TradeExecutionSheet";
@@ -25,27 +25,6 @@ function resolveSymbol(s: string) {
     return `BINANCE:${s}`;
   }
   return `FX:${s}`;
-}
-
-/** Parse symbol from iframe src query param "symbol" */
-function symbolFromIframeSrc(src: string | null) {
-  if (!src) return "";
-  try {
-    const u = new URL(src, window.location.href);
-    const s = u.searchParams.get("symbol");
-    if (s) {
-      // some embeds may URL-encode colon as %3A
-      return normalizeSymbol(decodeURIComponent(s));
-    }
-    // fallback: try regex for symbol=... even in fragment
-    const m = src.match(/[?&]symbol=([^&]+)/i);
-    if (m && m[1]) {
-      return normalizeSymbol(decodeURIComponent(m[1]));
-    }
-  } catch {
-    // ignore
-  }
-  return "";
 }
 
 /* --- Small UI icons used in header --- */
@@ -73,9 +52,11 @@ function CSIcon({ size = 36 }: { size?: number }) {
 
 /* ----------------- Component ----------------- */
 export default function ChartContent() {
+  const uid = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  const widgetHostIdRef = useRef(`tradingview_chart_${uid.replace(/[:]/g, "_")}`);
+  const bootedRef = useRef(false);
   const searchParams = useSearchParams();
-  const router = useRouter();
   const paramSymbol = searchParams.get("symbol");
 
   // initial symbol: prefer URL param, else EURUSD
@@ -135,13 +116,19 @@ export default function ChartContent() {
     return () => window.removeEventListener("resize", handle);
   }, []);
 
-  // load embed widget and then poll iframe.src to detect symbol changes
+  // Load TradingView widget once (StrictMode-safe).
   useEffect(() => {
+    if (bootedRef.current) return;
     if (!containerRef.current) return;
+    bootedRef.current = true;
     const containerEl = containerRef.current;
 
-    // remove any previous contents (script/iframe)
     containerEl.innerHTML = "";
+    const widgetHost = document.createElement("div");
+    widgetHost.id = widgetHostIdRef.current;
+    widgetHost.style.width = "100%";
+    widgetHost.style.height = "100%";
+    containerEl.appendChild(widgetHost);
 
    let chartBg = "#ffffff";
 if (theme === "dark") {
@@ -164,7 +151,7 @@ if (theme === "dark") {
       locale: "en",
       hide_side_toolbar: false,
       allow_symbol_change: true,
-      container_id: "tradingview_chart",
+      container_id: widgetHostIdRef.current,
       studies: [],
       withdateranges: true,
       details: true,
@@ -182,64 +169,10 @@ if (theme === "dark") {
 
     containerEl.appendChild(script);
 
-    // start polling iframe.src after embed script inserts iframe
-    let pollHandle: number | null = null;
-    const startPolling = () => {
-      if (pollHandle) return;
-      pollHandle = window.setInterval(() => {
-        try {
-          const iframe = containerEl.querySelector("iframe");
-          if (!iframe) return;
-          const src = (iframe as HTMLIFrameElement).getAttribute("src") || (iframe as HTMLIFrameElement).src;
-          const sym = symbolFromIframeSrc(src);
-          if (sym && sym !== displaySymbol) {
-            // update displaySymbol (this drives quotes)
-            setDisplaySymbol(sym);
-
-            // also sync URL param if different
-            const url = new URL(window.location.href);
-            if (url.searchParams.get("symbol") !== sym) {
-              url.searchParams.set("symbol", sym);
-              // replace state without scrolling
-              router.replace(url.toString(), { scroll: false });
-            }
-          }
-        } catch {
-          // ignore cross-origin access errors (we only read src attribute which is safe)
-        }
-      }, 700); // poll every 700ms
-    };
-
-    // start a small timeout to give embed script chance to create iframe
-    const startTimeout = window.setTimeout(startPolling, 600);
-
-    // ensure poll starts again if iframe not present initially (rare)
-    const fallbackInterval = window.setInterval(() => {
-      if (!pollHandle) {
-        const iframe = containerEl.querySelector("iframe");
-        if (iframe) {
-          // start immediately
-          startPolling();
-          window.clearInterval(fallbackInterval);
-        }
-      } else {
-        window.clearInterval(fallbackInterval);
-      }
-    }, 800);
-
     return () => {
-      // cleanup
-      window.clearTimeout(startTimeout);
-      if (pollHandle) {
-        clearInterval(pollHandle);
-        pollHandle = null;
-      }
-      clearInterval(fallbackInterval);
-      // remove script & iframe (container innerHTML cleanup already done at start of new effect)
-      containerEl.innerHTML = "";
+      // Don't teardown embed script on dev StrictMode passive cleanup.
     };
-    // we intentionally depend on currentSymbol/theme/isDesktop - when currentSymbol changes we'll re-create widget
-  }, [currentSymbol, theme, isDesktop, displaySymbol, router]);
+  }, [currentSymbol, theme, isDesktop]);
 
   // If you want programmatic symbol change (e.g., user selects a symbol from your UI),
   // call setCurrentSymbol("USDJPY") and the embed will be recreated with that symbol.
@@ -282,7 +215,7 @@ if (theme === "dark") {
         />
       </TopBarSlot>
 
-      <div ref={containerRef} id="tradingview_chart" className="flex-1 w-full" />
+      <div ref={containerRef} className="flex-1 w-full" />
     </div>
   );
 }

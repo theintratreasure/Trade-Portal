@@ -1,24 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 
 type ToastProps = {
   message: string;
   type?: "success" | "error";
+  onClose?: () => void;
 };
 
-export function Toast({ message, type = "success" }: ToastProps) {
+export function Toast({ message, type = "success", onClose }: ToastProps) {
   const isSuccess = type === "success";
   const [visible, setVisible] = useState(true);
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const showTimer = setTimeout(() => {
+      setVisible(true);
+    }, 0);
+
+    const hideTimer = setTimeout(() => {
       setVisible(false);
+      onCloseRef.current?.();
     }, 3000);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [message, type]);
 
   if (!visible) return null;
 

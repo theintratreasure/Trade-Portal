@@ -405,7 +405,7 @@ export default function ModifyPendingOrderPage() {
       </div>
     </div>
 
-    {toast && <Toast message={toast.message} type={toast.type} />}
+    {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     {modifyResult && (
   <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] flex flex-col items-center justify-center text-[var(--text-main)]">
 

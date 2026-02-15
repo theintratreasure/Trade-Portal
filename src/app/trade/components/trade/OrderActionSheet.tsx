@@ -10,6 +10,21 @@ type OrderSheetProps = {
     onDeleteClick: () => void;
 };
 
+const formatDateTime24 = (value: string | number | Date | null | undefined) => {
+    if (!value) return "-";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return "-";
+    return dt.toLocaleString(undefined, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+};
+
 export default function OrderActionSheet({
     order,
     open,
@@ -63,7 +78,7 @@ export default function OrderActionSheet({
 
                         <div className="flex justify-between mr-2">
                             <span>Created:</span>
-                            <span>{new Date(order.createdAt).toLocaleString()}</span>
+                            <span>{formatDateTime24(order.createdAt)}</span>
                         </div>
 
                         <div className="flex justify-between mr-2">

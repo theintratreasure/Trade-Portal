@@ -19,6 +19,21 @@ import type { HistoryFilterType } from "@/services/trade.service";
 type TabType = "positions" | "orders" | "deals";
 type SideFilter = "ALL" | "BUY" | "SELL";
 
+const formatDateTime24 = (value: string | number | Date | null | undefined) => {
+  if (!value) return "-";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "-";
+  return dt.toLocaleString(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+};
+
 /* ================= TABS ================= */
 const LongPressRow = ({
   children,
@@ -621,7 +636,7 @@ export default function TradeHistory() {
 
                         <div className="text-right mt-price-line">
                           <div className="text-[12px]">
-                            {new Date(order.openTime).toLocaleString()}
+                            {formatDateTime24(order.openTime)}
                           </div>
                           <div className="mt-profit text-[13px]">
                             {order.status === "CLOSED" ? "FILLED" : order.status}
@@ -766,7 +781,7 @@ export default function TradeHistory() {
 
                         <div className="text-right">
                           <div className="text-[12px] mt-price-line">
-                            {new Date(pos.openTime).toLocaleString()}
+                            {formatDateTime24(pos.openTime)}
                           </div>
 
                           <div
@@ -927,7 +942,7 @@ export default function TradeHistory() {
 
                         <div className="text-right">
                           <div className="text-[12px] mt-price-line">
-                            {new Date(deal.date).toLocaleString()}
+                            {formatDateTime24(deal.date)}
                           </div>
 
                           {deal.pnl !== 0 && (
