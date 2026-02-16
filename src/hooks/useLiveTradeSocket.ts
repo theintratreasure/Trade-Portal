@@ -10,8 +10,12 @@ const LIVE_SOCKET_RECONNECT_MAX_MS = 5000;
 const LIVE_RECONCILE_INTERVAL_MS = 3000;
 
 type LiveAccount = {
+  accountId?: string;
   balance: number;
   equity: number;
+  bonusBalance?: number;
+  bonusLive?: number;
+  bonusPercent?: number;
   usedMargin: number;
   freeMargin: number;
 };
@@ -88,6 +92,32 @@ const toNumberOrUndefined = (value: unknown): number | undefined => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
+
+function normalizeLiveAccount(data: unknown): LiveAccount | null {
+  if (!data || typeof data !== "object") return null;
+  const row = data as Record<string, unknown>;
+  const nestedData =
+    row.data && typeof row.data === "object"
+      ? (row.data as Record<string, unknown>)
+      : null;
+  const source = nestedData ?? row;
+
+  const balance = Number(source.balance ?? 0);
+  const equity = Number(source.equity ?? 0);
+  const usedMargin = Number(source.usedMargin ?? source.margin ?? 0);
+  const freeMargin = Number(source.freeMargin ?? 0);
+
+  return {
+    accountId: source.accountId ? String(source.accountId) : undefined,
+    balance: Number.isFinite(balance) ? balance : 0,
+    equity: Number.isFinite(equity) ? equity : 0,
+    bonusBalance: toNumberOrUndefined(source.bonusBalance ?? source.bonus_balance),
+    bonusLive: toNumberOrUndefined(source.bonusLive ?? source.bonus_live),
+    bonusPercent: toNumberOrUndefined(source.bonusPercent ?? source.bonus_percent),
+    usedMargin: Number.isFinite(usedMargin) ? usedMargin : 0,
+    freeMargin: Number.isFinite(freeMargin) ? freeMargin : 0,
+  };
+}
 
 function normalizePendingOrder(data: unknown): LivePending | null {
   if (!data || typeof data !== "object") return null;
@@ -379,7 +409,8 @@ function bindSocket(socket: WebSocket, accountId: string) {
       }
 
       if (message.type === "live_account" && message.data && typeof message.data === "object") {
-        shared.account = message.data as LiveAccount;
+        const account = normalizeLiveAccount(message.data);
+        if (account) shared.account = account;
         const positions = parsePositionsFromUnknown(message.data);
         if (positions.length > 0) {
           applyPositionMerge(positions);
@@ -412,7 +443,8 @@ function bindSocket(socket: WebSocket, accountId: string) {
         message.data &&
         typeof message.data === "object"
       ) {
-        shared.account = message.data as LiveAccount;
+        const account = normalizeLiveAccount(message.data);
+        if (account) shared.account = account;
         scheduleEmit();
         return;
       }
@@ -487,9 +519,11 @@ function bindSocket(socket: WebSocket, accountId: string) {
       ) {
         const row = message.data as Record<string, unknown>;
         if (row.account && typeof row.account === "object") {
-          shared.account = row.account as LiveAccount;
+          const account = normalizeLiveAccount(row.account);
+          if (account) shared.account = account;
         } else {
-          shared.account = message.data as LiveAccount;
+          const account = normalizeLiveAccount(message.data);
+          if (account) shared.account = account;
         }
         const positions = parsePositionsFromUnknown(message.data);
         if (positions.length > 0) {

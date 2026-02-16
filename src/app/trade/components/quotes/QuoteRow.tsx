@@ -129,32 +129,30 @@ const formattedPercent =
 
   if (viewMode === "simple") {
     return (
-      <div className="px-1 md:px-0 py-1 border-b border-[var(--border-soft)]">
-       
-
-        <div className="mt-2 flex items-center justify-between">
-          <div className="font-semibold text-[14px]">
+      <div className="px-1 md:px-0 py-1.5 border-b border-[var(--border-soft)] overflow-x-hidden">
+        <div className="mt-1 grid grid-cols-[minmax(72px,1fr)_minmax(82px,auto)_minmax(82px,auto)] items-center gap-2 max-[360px]:gap-1.5">
+          <div className="font-semibold text-[14px] max-[360px]:text-[12px] truncate pr-1">
             {live.symbol}
           </div>
 
-          <div className="flex gap-10">
-            <div className={`text-right font-semibold text-[18px] ${bidColor}`}>
-              {bid.int}.
+          <div className={`text-right font-semibold text-[18px] max-[360px]:text-[15px] leading-none whitespace-nowrap tabular-nums ${bidColor}`}>
+            {bid.int}
+            <span className="text-[14px] max-[360px]:text-[12px]">.</span>
               <span>{bid.normal}</span>
-              <span className="text-[22px]">{bid.big}</span>
-              <sup className="text-[11px] relative top-[-13px]">
+              <span className="text-[22px] max-[360px]:text-[18px]">{bid.big}</span>
+              <sup className="text-[11px] max-[360px]:text-[9px] relative top-[-11px] max-[360px]:top-[-9px]">
                 {bid.small}
               </sup>
-            </div>
+          </div>
 
-            <div className={`text-right font-semibold text-[18px] ${askColor}`}>
-              {ask.int}.
+          <div className={`text-right font-semibold text-[18px] max-[360px]:text-[15px] leading-none whitespace-nowrap tabular-nums ${askColor}`}>
+            {ask.int}
+            <span className="text-[14px] max-[360px]:text-[12px]">.</span>
               <span>{ask.normal}</span>
-              <span className="text-[22px]">{ask.big}</span>
-              <sup className="text-[11px] relative top-[-13px]">
+              <span className="text-[22px] max-[360px]:text-[18px]">{ask.big}</span>
+              <sup className="text-[11px] max-[360px]:text-[9px] relative top-[-11px] max-[360px]:top-[-9px]">
                 {ask.small}
               </sup>
-            </div>
           </div>
         </div>
       </div>
@@ -162,23 +160,23 @@ const formattedPercent =
   }
 
   return (
-    <div className="flex items-center justify-between px-4 md:px-0 py-3 border-b border-[var(--border-soft)]">
+    <div className="flex items-center justify-between gap-3 px-3 md:px-0 py-3 border-b border-[var(--border-soft)] overflow-x-hidden">
       {/* LEFT */}
-      <div className="flex flex-col gap-[2px] min-w-[130px]">
+      <div className="flex flex-col gap-[2px] min-w-0 flex-1">
 
         {/* CHANGE + % */}
-        <div className={`text-[13px] font-semibold ${changeColor}`}>
+        <div className={`text-[13px] max-[360px]:text-[11px] font-semibold ${changeColor} truncate`}>
           {formattedChange} | {formattedPercent}
         </div>
 
 
         {/* SYMBOL */}
-        <div className="font-semibold text-[14px]">
+        <div className="font-semibold text-[14px] max-[360px]:text-[12px] truncate">
           {live.symbol}
         </div>
 
         {/* TIME + SPREAD */}
-        <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-2">
+        <div className="text-[11px] max-[360px]:text-[10px] text-[var(--text-muted)] flex items-center gap-2 max-[360px]:gap-1 min-w-0">
           {live.tickTime ?? "--:--:--"}
           <HGapSeparatorIcon />
           {diff}
@@ -187,36 +185,38 @@ const formattedPercent =
 
 
       {/* RIGHT */}
-      <div className="flex gap-6">
+      <div className="grid grid-cols-2 gap-3 max-[360px]:gap-2 shrink-0">
         {/* BID */}
         <div className="text-right">
-          <div className={`font-semibold text-[18px] ${bidColor}`}>
-            {bid.int}.
+          <div className={`font-semibold text-[18px] max-[360px]:text-[15px] leading-none whitespace-nowrap tabular-nums ${bidColor}`}>
+            {bid.int}
+            <span className="text-[14px] max-[360px]:text-[12px]">.</span>
             <span>{bid.normal}</span>
-            <span className="text-[22px]">{bid.big}</span>
-            <sup className="text-[11px] relative top-[-13px]">
+            <span className="text-[22px] max-[360px]:text-[18px]">{bid.big}</span>
+            <sup className="text-[11px] max-[360px]:text-[9px] relative top-[-11px] max-[360px]:top-[-9px]">
               {bid.small}
             </sup>
           </div>
 
-          <div className="text-xs text-[var(--text-muted)]">
+          <div className="text-xs max-[360px]:text-[10px] text-[var(--text-muted)]">
             L: {live.low ?? "--"}
           </div>
         </div>
 
         {/* ASK */}
         <div className="text-right">
-          <div className={`font-semibold text-[18px] ${askColor}`}>
-            {ask.int}.
+          <div className={`font-semibold text-[18px] max-[360px]:text-[15px] leading-none whitespace-nowrap tabular-nums ${askColor}`}>
+            {ask.int}
+            <span className="text-[14px] max-[360px]:text-[12px]">.</span>
             <span>{ask.normal}</span>
-            <span className="text-[22px]">{ask.big}</span>
-            <sup className="text-[11px] relative top-[-13px]">
+            <span className="text-[22px] max-[360px]:text-[18px]">{ask.big}</span>
+            <sup className="text-[11px] max-[360px]:text-[9px] relative top-[-11px] max-[360px]:top-[-9px]">
               {ask.small}
             </sup>
           </div>
 
 
-          <div className="text-xs text-[var(--text-muted)]">
+          <div className="text-xs max-[360px]:text-[10px] text-[var(--text-muted)]">
             H: {live.high ?? "--"}
           </div>
         </div>

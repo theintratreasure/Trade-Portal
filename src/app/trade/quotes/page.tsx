@@ -23,17 +23,13 @@ export default function QuotesPage() {
         const saved = localStorage.getItem("trade-quote-view");
         return saved === "advanced" || saved === "simple" ? saved : "advanced";
     });
-    const [mounted, setMounted] = useState(false);
     const router = useRouter();
     const isDesktop = useMediaQuery("(min-width: 768px)");
     useEffect(() => {
-        if (mounted && isDesktop) {
+        if (isDesktop) {
             router.replace(`/trade`);
         }
-    }, [mounted, isDesktop, router]);
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    }, [isDesktop, router]);
 
     useEffect(() => {
         const syncFromStorage = () => {
@@ -61,8 +57,6 @@ export default function QuotesPage() {
         };
     }, []);
 
-    if (!mounted) return null;
-
     return (
         <>
             <TopBarSlot>
@@ -73,7 +67,7 @@ export default function QuotesPage() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setSheet("add")}
-                                className="h-12 w-12 flex items-center justify-center text-[var(--text-main)]"
+                                className="h-12 w-12 max-[360px]:h-10 max-[360px]:w-10 flex items-center justify-center text-[var(--text-main)]"
                             >
                                 <Plus size={22} strokeWidth={2.5} />
                             </button>
@@ -103,7 +97,7 @@ export default function QuotesPage() {
                 />
             </TopBarSlot>
 
-            <div className="text-[var(--text-main)] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-screen ">
+            <div className="text-[var(--text-main)] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-screen overflow-x-hidden">
                 <QuotesList
                     viewMode={viewMode}
                     onSelect={(symbol) => {

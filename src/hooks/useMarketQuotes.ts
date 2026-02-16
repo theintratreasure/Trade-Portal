@@ -9,16 +9,17 @@ import { useWatchlist } from "./watchlist/useWatchlist";
 type QuoteMap = Record<string, QuoteLiveState | undefined>;
 type QuoteListener = (quotes: QuoteMap) => void;
 
-const QUOTES_FLUSH_INTERVAL_MS = 90;
-
 const shared = {
   socket: null as MarketSocket | null,
   token: null as string | null,
+  accountId: null as string | null,
   buffer: {} as QuoteMap,
   listeners: new Set<QuoteListener>(),
   symbolRefCounts: new Map<string, number>(),
   flushTimer: null as number | null,
 };
+
+const QUOTES_FAST_FLUSH_INTERVAL_MS = 50;
 
 function getNumber(...values: unknown[]): number | undefined {
   for (const v of values) {
@@ -51,7 +52,7 @@ function scheduleEmit() {
   shared.flushTimer = window.setTimeout(() => {
     shared.flushTimer = null;
     emitQuotes();
-  }, QUOTES_FLUSH_INTERVAL_MS);
+  }, QUOTES_FAST_FLUSH_INTERVAL_MS);
 }
 
 function handleIncomingQuote(msg: unknown) {
@@ -216,8 +217,12 @@ function handleIncomingQuote(msg: unknown) {
   }
 }
 
-function ensureSocket(token: string) {
-  if (shared.socket && shared.token === token) return;
+function ensureSocket(token: string, accountId: string) {
+  if (shared.socket && shared.token === token) {
+    shared.accountId = accountId || null;
+    shared.socket.setAccountId(accountId || undefined);
+    return;
+  }
 
   if (shared.socket) {
     shared.socket.close();
@@ -225,6 +230,7 @@ function ensureSocket(token: string) {
   }
 
   shared.token = token;
+  shared.accountId = accountId || null;
   shared.buffer = {};
 
   for (const [symbol, count] of shared.symbolRefCounts) {
@@ -235,7 +241,7 @@ function ensureSocket(token: string) {
 
   const socket = new MarketSocket();
   shared.socket = socket;
-  socket.connect(token, handleIncomingQuote);
+  socket.connect(token, handleIncomingQuote, accountId || undefined);
 
   for (const [symbol, count] of shared.symbolRefCounts) {
     if (count > 0) {
@@ -244,6 +250,25 @@ function ensureSocket(token: string) {
   }
 
   scheduleEmit();
+}
+
+function getCookieValue(name: string): string {
+  if (typeof document === "undefined") return "";
+  const prefix = `${name}=`;
+  const token = document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(prefix));
+  return token ? decodeURIComponent(token.slice(prefix.length)) : "";
+}
+
+function getEffectiveAccountId(): string {
+  const fromCookie = getCookieValue("accountId");
+  if (fromCookie) return fromCookie;
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("tradeAccountId") ?? "";
+  }
+  return "";
 }
 
 function subscribeSymbol(symbol: string) {
@@ -286,6 +311,7 @@ function removeListener(listener: QuoteListener) {
 
 export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
   const [quotes, setQuotes] = useState<QuoteMap>({});
+  const [accountId, setAccountId] = useState<string>(() => getEffectiveAccountId());
   const { data: watchlist } = useWatchlist();
   const ownedSymbolsRef = useRef<Set<string>>(new Set());
   const listenerRef = useRef<QuoteListener>((snapshot) => setQuotes(snapshot));
@@ -301,19 +327,34 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
   }, [extraSymbols, watchlist]);
 
   useEffect(() => {
+    const syncAccountId = () => {
+      const next = getEffectiveAccountId();
+      setAccountId((prev) => (prev === next ? prev : next));
+    };
+
+    syncAccountId();
+    window.addEventListener("focus", syncAccountId);
+    window.addEventListener("trade-account-change", syncAccountId);
+    return () => {
+      window.removeEventListener("focus", syncAccountId);
+      window.removeEventListener("trade-account-change", syncAccountId);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!token) {
       queueMicrotask(() => setQuotes({}));
       return;
     }
 
-    ensureSocket(token);
+    ensureSocket(token, accountId);
     const listener = listenerRef.current;
     addListener(listener);
 
     return () => {
       removeListener(listener);
     };
-  }, [token]);
+  }, [accountId, token]);
 
   useEffect(() => {
     if (!token) {

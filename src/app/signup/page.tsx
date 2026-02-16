@@ -11,14 +11,16 @@ import { useCountries } from "@/hooks/useCountries";
 import { Country } from "@/types/country";
 import { PremiumInput } from "../components/ui/TextInput";
 import { CountrySelect } from "../components/ui/CountrySelect";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSignup } from "@/hooks/useAuth";
 import BackButton from "../components/ui/BackButton";
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const signup = useSignup();
   const { data: countries } = useCountries();
+  const referralFromQuery = (searchParams.get("ref") || "").trim();
 
   const defaultCountry = useMemo(
     () => countries?.[0] ?? null,
@@ -35,7 +37,7 @@ export default function SignupPage() {
     phone: "",
     password: "",
     confirmPassword: "",
-    referral: "",
+    referral: referralFromQuery,
   });
 
   const update = (k: keyof typeof form, v: string) =>
@@ -81,11 +83,15 @@ export default function SignupPage() {
           showToast("Verification email sent. Please check your email.");
           setStep("verify");
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
+          const error = err as {
+            response?: { data?: { message?: string; error?: string } };
+            message?: string;
+          };
           const backendMessage =
-            err?.response?.data?.message ||
-            err?.response?.data?.error ||
-            err?.message;
+            error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            error?.message;
 
           showToast(backendMessage || "Signup failed");
         },

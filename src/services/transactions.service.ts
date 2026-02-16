@@ -33,15 +33,23 @@ export const fetchTransactions = async ({
   type?: string;
   fromDate?: string;
 }): Promise<TransactionResponse> => {
-  const params: any = { page, limit };
+  const params: { page: number; limit: number; type?: string; fromDate?: string } = { page, limit };
 
   if (type) params.type = type;
   if (fromDate) params.fromDate = fromDate;
 
   const res = await api.get("/transactions", { params });
+  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+  const filteredRows = rows.filter((tx: Transaction) => {
+    const txType = String(tx?.type || "").toUpperCase();
+    const remark = String(tx?.remark || "").toUpperCase();
+
+    // Hide swap charges from transaction history views.
+    return !(txType.includes("SWAP") || remark.includes("SWAP"));
+  });
 
   return {
-    data: res.data.data,
+    data: filteredRows,
     pagination: res.data.pagination,
   };
 };

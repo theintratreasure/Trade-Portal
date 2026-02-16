@@ -105,7 +105,7 @@ export default function BottomSheet({
                   onClose();
                 }
               }}
-              className="w-full px-6 py-4 text-left text-sm border-b border-[var(--border-soft)]"
+              className="w-full px-2 py-4 text-left text-sm border-b border-[var(--border-soft)]"
             >
               New Order
             </button>
@@ -118,7 +118,7 @@ export default function BottomSheet({
                 router.push(`/trade/charts?symbol=${title}`);
                 onClose();
               }}
-              className="w-full px-6 py-4 text-left text-sm border-b border-[var(--border-soft)]"
+              className="w-full px-2 py-4 text-left text-sm border-b border-[var(--border-soft)]"
             >
               Chart
             </button>
@@ -128,17 +128,13 @@ export default function BottomSheet({
                 onClose();        // pehle bottom sheet band
                 onOpenProperty(); // phir property open
               }}
-              className="w-full px-6 py-4 text-left text-sm border-b border-[var(--border-soft)]"
+              className="w-full px-2 py-4 text-left text-sm border-b border-[var(--border-soft)]"
             >
               Properties
             </button>
 
 
-            <button
-              className="w-full px-6 py-4 text-left text-sm"
-            >
-              Market Statistics
-            </button>
+           
             <button
   onClick={() => {
     const next =
@@ -154,7 +150,7 @@ export default function BottomSheet({
 
     onClose();
   }}
-  className="w-full px-6 py-4 text-left text-sm border-b border-[var(--border-soft)]"
+  className="w-full px-2 py-4 text-left text-sm border-b border-[var(--border-soft)]"
 >
   {viewMode === "advanced"
     ? "Simple View Mode"
