@@ -6,7 +6,7 @@ import {
   Lock,
   Gift,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useCountries } from "@/hooks/useCountries";
 import { Country } from "@/types/country";
 import { PremiumInput } from "../components/ui/TextInput";
@@ -16,6 +16,14 @@ import { useSignup } from "@/hooks/useAuth";
 import BackButton from "../components/ui/BackButton";
 
 export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupContent />
+    </Suspense>
+  );
+}
+
+function SignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const signup = useSignup();
@@ -59,7 +67,7 @@ export default function SignupPage() {
 
     if (!isPasswordValid(form.password)) {
       showToast(
-        "Password must be 8–16 chars with uppercase, lowercase, number & special character"
+        "Password must be 8-16 chars with uppercase, lowercase, number & special character"
       );
       return;
     }
