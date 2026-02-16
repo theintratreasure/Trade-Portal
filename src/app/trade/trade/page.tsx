@@ -11,11 +11,7 @@ import {
 import TopBarSlot from "../components/layout/TopBarSlot";
 import TradeTopBar from "../components/layout/TradeTopBar";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
-import {
-    useLiveTradeSocket,
-    type LivePending,
-    type LivePosition,
-} from "@/hooks/useLiveTradeSocket";
+import { useLiveTradeSocket, type LivePosition } from "@/hooks/useLiveTradeSocket";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import DeleteOrderModal from "../components/trade/DeleteOrderModal";
 import OrderActionSheet from "../components/trade/OrderActionSheet";
@@ -139,6 +135,13 @@ const toFixedSafe = (value: unknown, digits = 2, fallback = "0.00") => {
     return Number.isFinite(n) ? n.toFixed(digits) : fallback;
 };
 
+const getAccountIdFromUnknown = (value: unknown): string | undefined => {
+    if (!value || typeof value !== "object") return undefined;
+    const row = value as Record<string, unknown>;
+    const id = row.accountId ?? row._id ?? row.id;
+    return id === undefined || id === null ? undefined : String(id);
+};
+
 function isActivePositionRow(row: Record<string, unknown>): boolean {
     const status = String(
         row?.status ?? row?.state ?? row?.positionStatus ?? row?.position_status ?? "OPEN"
@@ -167,22 +170,13 @@ export default function TradePage() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const { data: tradeAccount } = useTradeAccount();
 
-    const tradeAccountRow =
-        tradeAccount && typeof tradeAccount === "object"
-            ? (tradeAccount as Record<string, unknown>)
-            : null;
-    const accountId = String(
-        tradeAccountRow?.accountId ??
-        tradeAccountRow?._id ??
-        tradeAccountRow?.id ??
-        ""
-    );
+    const accountId = getAccountIdFromUnknown(tradeAccount);
     const [selectedPos, setSelectedPos] = useState<Position | null>(null);
     const [showSheet, setShowSheet] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<PendingOrder | null>(null);
     const [showOrderSheet, setShowOrderSheet] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const { account, positions, pending } = useLiveTradeSocket(accountId || undefined);
+    const { account, positions, pending } = useLiveTradeSocket(accountId);
     const [token] = useState<string>(() => getTradeTokenFromStorageSync());
 
     const { data: restFallback } = useQuery({
@@ -233,27 +227,27 @@ export default function TradePage() {
         const restPositions: LivePosition[] = rows
             .filter((row: Record<string, unknown>) => isActivePositionRow(row))
             .map((row: Record<string, unknown>): LivePosition => {
-                const side: "BUY" | "SELL" =
+                const side: LivePosition["side"] =
                     String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
                 return {
-                accountId: String(row?.accountId ?? accountId ?? ""),
-                positionId: String(row?.orderId ?? row?.positionId ?? row?.id ?? row?._id ?? ""),
-                symbol: String(row?.symbol ?? "-"),
-                side,
-                volume: Number(row?.qty ?? row?.volume ?? 0),
-                openPrice: Number(row?.openPrice ?? 0),
-                currentPrice: Number(row?.currentPrice ?? row?.closePrice ?? row?.openPrice ?? 0),
-                floatingPnL: Number(row?.profitLoss ?? row?.floatingPnL ?? 0),
-                stopLoss: (row?.stopLoss ?? null) as number | null,
-                takeProfit: (row?.takeProfit ?? null) as number | null,
-                swap: Number(row?.swap ?? 0),
-                commission: Number(row?.commission ?? 0),
-                openTime:
-                    row?.openTime != null
-                        ? String(row.openTime)
-                        : row?.open_time != null
-                            ? String(row.open_time)
-                            : undefined,
+                    accountId: String(row?.accountId ?? accountId ?? ""),
+                    positionId: String(row?.orderId ?? row?.positionId ?? row?.id ?? row?._id ?? ""),
+                    symbol: String(row?.symbol ?? "-"),
+                    side,
+                    volume: Number(row?.qty ?? row?.volume ?? 0),
+                    openPrice: Number(row?.openPrice ?? 0),
+                    currentPrice: Number(row?.currentPrice ?? row?.closePrice ?? row?.openPrice ?? 0),
+                    floatingPnL: Number(row?.profitLoss ?? row?.floatingPnL ?? 0),
+                    stopLoss: (row?.stopLoss ?? null) as number | null,
+                    takeProfit: (row?.takeProfit ?? null) as number | null,
+                    swap: Number(row?.swap ?? 0),
+                    commission: Number(row?.commission ?? 0),
+                    openTime:
+                        row?.openTime != null
+                            ? String(row.openTime)
+                            : row?.open_time != null
+                                ? String(row.open_time)
+                                : undefined,
                 };
             });
 
@@ -273,13 +267,10 @@ export default function TradePage() {
                 const status = String(row?.status ?? "").toUpperCase();
                 return status === "PENDING" || status === "PLACED" || status === "OPEN";
             })
-            .map((row: Record<string, unknown>): LivePending => {
-                const side: "BUY" | "SELL" =
-                    String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
-                return {
+            .map((row: Record<string, unknown>) => ({
                 orderId: String(row?.orderId ?? row?.id ?? row?._id ?? ""),
                 symbol: String(row?.symbol ?? "-"),
-                side,
+                side: String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY",
                 orderType: String(row?.orderType ?? row?.type ?? "MARKET"),
                 price: Number(row?.price ?? row?.openPrice ?? 0),
                 volume: Number(row?.qty ?? row?.volume ?? 0),
@@ -288,8 +279,7 @@ export default function TradePage() {
                 createdAt: Number(new Date(String(row?.openTime ?? row?.createdAt ?? 0)).getTime()),
                 currentPrice: undefined,
                 status: String(row?.status ?? "PENDING"),
-                };
-            });
+            }));
     }, [pending, restFallback]);
 
     const pendingSymbols = useMemo(
@@ -377,8 +367,10 @@ export default function TradePage() {
     const accountStats: AccountStat[] = effectiveAccount
         ? [
             { label: "Balance", value: accountBalance.toFixed(2) },
+            { label: "Credit", value: accountBonusBalance.toFixed(2) },
             { label: "Equity", value: accountEquity.toFixed(2) },
-            { label: "Bonus", value: accountBonusBalance.toFixed(2) },
+            // { label: "Bonus Live", value: accountBonusLive.toFixed(2) },
+            // { label: "Bonus (%)", value: accountBonusPercent.toFixed(2) },
             { label: "Margin", value: accountUsedMargin.toFixed(2) },
             { label: "Free margin", value: accountFreeMargin.toFixed(2) },
             { label: "Margin Level (%)", value: marginLevel },
@@ -561,7 +553,12 @@ export default function TradePage() {
                                             {accountBalance.toFixed(2)}
                                         </span>
                                     </div>
-
+                                     <div>
+                                        <span className="text-[var(--text-muted)]">Used Margin:</span>{" "}
+                                        <span className="font-semibold text-[var(--mt-blue)]">
+                                            {accountUsedMargin.toFixed(2)}
+                                        </span>
+                                    </div>
                                     <div>
                                         <span className="text-[var(--text-muted)]">Equity:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
@@ -569,14 +566,9 @@ export default function TradePage() {
                                         </span>
                                     </div>
 
-                                    <div>
-                                        <span className="text-[var(--text-muted)]">Used Margin:</span>{" "}
-                                        <span className="font-semibold text-[var(--mt-blue)]">
-                                            {accountUsedMargin.toFixed(2)}
-                                        </span>
-                                    </div>
+                                   
 
-                                    <div>
+                                    {/* <div>
                                         <span className="text-[var(--text-muted)]">Bonus:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
                                             {accountBonusBalance.toFixed(2)}
@@ -588,14 +580,14 @@ export default function TradePage() {
                                         <span className="font-semibold text-[var(--mt-blue)]">
                                             {accountBonusLive.toFixed(2)}
                                         </span>
-                                    </div>
-
+                                    </div> */}
+{/* 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Bonus %:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
                                             {accountBonusPercent.toFixed(2)}%
                                         </span>
-                                    </div>
+                                    </div> */}
 
                                     <div>
                                         <span className="text-[var(--text-muted)]">Free Margin:</span>{" "}
