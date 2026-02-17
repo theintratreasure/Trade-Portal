@@ -6,8 +6,11 @@ export const useCreateWithdrawal = () => {
 
   return useMutation({
     mutationFn: createWithdrawal,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["withdrawals"] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["withdrawals"] }),
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+      ]);
     },
   });
 };
