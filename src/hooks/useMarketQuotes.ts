@@ -13,11 +13,16 @@ function normalizeSymbol(value: string): string {
   return String(value ?? "").trim().toUpperCase();
 }
 
+function compactSymbol(value: string): string {
+  return normalizeSymbol(value).replace(/[^A-Z0-9]/g, "");
+}
+
 const shared = {
   socket: null as MarketSocket | null,
   token: null as string | null,
   accountId: null as string | null,
   buffer: {} as QuoteMap,
+  cache: {} as QuoteMap,
   listeners: new Set<QuoteListener>(),
   symbolRefCounts: new Map<string, number>(),
   flushTimer: null as number | null,
@@ -119,6 +124,7 @@ function handleIncomingQuote(msg: unknown) {
         bidDir: "same",
         askDir: "same",
       };
+      shared.cache[sym] = shared.buffer[sym];
       scheduleEmit();
       return;
     }
@@ -129,6 +135,18 @@ function handleIncomingQuote(msg: unknown) {
       typeof nestedData.code === "string"
     ) {
       const symbol = normalizeSymbol(nestedData.code);
+      const symbolCompact = compactSymbol(symbol);
+      const aliasKeys = new Set<string>();
+      for (const key of Object.keys(shared.buffer)) {
+        if (compactSymbol(key) === symbolCompact) aliasKeys.add(key);
+      }
+      for (const key of shared.symbolRefCounts.keys()) {
+        if (compactSymbol(key) === symbolCompact) aliasKeys.add(key);
+      }
+      if (aliasKeys.size === 0) {
+        aliasKeys.add(symbol);
+      }
+
       const bids = Array.isArray(nestedData.bids)
         ? (nestedData.bids as Array<Record<string, unknown>>)
         : [];
@@ -140,11 +158,14 @@ function handleIncomingQuote(msg: unknown) {
 
       if (!bid || !ask || Number(bid.price) <= 0 || Number(ask.price) <= 0) return;
 
-      if (!shared.buffer[symbol]) {
-        shared.buffer[symbol] = getPlaceholder(symbol);
+      for (const key of aliasKeys) {
+        if (!shared.buffer[key]) {
+          shared.buffer[key] = getPlaceholder(key);
+        }
       }
 
-      const old = shared.buffer[symbol] as QuoteLiveState;
+      const baseKey = [...aliasKeys][0];
+      const old = (shared.buffer[baseKey] ?? getPlaceholder(baseKey)) as QuoteLiveState;
       const currentPrice = Number(bid.price);
       const dayClose = typeof old.dayClose === "number" ? old.dayClose : 0;
 
@@ -187,34 +208,46 @@ function handleIncomingQuote(msg: unknown) {
         changePercent = (change / dayClose) * 100;
       }
 
-      shared.buffer[symbol] = {
-        ...old,
-        bid: String(bid.price),
-        ask: String(ask.price),
-        bidVolume: String(bid.volume ?? "--"),
-        askVolume: String(ask.volume ?? "--"),
-        tickTime,
-        change,
-        changePercent,
-        high: nextHigh,
-        low: nextLow,
-        bidDir:
-          old.bid === "--"
-            ? "same"
-            : currentPrice > Number(old.bid)
-            ? "up"
-            : currentPrice < Number(old.bid)
-            ? "down"
-            : old.bidDir,
-        askDir:
-          old.ask === "--"
-            ? "same"
-            : Number(ask.price) > Number(old.ask)
-            ? "up"
-            : Number(ask.price) < Number(old.ask)
-            ? "down"
-            : old.askDir,
-      } as QuoteLiveState;
+      const nextBid = String(bid.price);
+      const nextAsk = String(ask.price);
+      const nextBidVolume = String(bid.volume ?? "--");
+      const nextAskVolume = String(ask.volume ?? "--");
+      const nextBidDir =
+        old.bid === "--"
+          ? "same"
+          : currentPrice > Number(old.bid)
+          ? "up"
+          : currentPrice < Number(old.bid)
+          ? "down"
+          : old.bidDir;
+      const nextAskDir =
+        old.ask === "--"
+          ? "same"
+          : Number(ask.price) > Number(old.ask)
+          ? "up"
+          : Number(ask.price) < Number(old.ask)
+          ? "down"
+          : old.askDir;
+
+      for (const key of aliasKeys) {
+        shared.buffer[key] = {
+          ...(shared.buffer[key] as QuoteLiveState),
+          symbol: key,
+          bid: nextBid,
+          ask: nextAsk,
+          bidVolume: nextBidVolume,
+          askVolume: nextAskVolume,
+          tickTime,
+          change,
+          changePercent,
+          high: nextHigh,
+          low: nextLow,
+          dayClose: dayClose > 0 ? dayClose : undefined,
+          bidDir: nextBidDir,
+          askDir: nextAskDir,
+        } as QuoteLiveState;
+        shared.cache[key] = shared.buffer[key];
+      }
 
       scheduleEmit();
     }
@@ -224,8 +257,9 @@ function handleIncomingQuote(msg: unknown) {
 }
 
 function ensureSocket(token: string, accountId: string) {
+  const normalizedAccountId = accountId || null;
   if (shared.socket && shared.token === token) {
-    shared.accountId = accountId || null;
+    shared.accountId = normalizedAccountId;
     shared.socket.setAccountId(accountId || undefined);
     return;
   }
@@ -235,13 +269,20 @@ function ensureSocket(token: string, accountId: string) {
     shared.socket = null;
   }
 
+  const sameSession =
+    shared.token === token && shared.accountId === normalizedAccountId;
   shared.token = token;
-  shared.accountId = accountId || null;
-  shared.buffer = {};
+  shared.accountId = normalizedAccountId;
+  if (!sameSession) {
+    // Prevent cross-session stale prices.
+    shared.buffer = {};
+    shared.cache = {};
+  }
 
   for (const [symbol, count] of shared.symbolRefCounts) {
     if (count > 0) {
-      shared.buffer[symbol] = getPlaceholder(symbol);
+      shared.buffer[symbol] =
+        shared.cache[symbol] ?? shared.buffer[symbol] ?? getPlaceholder(symbol);
     }
   }
 
@@ -284,7 +325,8 @@ function subscribeSymbol(symbol: string) {
   shared.symbolRefCounts.set(normalized, currentCount + 1);
 
   if (currentCount === 0) {
-    shared.buffer[normalized] = shared.buffer[normalized] ?? getPlaceholder(normalized);
+    shared.buffer[normalized] =
+      shared.cache[normalized] ?? shared.buffer[normalized] ?? getPlaceholder(normalized);
     shared.socket?.subscribe(normalized);
     scheduleEmit();
   }
@@ -314,8 +356,6 @@ function removeListener(listener: QuoteListener) {
   if (shared.listeners.size === 0 && shared.symbolRefCounts.size === 0) {
     shared.socket?.close();
     shared.socket = null;
-    shared.token = null;
-    shared.buffer = {};
   }
 }
 
