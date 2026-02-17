@@ -21,6 +21,13 @@ type CreatedAccount = {
   watch_password: string;
 };
 
+function formatLeverage(value: unknown): string {
+  const leverage = Number(value);
+  if (!Number.isFinite(leverage)) return "-";
+  if (leverage === 0) return "Unlimited";
+  return `1:${leverage}`;
+}
+
 export default function OpenAccountPage() {
   const router = useRouter();
   const { data, isLoading } = useActiveAccountPlans();
@@ -278,7 +285,7 @@ export default function OpenAccountPage() {
               <InfoField label="Account Type" value={createdAccount.account_type} />
               <InfoField label="Plan Name" value={createdAccount.plan_name} />
               <InfoField label="Currency" value={createdAccount.currency} />
-              <InfoField label="Leverage" value={`1:${createdAccount.leverage}`} />
+              <InfoField label="Leverage" value={formatLeverage(createdAccount.leverage)} />
               <InfoField label="Trade Password" value={createdAccount.trade_password} />
               <InfoField label="Watch Password" value={createdAccount.watch_password} />
 

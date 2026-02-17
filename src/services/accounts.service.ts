@@ -10,6 +10,8 @@ export interface AccountPlan {
   minDeposit: number;
   spreadPips: number;
   max_leverage: number;
+  referral_reward_amount?: number;
+  referralRewardAmount?: number;
   spread_type: "FLOATING" | "FIXED";
   commission_per_lot: number;
   is_demo_allowed: boolean;

@@ -1,6 +1,5 @@
 "use client";
 
-import { div } from "framer-motion/client";
 import {
   ShieldCheck,
   Layers,
@@ -10,7 +9,43 @@ import {
   Calendar,
 } from "lucide-react";
 
-export default function AccountDetails({ data }: { data: any }) {
+type AccountDetailsData = {
+  status?: string;
+  account_type?: string;
+  balance?: number | string;
+  equity?: number | string;
+  leverage?: number | string;
+  spread_pips?: number | string;
+  spread_type?: string;
+  commission_per_lot?: number | string;
+  currency?: string;
+  swap_enabled?: boolean;
+  createdAt?: string | number | Date;
+};
+
+function toSafeNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatCreatedAt(value: string | number | Date | undefined): string {
+  if (value == null) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
+
+function formatLeverage(value: unknown): string {
+  const leverage = Number(value);
+  if (!Number.isFinite(leverage)) return "-";
+  if (leverage === 0) return "Unlimited";
+  return `1:${leverage}`;
+}
+
+export default function AccountDetails({ data }: { data: AccountDetailsData }) {
+  const accountStatus = String(data.status ?? "inactive");
+  const commissionPerLot = toSafeNumber(data.commission_per_lot);
+
   return (
     <div className="mt-4 space-y-4">
       {/* ================= SUMMARY STRIP ================= */}
@@ -21,13 +56,13 @@ export default function AccountDetails({ data }: { data: any }) {
           </div>
           <div
             className={`mt-1 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-              data.status === "active"
+              accountStatus === "active"
                 ? "bg-green-500/10 text-green-600"
                 : "bg-red-500/10 text-red-600"
             }`}
           >
             <ShieldCheck size={14} />
-            {data.status.toUpperCase()}
+            {accountStatus.toUpperCase()}
           </div>
         </div>
 
@@ -58,7 +93,7 @@ export default function AccountDetails({ data }: { data: any }) {
         <InfoCard
           icon={<Layers />}
           label="Leverage"
-          value={`1:${data.leverage}`}
+          value={formatLeverage(data.leverage)}
         />
 
         <InfoCard
@@ -71,8 +106,8 @@ export default function AccountDetails({ data }: { data: any }) {
           icon={<DollarSign />}
           label="Commission / lot"
           value={
-            data.commission_per_lot > 0
-              ? `${data.commission_per_lot} ${data.currency}`
+            commissionPerLot > 0
+              ? `${commissionPerLot} ${data.currency}`
               : "No commission"
           }
         />
@@ -91,7 +126,7 @@ export default function AccountDetails({ data }: { data: any }) {
           Created on
         </div>
         <div className="mt-1 text-sm font-medium">
-          {new Date(data.createdAt).toLocaleString()}
+          {formatCreatedAt(data.createdAt)}
         </div>
       </div>
     </div>

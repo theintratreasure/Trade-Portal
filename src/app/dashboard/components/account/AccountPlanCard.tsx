@@ -3,6 +3,13 @@
 import { CheckCircle2, Gem, Sparkles } from "lucide-react";
 import type { AccountPlan } from "@/services/accounts.service";
 
+function formatLeverage(value: unknown): string {
+  const leverage = Number(value);
+  if (!Number.isFinite(leverage)) return "-";
+  if (leverage === 0) return "Unlimited";
+  return `1:${leverage}`;
+}
+
 export default function AccountPlanCard({
   plan,
   selected,
@@ -12,6 +19,9 @@ export default function AccountPlanCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const referralReward =
+    Number(plan.referral_reward_amount ?? plan.referralRewardAmount) || 0;
+
   return (
     <button
       onClick={onSelect}
@@ -59,8 +69,8 @@ export default function AccountPlanCard({
         <div className="relative mt-3 grid grid-cols-2 gap-2 min-[360px]:gap-2.5 lg:mt-4 lg:grid-cols-5">
           <Meta label="Min deposit" value={`${plan.minDeposit} USD`} />
           <Meta label="Spread" value={`From ${plan.spreadPips} pips`} />
-          <Meta label="Referral" value={`$ ${plan.referral_reward_amount}`} />
-          <Meta label="Leverage" value={`1:${plan.max_leverage}`} />
+          <Meta label="Referral" value={`$ ${referralReward}`} />
+          <Meta label="Leverage" value={formatLeverage(plan.max_leverage)} />
           <Meta
             label="Commission"
             value={
