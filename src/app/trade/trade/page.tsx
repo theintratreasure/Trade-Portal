@@ -136,6 +136,22 @@ const toFixedSafe = (value: unknown, digits = 2, fallback = "0.00") => {
 };
 
 const isFinitePositive = (value: number) => Number.isFinite(value) && value > 0;
+const isAlmostEqual = (a: number, b: number, epsilon = 1e-9) => Math.abs(a - b) <= epsilon;
+const firstFiniteNumber = (...values: unknown[]): number | undefined => {
+    for (const value of values) {
+        const n = Number(value);
+        if (Number.isFinite(n)) return n;
+    }
+    return undefined;
+};
+const getPnlScale = (symbol: string): number => {
+    const s = String(symbol ?? "").toUpperCase();
+    if (/^[A-Z]{6}$/.test(s)) return 100000; // FX majors like EURUSD
+    if (s.includes("XAU")) return 100;
+    if (s.includes("XAG")) return 5000;
+    if (s.includes("USDT")) return 1; // crypto quoted in USDT
+    return 1;
+};
 
 const getAccountIdFromUnknown = (value: unknown): string | undefined => {
     if (!value || typeof value !== "object") return undefined;
@@ -229,6 +245,32 @@ export default function TradePage() {
         const restPositions: LivePosition[] = rows
             .filter((row: Record<string, unknown>) => isActivePositionRow(row))
             .map((row: Record<string, unknown>): LivePosition => {
+                const openPrice =
+                    firstFiniteNumber(row?.openPrice, row?.open_price, row?.entryPrice, row?.entry_price, row?.price) ?? 0;
+                const currentPrice =
+                    firstFiniteNumber(
+                        row?.currentPrice,
+                        row?.current_price,
+                        row?.closePrice,
+                        row?.close_price,
+                        row?.marketPrice,
+                        row?.market_price,
+                        row?.ltp,
+                        row?.lastPrice,
+                        row?.last_price
+                    ) ?? openPrice;
+                const floatingPnL =
+                    firstFiniteNumber(
+                        row?.floatingPnL,
+                        row?.floating_pnl,
+                        row?.profitLoss,
+                        row?.profit_loss,
+                        row?.unrealizedPnL,
+                        row?.unrealisedPnL,
+                        row?.pnl,
+                        row?.profit,
+                        row?.pl
+                    ) ?? 0;
                 const side: LivePosition["side"] =
                     String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
                 return {
@@ -236,10 +278,10 @@ export default function TradePage() {
                     positionId: String(row?.orderId ?? row?.positionId ?? row?.id ?? row?._id ?? ""),
                     symbol: String(row?.symbol ?? "-"),
                     side,
-                    volume: Number(row?.qty ?? row?.volume ?? 0),
-                    openPrice: Number(row?.openPrice ?? 0),
-                    currentPrice: Number(row?.currentPrice ?? row?.closePrice ?? row?.openPrice ?? 0),
-                    floatingPnL: Number(row?.profitLoss ?? row?.floatingPnL ?? 0),
+                    volume: Number(row?.qty ?? row?.volume ?? row?.lot ?? row?.lots ?? row?.size ?? 0),
+                    openPrice,
+                    currentPrice,
+                    floatingPnL,
                     stopLoss: (row?.stopLoss ?? null) as number | null,
                     takeProfit: (row?.takeProfit ?? null) as number | null,
                     swap: Number(row?.swap ?? 0),
@@ -262,11 +304,24 @@ export default function TradePage() {
                 merged.set(item.positionId, item);
                 continue;
             }
+            const nextOpen = isFinitePositive(item.openPrice) ? item.openPrice : prev.openPrice;
+            const nextCurrent = isFinitePositive(item.currentPrice) ? item.currentPrice : prev.currentPrice;
+            const nextPnl = Number.isFinite(item.floatingPnL) ? item.floatingPnL : prev.floatingPnL;
+            const looksLikeResetTick =
+                isFinitePositive(nextOpen) &&
+                isFinitePositive(nextCurrent) &&
+                isAlmostEqual(nextCurrent, nextOpen) &&
+                isFinitePositive(prev.openPrice) &&
+                isFinitePositive(prev.currentPrice) &&
+                !isAlmostEqual(prev.currentPrice, prev.openPrice) &&
+                Number.isFinite(nextPnl) &&
+                Math.abs(nextPnl) <= 0.05;
             merged.set(item.positionId, {
                 ...prev,
                 ...item,
-                openPrice: isFinitePositive(item.openPrice) ? item.openPrice : prev.openPrice,
-                currentPrice: isFinitePositive(item.currentPrice) ? item.currentPrice : prev.currentPrice,
+                openPrice: nextOpen,
+                currentPrice: looksLikeResetTick ? prev.currentPrice : nextCurrent,
+                floatingPnL: looksLikeResetTick ? prev.floatingPnL : nextPnl,
             });
         }
         return Array.from(merged.values());
@@ -307,7 +362,22 @@ export default function TradePage() {
             ),
         [socketOrRestPending]
     );
-    const quotes = useMarketQuotes(token, pendingSymbols);
+    const positionSymbols = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    socketOrRestPositions
+                        .map((pos) => pos?.symbol)
+                        .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
+                )
+            ),
+        [socketOrRestPositions]
+    );
+    const quoteSymbols = useMemo(
+        () => Array.from(new Set([...pendingSymbols, ...positionSymbols])),
+        [pendingSymbols, positionSymbols]
+    );
+    const quotes = useMarketQuotes(token, quoteSymbols);
     const [openMenu, setOpenMenu] = useState<DesktopMenuState | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -404,23 +474,58 @@ export default function TradePage() {
                 : "text-[var(--text-muted)]";
 
     const livePositions: Position[] = useMemo(() => {
-        return socketOrRestPositions.map((pos) => ({
-            id: pos.positionId,
-            pair: pos.symbol,
-            type: pos.side.toLowerCase(),
-            lot: toSafeNumber(pos.volume),
-            from: toFixedSafe(pos.openPrice, 2, "-"),
-            to: toFixedSafe(pos.currentPrice, 2, "-"),
-            profit: toSafeNumber(pos.floatingPnL),
-            openTime: pos.openTime
-                ? formatOpenTime24(pos.openTime)
-                : "-",
+        return socketOrRestPositions.map((pos) => {
+            const openPrice = toSafeNumber(pos.openPrice, 0);
+            const rawCurrentPrice = toSafeNumber(pos.currentPrice, NaN);
+            const liveQuote = pos.symbol ? quotes[pos.symbol] : undefined;
+            const quoteSidePrice = firstFiniteNumber(
+                pos.side === "BUY" ? liveQuote?.bid : liveQuote?.ask
+            );
+            const hasRawCurrent = Number.isFinite(rawCurrentPrice) && rawCurrentPrice > 0;
+            const currentPrice =
+                hasRawCurrent && !isAlmostEqual(rawCurrentPrice, openPrice)
+                    ? rawCurrentPrice
+                    : quoteSidePrice != null && quoteSidePrice > 0
+                        ? quoteSidePrice
+                        : hasRawCurrent
+                            ? rawCurrentPrice
+                            : openPrice;
 
-            swap: toFixedSafe(pos.swap),
-            stopLoss: pos.stopLoss == null ? null : toSafeNumber(pos.stopLoss, 0),
-            takeProfit: pos.takeProfit == null ? null : toSafeNumber(pos.takeProfit, 0),
-        }));
-    }, [socketOrRestPositions]);
+            const rawPnl = toSafeNumber(pos.floatingPnL, NaN);
+            const hasRawPnl = Number.isFinite(rawPnl);
+            const looksPlaceholderPnl =
+                hasRawPnl &&
+                (Math.abs(rawPnl + 0.03) < 0.000001 ||
+                    (Math.abs(rawPnl) <= 0.05 && hasRawCurrent && isAlmostEqual(rawCurrentPrice, openPrice)));
+            const estimatedPnl =
+                ((currentPrice - openPrice) * (pos.side === "BUY" ? 1 : -1)) *
+                toSafeNumber(pos.volume, 0) *
+                getPnlScale(pos.symbol);
+            const pnl =
+                hasRawPnl && !looksPlaceholderPnl
+                    ? rawPnl
+                    : Number.isFinite(estimatedPnl)
+                        ? estimatedPnl
+                        : 0;
+
+            return {
+                id: pos.positionId,
+                pair: pos.symbol,
+                type: pos.side.toLowerCase(),
+                lot: toSafeNumber(pos.volume),
+                from: toFixedSafe(openPrice, 2, "-"),
+                to: toFixedSafe(currentPrice, 2, "-"),
+                profit: pnl,
+                openTime: pos.openTime
+                    ? formatOpenTime24(pos.openTime)
+                    : "-",
+
+                swap: toFixedSafe(pos.swap),
+                stopLoss: pos.stopLoss == null ? null : toSafeNumber(pos.stopLoss, 0),
+                takeProfit: pos.takeProfit == null ? null : toSafeNumber(pos.takeProfit, 0),
+            };
+        });
+    }, [quotes, socketOrRestPositions]);
 
     const pendingWithLive = useMemo<PendingOrder[]>(() => {
         return socketOrRestPending.map((order) => {

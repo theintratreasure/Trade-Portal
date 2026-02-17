@@ -146,32 +146,66 @@ function normalizePendingOrder(data: unknown): LivePending | null {
 function normalizePosition(data: unknown): LivePosition | null {
   if (!data || typeof data !== "object") return null;
   const row = data as Record<string, unknown>;
-  const id = row.positionId ?? row.id ?? row._id;
+  const nestedData =
+    row.data && typeof row.data === "object"
+      ? (row.data as Record<string, unknown>)
+      : null;
+  const source = nestedData ?? row;
+  const id =
+    source.positionId ??
+    source.id ??
+    source._id ??
+    source.orderId ??
+    source.position_id;
   if (!id) return null;
 
-  const rawOpenPrice = toNumberOrUndefined(row.openPrice ?? row.entryPrice ?? row.price);
-  const rawCurrentPrice = toNumberOrUndefined(
-    row.currentPrice ?? row.current_price ?? row.ltp ?? row.lastPrice
+  const rawOpenPrice = toNumberOrUndefined(
+    source.openPrice ??
+      source.open_price ??
+      source.entryPrice ??
+      source.entry_price ??
+      source.price
   );
-  const rawFloatingPnL = toNumberOrUndefined(row.floatingPnL ?? row.pnl ?? row.profit);
+  const rawCurrentPrice = toNumberOrUndefined(
+    source.currentPrice ??
+      source.current_price ??
+      source.closePrice ??
+      source.close_price ??
+      source.marketPrice ??
+      source.market_price ??
+      source.ltp ??
+      source.lastPrice ??
+      source.last_price
+  );
+  const rawFloatingPnL = toNumberOrUndefined(
+    source.floatingPnL ??
+      source.floating_pnl ??
+      source.profitLoss ??
+      source.profit_loss ??
+      source.unrealizedPnL ??
+      source.unrealisedPnL ??
+      source.pnl ??
+      source.profit ??
+      source.pl
+  );
 
   return {
-    accountId: String(row.accountId ?? ""),
+    accountId: String(source.accountId ?? source.account_id ?? ""),
     positionId: String(id),
-    symbol: String(row.symbol ?? row.pair ?? row.instrument ?? "-"),
-    side: String(row.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
-    volume: Number(row.volume ?? row.lot ?? 0),
+    symbol: String(source.symbol ?? source.pair ?? source.instrument ?? source.code ?? "-"),
+    side: String(source.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
+    volume: Number(source.volume ?? source.lot ?? source.qty ?? source.lots ?? source.size ?? 0),
     openPrice: rawOpenPrice ?? 0,
     currentPrice: rawCurrentPrice ?? rawOpenPrice ?? 0,
-    floatingPnL: rawFloatingPnL ?? 0,
-    stopLoss: (row.stopLoss ?? row.stop_loss ?? null) as number | null,
-    takeProfit: (row.takeProfit ?? row.take_profit ?? null) as number | null,
-    swap: Number(row.swap ?? 0),
-    commission: Number(row.commission ?? 0),
-    openTime: row.openTime
-      ? String(row.openTime)
-      : row.open_time
-      ? String(row.open_time)
+    floatingPnL: rawFloatingPnL ?? Number.NaN,
+    stopLoss: (source.stopLoss ?? source.stop_loss ?? null) as number | null,
+    takeProfit: (source.takeProfit ?? source.take_profit ?? null) as number | null,
+    swap: Number(source.swap ?? 0),
+    commission: Number(source.commission ?? 0),
+    openTime: source.openTime
+      ? String(source.openTime)
+      : source.open_time
+      ? String(source.open_time)
       : undefined,
   };
 }
@@ -180,20 +214,35 @@ function isFinitePositive(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
+function isAlmostEqual(a: number, b: number, epsilon = 1e-9): boolean {
+  return Math.abs(a - b) <= epsilon;
+}
+
 function mergePosition(prev: LivePosition | undefined, next: LivePosition): LivePosition {
   if (!prev) return next;
+  const nextOpen = isFinitePositive(next.openPrice) ? next.openPrice : prev.openPrice;
+  const nextCurrent = isFinitePositive(next.currentPrice) ? next.currentPrice : prev.currentPrice;
+  const nextPnl = Number.isFinite(next.floatingPnL) ? next.floatingPnL : prev.floatingPnL;
+
+  const looksLikeResetTick =
+    isFinitePositive(nextOpen) &&
+    isFinitePositive(nextCurrent) &&
+    isAlmostEqual(nextCurrent, nextOpen) &&
+    isFinitePositive(prev.openPrice) &&
+    isFinitePositive(prev.currentPrice) &&
+    !isAlmostEqual(prev.currentPrice, prev.openPrice) &&
+    Number.isFinite(nextPnl) &&
+    Math.abs(nextPnl) <= 0.05;
+
   return {
     ...prev,
     ...next,
     accountId: next.accountId || prev.accountId,
     symbol: next.symbol && next.symbol !== "-" ? next.symbol : prev.symbol,
     volume: Number.isFinite(next.volume) && next.volume > 0 ? next.volume : prev.volume,
-    openPrice: isFinitePositive(next.openPrice) ? next.openPrice : prev.openPrice,
-    currentPrice: isFinitePositive(next.currentPrice)
-      ? next.currentPrice
-      : isFinitePositive(prev.currentPrice)
-      ? prev.currentPrice
-      : next.currentPrice,
+    openPrice: nextOpen,
+    currentPrice: looksLikeResetTick ? prev.currentPrice : nextCurrent,
+    floatingPnL: looksLikeResetTick ? prev.floatingPnL : nextPnl,
   };
 }
 
