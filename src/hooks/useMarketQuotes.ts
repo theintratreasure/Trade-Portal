@@ -14,7 +14,19 @@ function normalizeSymbol(value: string): string {
 }
 
 function compactSymbol(value: string): string {
-  return normalizeSymbol(value).replace(/[^A-Z0-9]/g, "");
+  const compact = normalizeSymbol(value).replace(/[^A-Z0-9]/g, "");
+  return compact.replace(/^XBT/, "BTC");
+}
+
+function buildSymbolAliases(symbol: string): string[] {
+  const normalized = normalizeSymbol(symbol);
+  const aliases = new Set<string>([normalized]);
+  if (normalized.startsWith("BTC")) {
+    aliases.add(`XBT${normalized.slice(3)}`);
+  } else if (normalized.startsWith("XBT")) {
+    aliases.add(`BTC${normalized.slice(3)}`);
+  }
+  return Array.from(aliases);
 }
 
 const shared = {
@@ -25,10 +37,14 @@ const shared = {
   cache: {} as QuoteMap,
   listeners: new Set<QuoteListener>(),
   symbolRefCounts: new Map<string, number>(),
+  symbolAliases: new Map<string, string[]>(),
+  lastTickAt: new Map<string, number>(),
   flushTimer: null as number | null,
 };
 
 const QUOTES_FAST_FLUSH_INTERVAL_MS = 50;
+const QUOTES_STALE_RESUBSCRIBE_MS = 12000;
+const QUOTES_HEALTHCHECK_MS = 4000;
 
 function getNumber(...values: unknown[]): number | undefined {
   for (const v of values) {
@@ -247,6 +263,7 @@ function handleIncomingQuote(msg: unknown) {
           askDir: nextAskDir,
         } as QuoteLiveState;
         shared.cache[key] = shared.buffer[key];
+        shared.lastTickAt.set(key, Date.now());
       }
 
       scheduleEmit();
@@ -283,6 +300,9 @@ function ensureSocket(token: string, accountId: string) {
     if (count > 0) {
       shared.buffer[symbol] =
         shared.cache[symbol] ?? shared.buffer[symbol] ?? getPlaceholder(symbol);
+      const aliases = shared.symbolAliases.get(symbol) ?? buildSymbolAliases(symbol);
+      shared.symbolAliases.set(symbol, aliases);
+      aliases.forEach((alias) => socket.subscribe(alias));
     }
   }
 
@@ -292,7 +312,9 @@ function ensureSocket(token: string, accountId: string) {
 
   for (const [symbol, count] of shared.symbolRefCounts) {
     if (count > 0) {
-      socket.subscribe(symbol);
+      const aliases = shared.symbolAliases.get(symbol) ?? buildSymbolAliases(symbol);
+      shared.symbolAliases.set(symbol, aliases);
+      aliases.forEach((alias) => socket.subscribe(alias));
     }
   }
 
@@ -327,7 +349,9 @@ function subscribeSymbol(symbol: string) {
   if (currentCount === 0) {
     shared.buffer[normalized] =
       shared.cache[normalized] ?? shared.buffer[normalized] ?? getPlaceholder(normalized);
-    shared.socket?.subscribe(normalized);
+    const aliases = buildSymbolAliases(normalized);
+    shared.symbolAliases.set(normalized, aliases);
+    aliases.forEach((alias) => shared.socket?.subscribe(alias));
     scheduleEmit();
   }
 }
@@ -338,7 +362,10 @@ function unsubscribeSymbol(symbol: string) {
   const currentCount = shared.symbolRefCounts.get(normalized) ?? 0;
   if (currentCount <= 1) {
     shared.symbolRefCounts.delete(normalized);
-    shared.socket?.unsubscribe(normalized);
+    const aliases = shared.symbolAliases.get(normalized) ?? buildSymbolAliases(normalized);
+    aliases.forEach((alias) => shared.socket?.unsubscribe(alias));
+    shared.symbolAliases.delete(normalized);
+    shared.lastTickAt.delete(normalized);
     delete shared.buffer[normalized];
     scheduleEmit();
     return;
@@ -441,6 +468,26 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       ownedSymbolsRef.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const timer = window.setInterval(() => {
+      if (!shared.socket?.isOpen()) return;
+      const now = Date.now();
+      for (const symbol of ownedSymbolsRef.current) {
+        const last = shared.lastTickAt.get(symbol) ?? 0;
+        if (!last || now - last < QUOTES_STALE_RESUBSCRIBE_MS) continue;
+        const aliases = shared.symbolAliases.get(symbol) ?? buildSymbolAliases(symbol);
+        aliases.forEach((alias) => {
+          shared.socket?.unsubscribe(alias);
+          shared.socket?.subscribe(alias);
+        });
+        shared.lastTickAt.set(symbol, now);
+      }
+    }, QUOTES_HEALTHCHECK_MS);
+
+    return () => window.clearInterval(timer);
+  }, [token]);
 
   return token ? quotes : {};
 }
