@@ -22,6 +22,7 @@ import ActionItem from "../components/trade/ActionItem";
 import { useRouter } from "next/navigation";
 import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 import tradeApi from "@/api/tradeApi";
+import { Toast } from "@/app/components/ui/Toast";
 
 type AccountStat = {
     label: string;
@@ -224,6 +225,10 @@ export default function TradePage() {
     const [selectedOrder, setSelectedOrder] = useState<PendingOrder | null>(null);
     const [showOrderSheet, setShowOrderSheet] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [closeSuccessToast, setCloseSuccessToast] = useState<string | null>(() => {
+        if (typeof window === "undefined") return null;
+        return sessionStorage.getItem("trade-close-success");
+    });
     const { account, positions, pending } = useLiveTradeSocket(accountId);
     const [token, setToken] = useState<string>(() => getTradeTokenFromStorageSync());
 
@@ -270,6 +275,19 @@ export default function TradePage() {
 
     const effectiveAccount = account ?? restFallback?.account ?? null;
     const [displayAccount, setDisplayAccount] = useState<Record<string, unknown> | null>(null);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (closeSuccessToast) {
+            sessionStorage.removeItem("trade-close-success");
+        }
+    }, [closeSuccessToast]);
+
+    useEffect(() => {
+        if (!closeSuccessToast) return;
+        const timer = window.setTimeout(() => setCloseSuccessToast(null), 2500);
+        return () => window.clearTimeout(timer);
+    }, [closeSuccessToast]);
 
     useEffect(() => {
         const syncTradeToken = () => {
@@ -1099,6 +1117,13 @@ export default function TradePage() {
                     </div>,
                     document.body
                 )}
+            {closeSuccessToast && (
+                <Toast
+                    message={closeSuccessToast}
+                    type="success"
+                    onClose={() => setCloseSuccessToast(null)}
+                />
+            )}
 
         </>
     );

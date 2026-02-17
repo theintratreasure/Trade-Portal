@@ -157,7 +157,7 @@ export default function Sidebar({
   `}
       >
 
-        <div className="flex items-center justify-between px-4 py-5 border-b border-[var(--border-soft)] relative">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border-soft)] relative">
           <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)]/15 via-[var(--primary)]/5 to-transparent pointer-events-none" />
 
           {!collapsed && (

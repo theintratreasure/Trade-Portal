@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useClosePosition } from "@/hooks/useClosePosition";
 import { Toast } from "@/app/components/ui/Toast";
 import TopBarSlot from "../../components/layout/TopBarSlot";
@@ -13,17 +13,24 @@ import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import { getTradeTokenFromStorageSync, splitPrice } from "../../components/function/splitPrice";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 
+function getAccountIdFromUnknown(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const row = value as Record<string, unknown>;
+  const id = row.accountId ?? row._id ?? row.id;
+  if (id === undefined || id === null) return undefined;
+  return String(id);
+}
+
 export default function ClosePositionPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const { mutate, isPending, data } = useClosePosition();
-  const [toast, setToast] = useState<any>(null);
+  const { mutate, isPending } = useClosePosition();
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [volume, setVolume] = useState<number>(0.01);
   const stepButtons = [-1.0, -0.5, -0.1, 0.1, 0.5, 1.0];
-  const realizedPnL = data?.data.realizedPnL;
   const { data: tradeAccount } = useTradeAccount();
-  const accountId = tradeAccount?.accountId;
+  const accountId = getAccountIdFromUnknown(tradeAccount);
 
   const { positions } = useLiveTradeSocket(accountId);
 
@@ -33,6 +40,10 @@ export default function ClosePositionPage() {
   const initialToken = getTradeTokenFromStorageSync();
   const [token] = useState<string>(initialToken);
   const quotes = useMarketQuotes(token);
+
+  useEffect(() => {
+    router.prefetch("/trade/trade");
+  }, [router]);
 
   const symbol = positions.find((p) => p.positionId === id)?.symbol;
   const live = symbol ? quotes[symbol] : undefined;
@@ -56,7 +67,11 @@ export default function ClosePositionPage() {
         : "text-[var(--text-main)]";
   const livePnL = currentPosition?.floatingPnL ?? 0;
   if (!position) {
-    return <div className="p-6"></div>;
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center p-6 text-[var(--text-muted)]">
+        <GlobalLoader />
+      </div>
+    );
   }
   const handleClose = () => {
     mutate(
@@ -64,16 +79,15 @@ export default function ClosePositionPage() {
       {
         onSuccess: (res) => {
           removeLivePositionFromCache(id);
-          setToast({
-            type: "success",
-            message: `Position closed (${res.data.realizedPnL})`,
-          });
-
-          setTimeout(() => {
-            router.push("/trade/trade");
-          }, 1500);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem(
+              "trade-close-success",
+              `Position closed (${res.data.realizedPnL})`
+            );
+          }
+          router.replace("/trade/trade");
         },
-        onError: (err: any) => {
+        onError: (err: { message?: string }) => {
           setToast({
             type: "error",
             message: err?.message || "Close failed",
@@ -121,7 +135,7 @@ export default function ClosePositionPage() {
             type="number"
             min="0.01"
             step="0.01"
-            value={position.volume?.toFixed(2)}
+            value={volume.toFixed(2)}
             onChange={(e) => {
               const val = Number(e.target.value);
               if (isNaN(val)) return;

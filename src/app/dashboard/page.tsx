@@ -181,7 +181,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="card p-4 md:p-6 rounded-2xl space-y-4 animate-fadeUp">
+      {/* <div className="card p-4 md:p-6 rounded-2xl space-y-4 animate-fadeUp">
         <h2 className="text-base md:text-lg font-semibold">Market Overview</h2>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 text-xs md:text-sm">
@@ -190,7 +190,7 @@ export default function DashboardPage() {
           <Market symbol="XAU/USD" price="2034.50" change="+1.25%" />
           <Market symbol="BTC/USD" price="42,180" change="+3.8%" />
         </div>
-      </div>
+      </div> */}
 
       <div className="card p-4 md:p-6 rounded-2xl space-y-4 animate-fadeUp">
         <h2 className="text-base md:text-lg font-semibold flex items-center gap-2">

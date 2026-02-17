@@ -47,37 +47,37 @@ export default function AccountDetails({ data }: { data: AccountDetailsData }) {
   const commissionPerLot = toSafeNumber(data.commission_per_lot);
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-3 space-y-3 max-[359px]:mt-2.5 max-[359px]:space-y-2.5">
       {/* ================= SUMMARY STRIP ================= */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[var(--bg-glass)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--bg-glass)] p-3 max-[359px]:gap-2 max-[359px]:p-2.5">
         <div>
-          <div className="text-xs text-[var(--text-muted)]">
+          <div className="text-[11px] text-[var(--text-muted)] max-[359px]:text-[10px]">
             Account status
           </div>
           <div
-            className={`mt-1 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
+            className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium max-[359px]:px-2 max-[359px]:py-0.5 max-[359px]:text-[10px] ${
               accountStatus === "active"
                 ? "bg-green-500/10 text-green-600"
                 : "bg-red-500/10 text-red-600"
             }`}
           >
-            <ShieldCheck size={14} />
+            <ShieldCheck size={12} />
             {accountStatus.toUpperCase()}
           </div>
         </div>
 
         <div className="text-right">
-          <div className="text-xs text-[var(--text-muted)]">
+          <div className="text-[11px] text-[var(--text-muted)] max-[359px]:text-[10px]">
             Account type
           </div>
-          <div className="font-medium capitalize">
+          <div className="font-medium capitalize text-sm max-[359px]:text-xs">
             {data.account_type}
           </div>
         </div>
       </div>
 
       {/* ================= MAIN GRID ================= */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-col-3 gap-4 text-sm">
+      <div className="grid grid-cols-2 gap-2 text-sm max-[359px]:gap-1.5 md:grid-cols-3">
         <InfoCard
           icon={<DollarSign />}
           label="Balance"
@@ -120,12 +120,12 @@ export default function AccountDetails({ data }: { data: AccountDetailsData }) {
       </div>
 
       {/* ================= FOOTER META ================= */}
-      <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-4">
-        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-          <Calendar size={14} />
+      <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-3 max-[359px]:p-2.5">
+        <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] max-[359px]:text-[10px]">
+          <Calendar size={12} />
           Created on
         </div>
-        <div className="mt-1 text-sm font-medium">
+        <div className="mt-1 text-xs min-[360px]:text-sm font-medium break-words">
           {formatCreatedAt(data.createdAt)}
         </div>
       </div>
@@ -145,20 +145,20 @@ function InfoCard({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border-soft)] bg-white/60 dark:bg-black/20 p-3 sm:p-4 backdrop-blur min-w-0">
-      <div className="flex items-start gap-3">
+    <div className="rounded-xl border border-[var(--border-soft)] bg-white/60 dark:bg-black/20 p-2 max-[359px]:p-1.5 min-[360px]:p-2.5 sm:p-3 backdrop-blur min-w-0">
+      <div className="flex items-start gap-2.5 min-[360px]:gap-3">
         {/* ICON */}
-        <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-glass)] text-[var(--primary)]">
+        <div className="flex h-5 w-5 max-[359px]:h-6 max-[359px]:w-6 min-[360px]:h-8 min-[360px]:w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-glass)] text-[var(--primary)]">
           {icon}
         </div>
 
         {/* TEXT */}
         <div className="flex flex-col min-w-0">
-          <div className="text-[11px] sm:text-xs text-[var(--text-muted)] leading-tight break-words">
+          <div className="text-[8px] min-[360px]:text-[10px] sm:text-[11px] text-[var(--text-muted)] leading-tight break-words">
             {label}
           </div>
 
-          <div className="mt-0.5 text-[13px] sm:text-sm font-semibold leading-tight break-words">
+          <div className="mt-0.5 text-[10px] min-[360px]:text-xs sm:text-[13px] font-semibold leading-tight break-words">
             {value}
           </div>
         </div>

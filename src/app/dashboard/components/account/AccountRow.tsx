@@ -44,6 +44,10 @@ export default function AccountRow({
     const resetWatch = useResetWatchPassword();
     const [showActions, setShowActions] = useState(false);
     const actionsWrapRef = useRef<HTMLDivElement | null>(null);
+    const secondaryBtnClass =
+        "h-10 min-w-[92px] rounded-md bg-[var(--bg-glass)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-card)]";
+    const tradeBtnClass =
+        "h-10 min-w-[78px] rounded-md bg-yellow-400 px-3 text-sm font-semibold text-black transition hover:brightness-95";
 
     const handleSubmitPassword = () => {
         if (!newPassword.trim()) {
@@ -126,14 +130,14 @@ export default function AccountRow({
             {/* ================= MOBILE VIEW ================= */}
             <div className="lg:hidden p-2 md:p-4 space-y-3">
                 {/* HEADER */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-[10px]">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 space-y-1">
                         <span className="rounded bg-[var(--bg-glass)] text-[var(--success)] px-1.5 py-0.5">
                             {account.account_type === "live" ? "Live" : "Demo"}
                         </span>
-                        <span className="ml-1 max-w-[42vw] truncate text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                        <div className="text-xs uppercase tracking-wide text-[var(--text-muted)] break-words leading-tight">
                             {account.plan_name}
-                        </span>
+                        </div>
                     </div>
 
                     <button onClick={() => setOpen(!open)}>
@@ -145,12 +149,12 @@ export default function AccountRow({
                 </div>
 
                 {/* ACCOUNT NUMBER */}
-                <div className="text-xs font-medium break-all">
+                <div className="text-sm font-semibold break-all leading-tight">
                     {account.account_number}
                 </div>
 
                 {/* BALANCE */}
-                <div className="text-xl sm:text-2xl font-semibold leading-none">
+                <div className="text-lg sm:text-xl font-semibold leading-tight">
                     {account.balance.toFixed(2)}{" "}
                     <span className="text-xs font-normal">
                         {account.currency}
@@ -245,23 +249,24 @@ export default function AccountRow({
 
             {/* ================= DESKTOP VIEW ================= */}
             <div className="hidden lg:block px-6 py-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-4">
                     {/* LEFT */}
-                    <div className="flex min-w-0 items-center gap-3 lg:gap-4">
-                        <span className="rounded bg-[var(--bg-glass)] text-[var(--success)] px-2 py-0.5 text-xs">
-                            {account.account_type === "live" ? "Live" : "Demo"}
-                        </span>
-
-                        <div className="min-w-0 font-medium">
-                            <span className="break-all">{account.account_number}</span>
-                            <span className="block text-sm text-[var(--text-muted)] uppercase lg:ml-2 lg:inline lg:text-base">
+                    <div className="min-w-[260px] flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                            <span className="whitespace-nowrap rounded bg-[var(--bg-glass)] px-2 py-1 text-xs text-[var(--success)]">
+                                {account.account_type === "live" ? "Live" : "Demo"}
+                            </span>
+                            <span className="text-sm uppercase tracking-wide text-[var(--text-muted)] leading-tight">
                                 {account.plan_name}
                             </span>
+                        </div>
+                        <div className="text-base lg:text-lg font-semibold leading-tight whitespace-nowrap">
+                            {account.account_number}
                         </div>
                     </div>
 
                     {/* CENTER */}
-                    <div className="text-left text-lg font-semibold lg:text-xl">
+                    <div className="w-[220px] shrink-0 text-left xl:text-center text-lg font-semibold lg:text-xl whitespace-nowrap">
                         $ {account.balance.toFixed(2)}{" "}
                         <span className="text-sm font-normal">
                             {account.currency}
@@ -269,14 +274,17 @@ export default function AccountRow({
                     </div>
 
                     {/* RIGHT */}
-                    <div ref={actionsWrapRef} className="relative flex w-full flex-wrap items-center justify-start gap-2 lg:w-auto lg:justify-end">
+                    <div
+                        ref={actionsWrapRef}
+                        className="relative ml-auto flex flex-wrap xl:flex-nowrap items-center justify-end gap-2"
+                    >
                         <button
                             onClick={() =>
                                 router.push(
                                     `/trade-login?account=${encodeURIComponent(account.account_number)}`
                                 )
                             }
-                            className="rounded-md bg-yellow-400 px-3 lg:px-4 py-2 text-sm font-medium text-black"
+                            className={tradeBtnClass}
                         >
                             Trade
                         </button>
@@ -287,7 +295,7 @@ export default function AccountRow({
                                     onClick={() =>
                                         router.push(`/dashboard/payments/deposit?account=${account._id}`)
                                     }
-                                    className="rounded-md bg-[var(--bg-glass)] px-3 lg:px-4 py-2 text-sm"
+                                    className={secondaryBtnClass}
                                 >
                                     Deposit
                                 </button>
@@ -296,14 +304,14 @@ export default function AccountRow({
                                     onClick={() =>
                                         router.push(`/dashboard/payments/withdraw?account=${account._id}`)
                                     }
-                                    className="rounded-md bg-[var(--bg-glass)] px-3 lg:px-4 py-2 text-sm"
+                                    className={secondaryBtnClass}
                                 >
                                     Withdraw
                                 </button>
                                  <div className="relative">
                                 <button
                                     onClick={() => setShowActions(!showActions)}
-                                    className="rounded-md bg-[var(--bg-glass)] px-3 py-2 text-sm"
+                                    className={secondaryBtnClass}
                                 >
                                     More
                                 </button>
@@ -340,7 +348,7 @@ export default function AccountRow({
                             <div className="relative">
                                 <button
                                     onClick={() => setShowActions(!showActions)}
-                                    className="rounded-md bg-[var(--bg-glass)] px-3 py-2 text-sm"
+                                    className={secondaryBtnClass}
                                 >
                                     More
                                 </button>
@@ -373,7 +381,7 @@ export default function AccountRow({
 
                         <button
                             onClick={() => setOpen(!open)}
-                            className="p-1"
+                            className="grid h-10 w-10 place-items-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-glass)] hover:text-[var(--text-main)]"
                         >
                             <ChevronDown
                                 size={18}
