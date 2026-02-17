@@ -36,6 +36,7 @@ export const getActiveAccountPlans = async (): Promise<AccountPlan[]> => {
 export const createAccount = async (payload: {
   account_plan_id: string;
   account_type: AccountType;
+  opening_balance?: number;
 }) => {
   const res = await api.post("/accounts", payload);
   return res.data;

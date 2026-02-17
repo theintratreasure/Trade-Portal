@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, BadgeCheck, Wallet2 } from "lucide-react";
 import { Toast } from "@/app/components/ui/Toast";
@@ -30,6 +30,8 @@ export default function OpenAccountPage() {
   const [selectedPlan, setSelectedPlan] = useState<AccountPlan | null>(null);
   const [accountType, setAccountType] = useState<"live" | "demo">("live");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [demoBalanceOpen, setDemoBalanceOpen] = useState(false);
+  const [demoOpeningBalance, setDemoOpeningBalance] = useState<string>("25000");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -41,17 +43,39 @@ export default function OpenAccountPage() {
 
   const handleContinue = () => {
     if (!selectedPlan) return;
+    if (accountType === "demo") {
+      const amount = Number(demoOpeningBalance);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setErrorMsg("Please enter a valid demo opening balance.");
+        return;
+      }
+      setDemoBalanceOpen(true);
+      return;
+    }
     setConfirmOpen(true);
   };
 
   const handleConfirmCreate = async () => {
     try {
-      const res = await createAccount.mutateAsync({
+      const payload: {
+        account_plan_id: string;
+        account_type: "live" | "demo";
+        opening_balance?: number;
+      } = {
         account_plan_id: selectedPlan._id,
         account_type: accountType,
+      };
+
+      if (accountType === "demo") {
+        payload.opening_balance = Number(demoOpeningBalance);
+      }
+
+      const res = await createAccount.mutateAsync({
+        ...payload,
       });
 
       setConfirmOpen(false);
+      setDemoBalanceOpen(false);
       setCreatedAccount(res.data);
       setToast({
         message:
@@ -60,15 +84,31 @@ export default function OpenAccountPage() {
       });
     } catch (err: unknown) {
       setConfirmOpen(false);
+      setDemoBalanceOpen(false);
       const row = err as { response?: { data?: { message?: string } }; message?: string };
       const apiMessage = row?.response?.data?.message || row?.message || "Something went wrong. Please try again.";
       setErrorMsg(apiMessage);
     }
   };
 
-  const allPlans = data || [];
-  const filteredPlans = allPlans;
-  const currentStep = !selectedPlan ? 2 : confirmOpen || createAccount.isPending ? 3 : 3;
+  const filteredPlans = useMemo(() => {
+    const plans = data ?? [];
+    if (accountType === "demo") {
+      return plans.filter((plan) => plan.is_demo_allowed);
+    }
+    return plans.filter((plan) => !plan.is_demo_allowed);
+  }, [accountType, data]);
+
+  useEffect(() => {
+    if (accountType !== "demo") return;
+    if (filteredPlans.length !== 1) return;
+    if (selectedPlan?._id === filteredPlans[0]?._id) return;
+    const timer = window.setTimeout(() => {
+      setSelectedPlan(filteredPlans[0]);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [accountType, filteredPlans, selectedPlan]);
+  const currentStep = !selectedPlan ? 2 : 3;
 
   return (
     <div className="min-h-screen bg-[var(--bg-main)] pb-28 md:pb-24">
@@ -270,6 +310,54 @@ export default function OpenAccountPage() {
           onConfirm={handleConfirmCreate}
           loading={createAccount.isPending}
         />
+      )}
+
+      {demoBalanceOpen && selectedPlan && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-[var(--bg-card)] p-5 shadow-xl">
+            <h2 className="text-lg font-semibold">Demo Opening Balance</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Enter the opening balance for your demo account.
+            </p>
+
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                step="1"
+                inputMode="numeric"
+                value={demoOpeningBalance}
+                onChange={(e) => setDemoOpeningBalance(e.target.value)}
+                className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)]"
+                placeholder="Enter demo amount"
+              />
+              <span className="text-xs text-[var(--text-muted)]">USD</span>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setDemoBalanceOpen(false)}
+                className="rounded-md px-4 py-2 text-sm bg-[var(--bg-glass)]"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={createAccount.isPending}
+                onClick={() => {
+                  const amount = Number(demoOpeningBalance);
+                  if (!Number.isFinite(amount) || amount <= 0) {
+                    setErrorMsg("Please enter a valid demo opening balance.");
+                    return;
+                  }
+                  void handleConfirmCreate();
+                }}
+                className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm text-[var(--text-main)]"
+              >
+                {createAccount.isPending ? "Creating..." : "Confirm & Create"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {errorMsg && <Toast message={errorMsg} type="error" onClose={() => setErrorMsg(null)} />}
