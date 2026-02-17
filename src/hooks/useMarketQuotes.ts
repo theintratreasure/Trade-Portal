@@ -105,7 +105,6 @@ function handleIncomingQuote(msg: unknown) {
         nestedData?.dayClose,
         nestedData?.day_close
       );
-      const dayClose = dayCloseNum !== undefined ? String(dayCloseNum) : cur.bid;
 
       shared.buffer[sym] = {
         ...cur,
@@ -113,8 +112,10 @@ function handleIncomingQuote(msg: unknown) {
         low: dayLow ?? cur.low,
         dayOpen: dayOpen ?? cur.dayOpen,
         dayClose: dayCloseNum ?? cur.dayClose,
-        bid: dayClose,
-        ask: dayClose,
+        // Keep bid/ask untouched on subscribe ack. Real tradable prices must come
+        // from orderbook ticks; using dayClose here causes brief PnL spikes.
+        bid: cur.bid,
+        ask: cur.ask,
         bidDir: "same",
         askDir: "same",
       };
