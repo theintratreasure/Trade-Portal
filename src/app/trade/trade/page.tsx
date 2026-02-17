@@ -567,10 +567,10 @@ export default function TradePage() {
                 />
             </TopBarSlot>
 
-            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100vh-3.5rem)] md:h-full overflow-y-auto pb-5 mb-5">
+            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100dvh-3.5rem)] md:h-full overflow-y-auto pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-5">
 
                 {/* ================= MOBILE (UNCHANGED) ================= */}
-                <div className="md:hidden pb-6 mb-5">
+                <div className="md:hidden pb-[calc(4rem+env(safe-area-inset-bottom))]">
 
                     <div className="space-y-[6px] ">
                         {accountStats.map((row) => (
