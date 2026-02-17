@@ -483,13 +483,11 @@ export default function TradePage() {
             );
             const hasRawCurrent = Number.isFinite(rawCurrentPrice) && rawCurrentPrice > 0;
             const currentPrice =
-                hasRawCurrent && !isAlmostEqual(rawCurrentPrice, openPrice)
-                    ? rawCurrentPrice
-                    : quoteSidePrice != null && quoteSidePrice > 0
-                        ? quoteSidePrice
-                        : hasRawCurrent
-                            ? rawCurrentPrice
-                            : openPrice;
+                quoteSidePrice != null && quoteSidePrice > 0
+                    ? quoteSidePrice
+                    : hasRawCurrent
+                        ? rawCurrentPrice
+                        : openPrice;
 
             const rawPnl = toSafeNumber(pos.floatingPnL, NaN);
             const hasRawPnl = Number.isFinite(rawPnl);
@@ -501,8 +499,11 @@ export default function TradePage() {
                 ((currentPrice - openPrice) * (pos.side === "BUY" ? 1 : -1)) *
                 toSafeNumber(pos.volume, 0) *
                 getPnlScale(pos.symbol);
+            const hasLiveQuotePrice = quoteSidePrice != null && quoteSidePrice > 0;
             const pnl =
-                hasRawPnl && !looksPlaceholderPnl
+                hasLiveQuotePrice && Number.isFinite(estimatedPnl)
+                    ? estimatedPnl
+                    : hasRawPnl && !looksPlaceholderPnl
                     ? rawPnl
                     : Number.isFinite(estimatedPnl)
                         ? estimatedPnl

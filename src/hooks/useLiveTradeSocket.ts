@@ -422,20 +422,15 @@ async function reconcileFromRest() {
       : [];
 
     if (!Array.isArray(rows)) return;
-    const next: Record<string, LivePosition> = {};
+    const next: Record<string, LivePosition> = { ...shared.positionsMap };
     for (const row of rows) {
       const pos = normalizePosition(row);
       if (!pos) continue;
-      next[pos.positionId] = pos;
+      next[pos.positionId] = mergePosition(next[pos.positionId], pos);
     }
-    const currentSize = Object.keys(shared.positionsMap).length;
-    const nextSize = Object.keys(next).length;
-    // If REST returns a partial list, avoid shrinking visible positions abruptly.
-    if (currentSize > nextSize && nextSize > 0) {
-      shared.positionsMap = { ...shared.positionsMap, ...next };
-    } else {
-      shared.positionsMap = next;
-    }
+    // Reconcile should never hard-replace the live map because REST is often delayed.
+    // Keep websocket state hot and let close events remove stale rows.
+    shared.positionsMap = next;
     scheduleEmit();
   } catch {
     // ignore reconcile errors; websocket remains primary source
