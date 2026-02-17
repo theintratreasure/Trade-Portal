@@ -554,11 +554,13 @@ export default function TradePage() {
 
     const accountForUi = displayAccount;
     const accountBalance = toSafeNumber(accountForUi?.balance);
-    const accountBonusBalance = toSafeNumber(accountForUi?.bonusBalance);
+    const accountCredit = toSafeNumber(
+        firstFiniteNumber(accountForUi?.credit, accountForUi?.bonusBalance)
+    );
     const fallbackEquity = toSafeNumber(accountForUi?.equity);
     const accountUsedMargin = toSafeNumber(accountForUi?.usedMargin);
     const totalPositionPnl = livePositions.reduce((sum, pos) => sum + toSafeNumber(pos.profit, 0), 0);
-    const accountEquity = accountForUi ? accountBalance + totalPositionPnl : fallbackEquity;
+    const accountEquity = accountForUi ? accountBalance + accountCredit : fallbackEquity;
     const accountFreeMargin =
         accountForUi && accountUsedMargin > 0 ? accountEquity - accountUsedMargin : toSafeNumber(accountForUi?.freeMargin);
     const marginLevel =
@@ -569,7 +571,7 @@ export default function TradePage() {
     const accountStats: AccountStat[] = accountForUi
         ? [
             { label: "Balance", value: accountBalance.toFixed(2) },
-            { label: "Credit", value: accountBonusBalance.toFixed(2) },
+            { label: "Credit", value: accountCredit.toFixed(2) },
             { label: "Equity", value: accountEquity.toFixed(2) },
             { label: "Margin", value: accountUsedMargin.toFixed(2) },
             { label: "Free margin", value: accountFreeMargin.toFixed(2) },
@@ -579,7 +581,7 @@ export default function TradePage() {
 
     const pnl =
         accountForUi
-            ? accountEquity - accountBalance
+            ? totalPositionPnl
             : 0;
     const formattedPnl = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
     const pnlColorClass =
@@ -734,10 +736,10 @@ export default function TradePage() {
                                             {accountBalance.toFixed(2)}
                                         </span>
                                     </div>
-                                     <div>
+                                    <div>
                                         <span className="text-[var(--text-muted)]">Credit:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
-                                            {accountBonusBalance.toFixed(2)}
+                                            {accountCredit.toFixed(2)}
                                         </span>
                                     </div>
                                      <div>

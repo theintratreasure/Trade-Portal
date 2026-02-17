@@ -5,6 +5,7 @@ import {
   fetchBySegment,
   addToWatchlist,
   removeFromWatchlist,
+  WatchlistItem,
 } from "@/services/watchlist.service";
 import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
@@ -47,18 +48,60 @@ export function useSegmentInstruments(segment: string | null) {
 /* ACTIONS */
 export function useWatchlistActions() {
   const qc = useQueryClient();
+  const token = getTradeTokenFromStorageSync();
+  const watchlistQueryKey = ["watchlist", token || null] as const;
 
   const add = useMutation({
     mutationFn: addToWatchlist,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["watchlist"] });
+    onMutate: async (code) => {
+      await qc.cancelQueries({ queryKey: watchlistQueryKey });
+      const previous = qc.getQueryData<WatchlistItem[]>(watchlistQueryKey) ?? [];
+
+      qc.setQueryData<WatchlistItem[]>(watchlistQueryKey, (current = []) => {
+        if (current.some((item) => item.code === code)) return current;
+        return [
+          ...current,
+          {
+            _id: `optimistic-${code}`,
+            code,
+            name: code,
+            isAdded: true,
+          },
+        ];
+      });
+
+      return { previous };
+    },
+    onError: (_error, _code, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(watchlistQueryKey, ctx.previous);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: watchlistQueryKey });
     },
   });
 
   const remove = useMutation({
     mutationFn: removeFromWatchlist,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["watchlist"] });
+    onMutate: async (code) => {
+      await qc.cancelQueries({ queryKey: watchlistQueryKey });
+      const previous = qc.getQueryData<WatchlistItem[]>(watchlistQueryKey) ?? [];
+
+      qc.setQueryData<WatchlistItem[]>(
+        watchlistQueryKey,
+        (current = []) => current.filter((item) => item.code !== code)
+      );
+
+      return { previous };
+    },
+    onError: (_error, _code, ctx) => {
+      if (ctx?.previous) {
+        qc.setQueryData(watchlistQueryKey, ctx.previous);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: watchlistQueryKey });
     },
   });
 
