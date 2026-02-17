@@ -149,15 +149,21 @@ function normalizePosition(data: unknown): LivePosition | null {
   const id = row.positionId ?? row.id ?? row._id;
   if (!id) return null;
 
+  const rawOpenPrice = toNumberOrUndefined(row.openPrice ?? row.entryPrice ?? row.price);
+  const rawCurrentPrice = toNumberOrUndefined(
+    row.currentPrice ?? row.current_price ?? row.ltp ?? row.lastPrice
+  );
+  const rawFloatingPnL = toNumberOrUndefined(row.floatingPnL ?? row.pnl ?? row.profit);
+
   return {
     accountId: String(row.accountId ?? ""),
     positionId: String(id),
     symbol: String(row.symbol ?? row.pair ?? row.instrument ?? "-"),
     side: String(row.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
     volume: Number(row.volume ?? row.lot ?? 0),
-    openPrice: Number(row.openPrice ?? row.entryPrice ?? row.price ?? 0),
-    currentPrice: Number(row.currentPrice ?? row.current_price ?? row.ltp ?? row.lastPrice ?? 0),
-    floatingPnL: Number(row.floatingPnL ?? row.pnl ?? row.profit ?? 0),
+    openPrice: rawOpenPrice ?? 0,
+    currentPrice: rawCurrentPrice ?? rawOpenPrice ?? 0,
+    floatingPnL: rawFloatingPnL ?? 0,
     stopLoss: (row.stopLoss ?? row.stop_loss ?? null) as number | null,
     takeProfit: (row.takeProfit ?? row.take_profit ?? null) as number | null,
     swap: Number(row.swap ?? 0),
@@ -167,6 +173,27 @@ function normalizePosition(data: unknown): LivePosition | null {
       : row.open_time
       ? String(row.open_time)
       : undefined,
+  };
+}
+
+function isFinitePositive(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
+function mergePosition(prev: LivePosition | undefined, next: LivePosition): LivePosition {
+  if (!prev) return next;
+  return {
+    ...prev,
+    ...next,
+    accountId: next.accountId || prev.accountId,
+    symbol: next.symbol && next.symbol !== "-" ? next.symbol : prev.symbol,
+    volume: Number.isFinite(next.volume) && next.volume > 0 ? next.volume : prev.volume,
+    openPrice: isFinitePositive(next.openPrice) ? next.openPrice : prev.openPrice,
+    currentPrice: isFinitePositive(next.currentPrice)
+      ? next.currentPrice
+      : isFinitePositive(prev.currentPrice)
+      ? prev.currentPrice
+      : next.currentPrice,
   };
 }
 
@@ -251,7 +278,7 @@ function applyPositionMerge(items: LivePosition[]) {
   if (items.length === 0) return;
   const next: Record<string, LivePosition> = { ...shared.positionsMap };
   for (const item of items) {
-    next[item.positionId] = item;
+    next[item.positionId] = mergePosition(next[item.positionId], item);
   }
   shared.positionsMap = next;
   scheduleEmit();
@@ -457,7 +484,10 @@ function bindSocket(socket: WebSocket, accountId: string) {
           scheduleEmit();
           return;
         }
-        shared.positionsMap[row.positionId] = row;
+        shared.positionsMap[row.positionId] = mergePosition(
+          shared.positionsMap[row.positionId],
+          row
+        );
         scheduleEmit();
         return;
       }

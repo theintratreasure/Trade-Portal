@@ -32,6 +32,17 @@ type FormState = {
   newPassword: string;
 };
 
+function setAuthCookie(token: string) {
+  if (typeof document === "undefined") return;
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? "; secure"
+      : "";
+  document.cookie = `accessToken=${encodeURIComponent(
+    token
+  )}; path=/; max-age=86400; samesite=lax${secure}`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -78,7 +89,13 @@ export default function LoginPage() {
       },
       {
         onSuccess: async (res) => {
-          const { accessToken, refreshToken, isMailVerified } = res.data;
+          const payload = res?.data?.data ?? res?.data ?? res;
+          const { accessToken, refreshToken, isMailVerified } = payload ?? {};
+
+          if (!accessToken || !refreshToken) {
+            setToast("Login response invalid. Please try again.");
+            return;
+          }
 
           if (!isMailVerified) {
             setToast("Please verify your email first");
@@ -88,7 +105,7 @@ export default function LoginPage() {
 
           localStorage.setItem("accessToken", accessToken);
           localStorage.setItem("refreshToken", refreshToken);
-          document.cookie = `accessToken=${accessToken}; path=/; max-age=86400`;
+          setAuthCookie(accessToken);
 
           setToast("Login successful");
 
@@ -124,7 +141,8 @@ export default function LoginPage() {
             console.log("FCM error:", err);
           }
 
-          router.push("/dashboard");
+          router.replace("/dashboard");
+          router.refresh();
         },
         onError: () => {
           setToast("Invalid email or password");

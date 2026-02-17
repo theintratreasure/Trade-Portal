@@ -135,6 +135,8 @@ const toFixedSafe = (value: unknown, digits = 2, fallback = "0.00") => {
     return Number.isFinite(n) ? n.toFixed(digits) : fallback;
 };
 
+const isFinitePositive = (value: number) => Number.isFinite(value) && value > 0;
+
 const getAccountIdFromUnknown = (value: unknown): string | undefined => {
     if (!value || typeof value !== "object") return undefined;
     const row = value as Record<string, unknown>;
@@ -254,7 +256,19 @@ export default function TradePage() {
         // Merge to avoid socket partial updates shrinking the list intermittently.
         const merged = new Map<string, LivePosition>();
         for (const item of restPositions) merged.set(item.positionId, item);
-        for (const item of positions) merged.set(item.positionId, item);
+        for (const item of positions) {
+            const prev = merged.get(item.positionId);
+            if (!prev) {
+                merged.set(item.positionId, item);
+                continue;
+            }
+            merged.set(item.positionId, {
+                ...prev,
+                ...item,
+                openPrice: isFinitePositive(item.openPrice) ? item.openPrice : prev.openPrice,
+                currentPrice: isFinitePositive(item.currentPrice) ? item.currentPrice : prev.currentPrice,
+            });
+        }
         return Array.from(merged.values());
     }, [accountId, positions, restFallback]);
 
