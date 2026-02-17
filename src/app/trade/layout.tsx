@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { TradeSidebarProvider } from "./components/layout/TradeSidebarContext";
 import TradeBottomNav from "./components/layout/TradeBottomNav";
 import TradeSidebar from "./components/layout/TradeSidebar";
@@ -9,6 +10,8 @@ import TradeDesktopSidebar from "./components/desktop/TradeDesktopSidebar";
 import TradeQuotesPanel from "./components/desktop/TradeQuotesPanel";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { LanguageProvider } from "./components/LanguageProvider";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
+import GlobalLoader from "../components/ui/GlobalLoader";
 
 export default function TradeLayoutClient({
     children,
@@ -34,9 +37,12 @@ function TradeLayoutInner({
 }: {
     children: ReactNode;
 }) {
+    const router = useRouter();
     const { quotesOpen } = useTradeDesktop();
-    const { data: account } = useTradeAccount();// comes from global state
+    useTradeAccount();// keep trade account cache warm globally
     const [isDesktop, setIsDesktop] = useState<boolean>(false);
+    const [authChecked, setAuthChecked] = useState(false);
+    const [hasTradeToken, setHasTradeToken] = useState(false);
 
     useEffect(() => {
         const mq = window.matchMedia("(min-width: 768px)");
@@ -45,6 +51,34 @@ function TradeLayoutInner({
         mq.addEventListener("change", apply);
         return () => mq.removeEventListener("change", apply);
     }, []);
+
+    useEffect(() => {
+        const syncAuth = () => {
+            const token = getTradeTokenFromStorageSync();
+            const isAuthed = Boolean(token);
+            setHasTradeToken(isAuthed);
+            setAuthChecked(true);
+            if (!isAuthed) {
+                router.replace("/trade-login");
+            }
+        };
+
+        syncAuth();
+        window.addEventListener("focus", syncAuth);
+        window.addEventListener("trade-token-change", syncAuth);
+        return () => {
+            window.removeEventListener("focus", syncAuth);
+            window.removeEventListener("trade-token-change", syncAuth);
+        };
+    }, [router]);
+
+    if (!authChecked || !hasTradeToken) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-[var(--bg-plan)]">
+                <GlobalLoader />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen mt-font mt-numbers bg-[var(--bg-plan)] md:bg-[var(--bg-card)]">

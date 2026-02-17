@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "./components/sidebar";
 import Topbar from "./components/topbar";
@@ -9,6 +9,12 @@ import { useUserMe } from "@/hooks/useUser";
 import GlobalLoader from "../components/ui/GlobalLoader";
 import { Capacitor } from "@capacitor/core";
 import KycReminderModal from "./components/KycReminderModal";
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const maybe = error as { response?: { status?: number } };
+  return maybe.response?.status;
+}
 
 export default function DashboardLayout({
   children,
@@ -24,19 +30,23 @@ export default function DashboardLayout({
 
   const isTradePage = pathname?.startsWith("/dashboard/trade") ?? false;
 
-  const [hasToken, setHasToken] = useState(false);
+  const hasToken = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(localStorage.getItem("accessToken"));
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    setHasToken(!!token);
-  }, []);
+    if (!isTradePage && !hasToken) {
+      router.replace("/login");
+    }
+  }, [hasToken, isTradePage, router]);
 
   const { data: user, isLoading, isError, error } = useUserMe({
     enabled: hasToken && !isTradePage,
   });
 
   useEffect(() => {
-    window.onerror = function (msg, url, line, col, error) {
+    window.onerror = function (msg) {
       alert("JS ERROR: " + msg);
     };
   }, []);
@@ -56,9 +66,29 @@ export default function DashboardLayout({
     }
   }, []);
 
+  useEffect(() => {
+    if (isTradePage) return;
+    if (!isError) return;
+
+    const status = getErrorStatus(error);
+    if (status === 401) {
+      localStorage.removeItem("accessToken");
+      document.cookie = "accessToken=; path=/; max-age=0";
+      router.replace("/login");
+    }
+  }, [error, isError, isTradePage, router]);
+
 
   /* ================= AUTH ================= */
-  if (!isTradePage) {
+    if (!isTradePage) {
+    if (!hasToken) {
+      return (
+        <div className="flex h-screen items-center justify-center text-sm">
+          <GlobalLoader />
+        </div>
+      );
+    }
+
     if (isLoading) {
       return (
         <div className="flex h-screen items-center justify-center text-sm">
@@ -67,15 +97,7 @@ export default function DashboardLayout({
       );
     }
 
-    if (isError) {
-      const status = (error as any)?.response?.status;
-      if (status === 401) {
-        localStorage.removeItem("accessToken");
-        document.cookie = "accessToken=; path=/; max-age=0";
-        router.replace("/login");
-        return null;
-      }
-    }
+    if (isError) return null;
   }
 
 
