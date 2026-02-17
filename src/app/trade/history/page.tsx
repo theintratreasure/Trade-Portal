@@ -419,6 +419,13 @@ export default function TradeHistory() {
     return "Custom";
   }, [dateFilter]);
 
+  const ordersGridTemplate =
+    "minmax(96px,1fr) minmax(150px,1.4fr) minmax(100px,1fr) minmax(110px,1fr) minmax(80px,0.8fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(110px,1fr)";
+  const positionsGridTemplate =
+    "1fr 1.2fr 0.95fr 0.85fr 0.65fr 0.75fr 0.75fr 0.7fr 0.7fr 0.7fr 0.9fr";
+  const dealsGridTemplate =
+    "minmax(96px,1fr) minmax(150px,1.4fr) minmax(100px,1fr) minmax(120px,1fr) minmax(80px,0.8fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,0.9fr) minmax(90px,1fr)";
+
 
   return (
     <>
@@ -566,10 +573,76 @@ export default function TradeHistory() {
         {/* DEBUG PANEL */}
 
         <HistoryTabs activeTab={activeTab} onChange={onTabChange} />
+        <div className="hidden md:flex items-center gap-3 mb-4 p-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-glass)]">
+          <select
+            value={selectedSymbolLabel ?? "ALL"}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSelectedSymbolLabel(value === "ALL" ? null : value);
+            }}
+            className="h-9 min-w-[150px] px-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] text-[13px]"
+          >
+            <option value="ALL">All Symbols</option>
+            {symbolsForDropdown.map((sym) => (
+              <option key={sym.key} value={sym.label}>
+                {sym.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sideFilter}
+            onChange={(e) => setSideFilter(e.target.value as SideFilter)}
+            className="h-9 min-w-[110px] px-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] text-[13px]"
+          >
+            <option value="ALL">ALL</option>
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+          </select>
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value as HistoryFilterType)}
+            className="h-9 min-w-[130px] px-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] text-[13px]"
+          >
+            <option value="all">All</option>
+            <option value="today">Today</option>
+            <option value="lastweek">Last Week</option>
+            <option value="last3month">Last 3 Month</option>
+            <option value="custom">Custom</option>
+          </select>
+          {dateFilter === "custom" && (
+            <>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="h-9 px-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] text-[13px]"
+              />
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="h-9 px-3 rounded-md border border-[var(--border-soft)] bg-[var(--bg-card)] text-[13px]"
+              />
+            </>
+          )}
+          <button
+            onClick={() => {
+              setSelectedSymbolLabel(null);
+              setSideFilter("ALL");
+              setDateFilter("all");
+              setFromDate("");
+              setToDate("");
+            }}
+            className="h-9 px-3 rounded-md border border-[var(--border-soft)] hover:bg-[var(--bg-plan)] text-[13px]"
+          >
+            Reset
+          </button>
+        </div>
 
         <div className="transition-opacity duration-200">
           {activeTab === "orders" && (
             <>
+              <div className="md:hidden">
               {/* SUMMARY */}
               {symbolOrderSummary && (
                 <div className="space-y-[6px] mb-3">
@@ -666,6 +739,58 @@ export default function TradeHistory() {
                   </LongPressRow>
                 );
               })}
+              </div>
+
+              <div className="hidden md:block">
+                <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
+                    <div className="font-semibold text-[14px]">Orders ({allOrders.length})</div>
+                  </div>
+                  <div className="w-full overflow-x-auto">
+                    <div className="min-w-[980px] w-full">
+                      <div
+                        className="grid w-full px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]"
+                        style={{ gridTemplateColumns: ordersGridTemplate }}
+                      >
+                        <div>ID</div>
+                        <div>TIME</div>
+                        <div>SYMBOL</div>
+                        <div>TYPE</div>
+                        <div>LOT</div>
+                        <div>PRICE</div>
+                        <div>SL</div>
+                        <div>TP</div>
+                        <div className="text-right">STATUS</div>
+                      </div>
+                      {allOrders.length > 0 ? (
+                        allOrders.map((order: any) => (
+                          <div
+                            key={order.orderId}
+                            className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                            style={{ gridTemplateColumns: ordersGridTemplate }}
+                          >
+                            <div>{String(order.orderId ?? "-").slice(0, 10)}</div>
+                            <div>{formatDateTime24(order.openTime)}</div>
+                            <div className="font-semibold">{order.symbol ?? "-"}</div>
+                            <div className={String(order.side).toUpperCase() === "BUY" ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
+                              {order.orderType ?? "-"}
+                            </div>
+                            <div>{Number(order.qty ?? 0).toFixed(2)}</div>
+                            <div>{Number(order.price ?? 0).toFixed(2)}</div>
+                            <div>{order.stopLoss ?? "-"}</div>
+                            <div>{order.takeProfit ?? "-"}</div>
+                            <div className="text-right font-semibold text-[var(--text-muted)]">
+                              {String(order.status ?? "").toUpperCase() === "CLOSED" ? "FILLED" : String(order.status ?? "-")}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-[var(--text-muted)]">No Orders Found</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div
                 ref={loadMoreRef}
@@ -684,6 +809,7 @@ export default function TradeHistory() {
           {activeTab === "positions" && (
 
             <>
+              <div className="md:hidden">
 
               {/* SUMMARY */}
               <div className="space-y-[6px] mb-3">
@@ -841,6 +967,69 @@ export default function TradeHistory() {
                   </LongPressRow>
                 );
               })}
+              </div>
+
+              <div className="hidden md:block">
+                <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
+                    <div className="font-semibold text-[14px]">Positions ({allPositions.length})</div>
+                  </div>
+                  <div className="w-full overflow-x-hidden">
+                    <div className="w-full">
+                      <div
+                        className="grid w-full px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]"
+                        style={{ gridTemplateColumns: positionsGridTemplate }}
+                      >
+                        <div>ID</div>
+                        <div>TIME</div>
+                        <div>SYMBOL</div>
+                        <div>ORDER</div>
+                        <div>LOT</div>
+                        <div>OPEN</div>
+                        <div>CLOSE</div>
+                        <div>SL</div>
+                        <div>TP</div>
+                        <div>SWAP</div>
+                        <div className="text-right">PROFIT</div>
+                      </div>
+                      {allPositions.length > 0 ? (
+                        allPositions.map((pos: any) => (
+                          <div
+                            key={pos.orderId}
+                            className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                            style={{ gridTemplateColumns: positionsGridTemplate }}
+                          >
+                            <div className="truncate">{String(pos.orderId ?? "-").slice(0, 10)}</div>
+                            <div className="truncate">{formatDateTime24(pos.openTime)}</div>
+                            <div className="font-semibold truncate">{pos.symbol ?? "-"}</div>
+                            <div className={String(pos.side).toUpperCase() === "BUY" ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
+                              {String(pos.side ?? "-").toUpperCase()}
+                            </div>
+                            <div>{Number(pos.qty ?? 0).toFixed(2)}</div>
+                            <div>{Number(pos.openPrice ?? 0).toFixed(2)}</div>
+                            <div>{pos.closePrice != null ? Number(pos.closePrice).toFixed(2) : "-"}</div>
+                            <div>{pos.stopLoss ?? "-"}</div>
+                            <div>{pos.takeProfit ?? "-"}</div>
+                            <div>{Number(pos.swap ?? 0).toFixed(2)}</div>
+                            <div
+                              className={`text-right font-semibold ${Number(pos.profitLoss ?? 0) > 0
+                                ? "text-[var(--mt-blue)]"
+                                : Number(pos.profitLoss ?? 0) < 0
+                                ? "text-[var(--mt-red)]"
+                                : "text-[var(--text-muted)]"
+                                }`}
+                            >
+                              {Number(pos.profitLoss ?? 0).toFixed(2)}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-[var(--text-muted)]">No Positions Found</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
 
               {/* LOAD MORE TRIGGER */}
@@ -856,6 +1045,7 @@ export default function TradeHistory() {
 
           {activeTab === "deals" && (
             <>
+              <div className="md:hidden">
               {/* SUMMARY */}
               <div className="space-y-[6px] mb-3">
                 {positionSummary.map((row) => (
@@ -996,6 +1186,65 @@ export default function TradeHistory() {
                   </LongPressRow>
                 );
               })}
+              </div>
+
+              <div className="hidden md:block">
+                <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
+                    <div className="font-semibold text-[14px]">Deals ({allDeals.length})</div>
+                  </div>
+                  <div className="w-full overflow-x-auto">
+                    <div className="min-w-[980px] w-full">
+                      <div
+                        className="grid w-full px-4 py-2 text-[12px] font-semibold text-[var(--text-muted)] border-b border-[var(--border-soft)]"
+                        style={{ gridTemplateColumns: dealsGridTemplate }}
+                      >
+                        <div>DEAL ID</div>
+                        <div>TIME</div>
+                        <div>SYMBOL</div>
+                        <div>TYPE</div>
+                        <div>LOT</div>
+                        <div>PRICE</div>
+                        <div>SWAP</div>
+                        <div>CHARGES</div>
+                        <div className="text-right">PNL</div>
+                      </div>
+                      {allDeals.length > 0 ? (
+                        allDeals.map((deal: any) => (
+                          <div
+                            key={deal.tradeId + deal.date}
+                            className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                            style={{ gridTemplateColumns: dealsGridTemplate }}
+                          >
+                            <div>{String(deal.tradeId ?? "-").slice(0, 10)}</div>
+                            <div>{formatDateTime24(deal.date)}</div>
+                            <div className="font-semibold">{deal.symbol ?? "-"}</div>
+                            <div className={String(deal.type ?? "").includes("BUY") ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
+                              {String(deal.type ?? "-").toLowerCase().replace("_", ", ")}
+                            </div>
+                            <div>{Number(deal.volume ?? 0).toFixed(2)}</div>
+                            <div>{Number(deal.price ?? 0).toFixed(2)}</div>
+                            <div>{Number(deal.swap ?? 0).toFixed(2)}</div>
+                            <div>{Number(deal.commission ?? 0).toFixed(2)}</div>
+                            <div
+                              className={`text-right font-semibold ${Number(deal.pnl ?? 0) > 0
+                                ? "text-[var(--mt-blue)]"
+                                : Number(deal.pnl ?? 0) < 0
+                                ? "text-[var(--mt-red)]"
+                                : "text-[var(--text-muted)]"
+                                }`}
+                            >
+                              {Number(deal.pnl ?? 0).toFixed(2)}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-[var(--text-muted)]">No Deals Found</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div
                 ref={loadMoreRef}
