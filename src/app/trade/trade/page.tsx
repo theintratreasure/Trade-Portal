@@ -269,6 +269,7 @@ export default function TradePage() {
     });
 
     const effectiveAccount = account ?? restFallback?.account ?? null;
+    const [displayAccount, setDisplayAccount] = useState<Record<string, unknown> | null>(null);
 
     useEffect(() => {
         const syncTradeToken = () => {
@@ -284,6 +285,21 @@ export default function TradePage() {
             window.removeEventListener("trade-token-change", syncTradeToken);
         };
     }, []);
+
+    useEffect(() => {
+        const nextAccount = effectiveAccount as Record<string, unknown> | null;
+        if (nextAccount) {
+            const syncTimer = window.setTimeout(() => {
+                setDisplayAccount(nextAccount);
+            }, 0);
+            return () => window.clearTimeout(syncTimer);
+        }
+
+        const clearTimer = window.setTimeout(() => {
+            setDisplayAccount(null);
+        }, 450);
+        return () => window.clearTimeout(clearTimer);
+    }, [effectiveAccount]);
 
     const socketOrRestPositions = useMemo(() => {
         const rows = Array.isArray(restFallback?.positions) ? restFallback.positions : [];
@@ -396,6 +412,24 @@ export default function TradePage() {
             }));
     }, [pending, restFallback]);
 
+    const [displayPositionsSource, setDisplayPositionsSource] = useState<LivePosition[]>([]);
+    useEffect(() => {
+        if (socketOrRestPositions.length > 0) {
+            const syncTimer = window.setTimeout(() => {
+                setDisplayPositionsSource(socketOrRestPositions);
+            }, 0);
+            return () => window.clearTimeout(syncTimer);
+        }
+
+        const clearTimer = window.setTimeout(() => {
+            setDisplayPositionsSource([]);
+        }, 450);
+        return () => window.clearTimeout(clearTimer);
+    }, [socketOrRestPositions]);
+
+    const positionsForUi =
+        socketOrRestPositions.length > 0 ? socketOrRestPositions : displayPositionsSource;
+
     const pendingSymbols = useMemo(
         () =>
             Array.from(
@@ -482,7 +516,7 @@ export default function TradePage() {
 
 
     const livePositions: Position[] = useMemo(() => {
-        return socketOrRestPositions.map((pos) => {
+        return positionsForUi.map((pos) => {
             const openPrice = toSafeNumber(pos.openPrice, 0);
             const rawCurrentPrice = toSafeNumber(pos.currentPrice, openPrice);
             const liveQuote = pos.symbol ? findQuoteBySymbol(quotes, pos.symbol) : undefined;
@@ -516,22 +550,23 @@ export default function TradePage() {
                 takeProfit: pos.takeProfit == null ? null : toSafeNumber(pos.takeProfit, 0),
             };
         });
-    }, [quotes, socketOrRestPositions]);
+    }, [positionsForUi, quotes]);
 
-    const accountBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.balance);
-    const accountBonusBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.bonusBalance);
-    const fallbackEquity = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.equity);
-    const accountUsedMargin = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.usedMargin);
+    const accountForUi = displayAccount;
+    const accountBalance = toSafeNumber(accountForUi?.balance);
+    const accountBonusBalance = toSafeNumber(accountForUi?.bonusBalance);
+    const fallbackEquity = toSafeNumber(accountForUi?.equity);
+    const accountUsedMargin = toSafeNumber(accountForUi?.usedMargin);
     const totalPositionPnl = livePositions.reduce((sum, pos) => sum + toSafeNumber(pos.profit, 0), 0);
-    const accountEquity = effectiveAccount ? accountBalance + totalPositionPnl : fallbackEquity;
+    const accountEquity = accountForUi ? accountBalance + totalPositionPnl : fallbackEquity;
     const accountFreeMargin =
-        effectiveAccount && accountUsedMargin > 0 ? accountEquity - accountUsedMargin : toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.freeMargin);
+        accountForUi && accountUsedMargin > 0 ? accountEquity - accountUsedMargin : toSafeNumber(accountForUi?.freeMargin);
     const marginLevel =
-        effectiveAccount && accountUsedMargin > 0
+        accountForUi && accountUsedMargin > 0
             ? ((accountEquity / accountUsedMargin) * 100).toFixed(2)
             : "0.00";
 
-    const accountStats: AccountStat[] = effectiveAccount
+    const accountStats: AccountStat[] = accountForUi
         ? [
             { label: "Balance", value: accountBalance.toFixed(2) },
             { label: "Credit", value: accountBonusBalance.toFixed(2) },
@@ -543,7 +578,7 @@ export default function TradePage() {
         : [];
 
     const pnl =
-        effectiveAccount
+        accountForUi
             ? accountEquity - accountBalance
             : 0;
     const formattedPnl = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
@@ -689,7 +724,7 @@ export default function TradePage() {
 
                     <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
                         {/* ===== ACCOUNT SUMMARY ===== */}
-                        {effectiveAccount && (
+                        {accountForUi && (
                             <div className="px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
                                 <div className="flex flex-wrap items-center gap-8 text-[13px]">
 
@@ -697,6 +732,12 @@ export default function TradePage() {
                                         <span className="text-[var(--text-muted)]">Balance:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
                                             {accountBalance.toFixed(2)}
+                                        </span>
+                                    </div>
+                                     <div>
+                                        <span className="text-[var(--text-muted)]">Credit:</span>{" "}
+                                        <span className="font-semibold text-[var(--mt-blue)]">
+                                            {accountBonusBalance.toFixed(2)}
                                         </span>
                                     </div>
                                      <div>
@@ -714,14 +755,9 @@ export default function TradePage() {
 
                                    
 
-                                    {/* <div>
-                                        <span className="text-[var(--text-muted)]">Bonus:</span>{" "}
-                                        <span className="font-semibold text-[var(--mt-blue)]">
-                                            {accountBonusBalance.toFixed(2)}
-                                        </span>
-                                    </div>
+                                  
 
-                                    <div>
+                                   {/*   <div>
                                         <span className="text-[var(--text-muted)]">Bonus Live:</span>{" "}
                                         <span className="font-semibold text-[var(--mt-blue)]">
                                             {accountBonusLive.toFixed(2)}
@@ -763,7 +799,7 @@ export default function TradePage() {
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
                                 <div className="font-semibold text-[14px]">
-                                Positions ({socketOrRestPositions.length})
+                                Positions ({livePositions.length})
                             </div>
                         </div>
 
