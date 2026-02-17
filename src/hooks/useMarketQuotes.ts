@@ -9,6 +9,10 @@ import { useWatchlist } from "./watchlist/useWatchlist";
 type QuoteMap = Record<string, QuoteLiveState | undefined>;
 type QuoteListener = (quotes: QuoteMap) => void;
 
+function normalizeSymbol(value: string): string {
+  return String(value ?? "").trim().toUpperCase();
+}
+
 const shared = {
   socket: null as MarketSocket | null,
   token: null as string | null,
@@ -31,8 +35,9 @@ function getNumber(...values: unknown[]): number | undefined {
 }
 
 function getPlaceholder(symbol: string): QuoteLiveState {
+  const normalized = normalizeSymbol(symbol);
   return {
-    symbol,
+    symbol: normalized,
     bid: "--",
     ask: "--",
     bidVolume: "--",
@@ -64,7 +69,7 @@ function handleIncomingQuote(msg: unknown) {
         : undefined;
 
     if (payload.status === "subscribed" && typeof payload.symbol === "string") {
-      const sym = payload.symbol;
+      const sym = normalizeSymbol(payload.symbol);
       const cur = shared.buffer[sym];
       if (!cur) return;
 
@@ -122,7 +127,7 @@ function handleIncomingQuote(msg: unknown) {
       nestedData &&
       typeof nestedData.code === "string"
     ) {
-      const symbol = nestedData.code;
+      const symbol = normalizeSymbol(nestedData.code);
       const bids = Array.isArray(nestedData.bids)
         ? (nestedData.bids as Array<Record<string, unknown>>)
         : [];
@@ -272,26 +277,30 @@ function getEffectiveAccountId(): string {
 }
 
 function subscribeSymbol(symbol: string) {
-  const currentCount = shared.symbolRefCounts.get(symbol) ?? 0;
-  shared.symbolRefCounts.set(symbol, currentCount + 1);
+  const normalized = normalizeSymbol(symbol);
+  if (!normalized) return;
+  const currentCount = shared.symbolRefCounts.get(normalized) ?? 0;
+  shared.symbolRefCounts.set(normalized, currentCount + 1);
 
   if (currentCount === 0) {
-    shared.buffer[symbol] = shared.buffer[symbol] ?? getPlaceholder(symbol);
-    shared.socket?.subscribe(symbol);
+    shared.buffer[normalized] = shared.buffer[normalized] ?? getPlaceholder(normalized);
+    shared.socket?.subscribe(normalized);
     scheduleEmit();
   }
 }
 
 function unsubscribeSymbol(symbol: string) {
-  const currentCount = shared.symbolRefCounts.get(symbol) ?? 0;
+  const normalized = normalizeSymbol(symbol);
+  if (!normalized) return;
+  const currentCount = shared.symbolRefCounts.get(normalized) ?? 0;
   if (currentCount <= 1) {
-    shared.symbolRefCounts.delete(symbol);
-    shared.socket?.unsubscribe(symbol);
-    delete shared.buffer[symbol];
+    shared.symbolRefCounts.delete(normalized);
+    shared.socket?.unsubscribe(normalized);
+    delete shared.buffer[normalized];
     scheduleEmit();
     return;
   }
-  shared.symbolRefCounts.set(symbol, currentCount - 1);
+  shared.symbolRefCounts.set(normalized, currentCount - 1);
 }
 
 function addListener(listener: QuoteListener) {
@@ -323,8 +332,8 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
     const manualSymbols = (extraSymbols ?? []).filter(
       (code): code is string => typeof code === "string" && code.length > 0
     );
-    return Array.from(new Set([...watchlistSymbols, ...manualSymbols]));
-  }, [extraSymbols, watchlist]);
+    return Array.from(new Set([...watchlistSymbols, ...manualSymbols].map((s) => normalizeSymbol(s)).filter(Boolean)));
+}, [extraSymbols, watchlist]);
 
   useEffect(() => {
     const syncAccountId = () => {

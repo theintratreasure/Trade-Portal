@@ -3,11 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import tradeApi from "@/api/tradeApi";
 import { buildSocketUrl } from "@/lib/socketUrl";
+import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 
 const LIVE_SOCKET_FLUSH_INTERVAL_MS = 40;
 const LIVE_SOCKET_IDLE_CLOSE_MS = 15000;
 const LIVE_SOCKET_RECONNECT_MAX_MS = 5000;
 const LIVE_RECONCILE_INTERVAL_MS = 3000;
+const LIVE_SOCKET_STALE_MS = 30000;
+const LIVE_SOCKET_HEALTHCHECK_MS = 5000;
+const LIVE_SOCKET_DEBUG = process.env.NEXT_PUBLIC_DEBUG_LIVE_SOCKET === "1";
 
 type LiveAccount = {
   accountId?: string;
@@ -77,7 +81,18 @@ const shared = {
   pendingMap: {} as Record<string, LivePending>,
   reconcileTimer: null as number | null,
   reconcileInFlight: false,
+  healthcheckTimer: null as number | null,
+  lastMessageAt: 0,
 };
+
+function debugLog(message: string, data?: unknown) {
+  if (!LIVE_SOCKET_DEBUG) return;
+  if (data === undefined) {
+    console.debug(`[useLiveTradeSocket] ${message}`);
+    return;
+  }
+  console.debug(`[useLiveTradeSocket] ${message}`, data);
+}
 
 export function removeLivePositionFromCache(positionId: string) {
   if (!positionId) return;
@@ -122,22 +137,41 @@ function normalizeLiveAccount(data: unknown): LiveAccount | null {
 function normalizePendingOrder(data: unknown): LivePending | null {
   if (!data || typeof data !== "object") return null;
   const row = data as Record<string, unknown>;
-  if (!row.orderId) return null;
+  const nestedData =
+    row.data && typeof row.data === "object"
+      ? (row.data as Record<string, unknown>)
+      : null;
+  const hasRowOrderKeys =
+    row.orderId != null ||
+    row.order_id != null ||
+    row.pendingOrderId != null ||
+    row.symbol != null;
+  const source =
+    nestedData &&
+    !hasRowOrderKeys &&
+    (nestedData.orderId != null ||
+      nestedData.order_id != null ||
+      nestedData.pendingOrderId != null ||
+      nestedData.symbol != null)
+      ? nestedData
+      : row;
+  const orderId = source.orderId ?? source.order_id ?? source.pendingOrderId ?? source.id ?? source._id;
+  if (!orderId) return null;
 
-  const statusRaw = row.status ?? row.orderStatus ?? row.state ?? row.order_state;
+  const statusRaw = source.status ?? source.orderStatus ?? source.state ?? source.order_state;
   const currentPriceRaw =
-    row.currentPrice ?? row.current_price ?? row.ltp ?? row.lastPrice;
+    source.currentPrice ?? source.current_price ?? source.ltp ?? source.lastPrice;
 
   return {
-    orderId: String(row.orderId),
-    symbol: String(row.symbol ?? "-"),
-    side: String(row.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
-    orderType: String(row.orderType ?? row.order_type ?? "-"),
-    price: Number(row.price ?? 0),
-    volume: Number(row.volume ?? 0),
-    stopLoss: (row.stopLoss ?? row.stop_loss ?? null) as number | null,
-    takeProfit: (row.takeProfit ?? row.take_profit ?? null) as number | null,
-    createdAt: Number(row.createdAt ?? row.created_at ?? Date.now()),
+    orderId: String(orderId),
+    symbol: String(source.symbol ?? "-"),
+    side: String(source.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
+    orderType: String(source.orderType ?? source.order_type ?? "-"),
+    price: Number(source.price ?? 0),
+    volume: Number(source.volume ?? source.qty ?? 0),
+    stopLoss: (source.stopLoss ?? source.stop_loss ?? null) as number | null,
+    takeProfit: (source.takeProfit ?? source.take_profit ?? null) as number | null,
+    createdAt: Number(source.createdAt ?? source.created_at ?? Date.now()),
     currentPrice: toNumberOrUndefined(currentPriceRaw),
     status: String(statusRaw ?? "PENDING"),
   };
@@ -150,14 +184,51 @@ function normalizePosition(data: unknown): LivePosition | null {
     row.data && typeof row.data === "object"
       ? (row.data as Record<string, unknown>)
       : null;
-  const source = nestedData ?? row;
+  const hasRowPositionKeys =
+    row.positionId != null ||
+    row.position_id != null ||
+    row.orderId != null ||
+    row.symbol != null ||
+    row.pair != null ||
+    row.instrument != null ||
+    row.openPrice != null ||
+    row.currentPrice != null ||
+    row.floatingPnL != null ||
+    row.profitLoss != null;
+  const source =
+    nestedData &&
+    !hasRowPositionKeys &&
+    (nestedData.positionId != null ||
+      nestedData.position_id != null ||
+      nestedData.orderId != null ||
+      nestedData.symbol != null ||
+      nestedData.pair != null ||
+      nestedData.instrument != null ||
+      nestedData.openPrice != null ||
+      nestedData.currentPrice != null ||
+      nestedData.floatingPnL != null ||
+      nestedData.profitLoss != null)
+      ? nestedData
+      : row;
   const id =
     source.positionId ??
+    source.position_id ??
     source.id ??
     source._id ??
-    source.orderId ??
-    source.position_id;
+    source.orderId;
   if (!id) return null;
+  const hasTradeShape =
+    source.positionId != null ||
+    source.position_id != null ||
+    source.orderId != null ||
+    source.symbol != null ||
+    source.pair != null ||
+    source.instrument != null ||
+    source.openPrice != null ||
+    source.currentPrice != null ||
+    source.floatingPnL != null ||
+    source.profitLoss != null;
+  if (!hasTradeShape) return null;
 
   const rawOpenPrice = toNumberOrUndefined(
     source.openPrice ??
@@ -208,6 +279,14 @@ function normalizePosition(data: unknown): LivePosition | null {
       ? String(source.open_time)
       : undefined,
   };
+}
+
+function getPositionIdFromUnknown(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const row = data as Record<string, unknown>;
+  const id = row.positionId ?? row.position_id ?? row.id ?? row._id ?? row.orderId;
+  if (id === null || id === undefined || id === "") return null;
+  return String(id);
 }
 
 function isFinitePositive(value: number): boolean {
@@ -279,12 +358,21 @@ function parsePositionsFromUnknown(data: unknown): LivePosition[] {
   }
   if (!data || typeof data !== "object") return [];
   const row = data as Record<string, unknown>;
+  const nestedData =
+    row.data && typeof row.data === "object"
+      ? (row.data as Record<string, unknown>)
+      : null;
   const candidates = [
     row.positions,
     row.openPositions,
     row.open_positions,
     row.livePositions,
     row.live_positions,
+    nestedData?.positions,
+    nestedData?.openPositions,
+    nestedData?.open_positions,
+    nestedData?.livePositions,
+    nestedData?.live_positions,
   ];
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
@@ -293,6 +381,12 @@ function parsePositionsFromUnknown(data: unknown): LivePosition[] {
         .filter((item): item is LivePosition => Boolean(item));
     }
   }
+  if (nestedData) {
+    const nestedParsed = parsePositionsFromUnknown(nestedData);
+    if (nestedParsed.length > 0) return nestedParsed;
+  }
+  const single = normalizePosition(data);
+  if (single) return [single];
   return [];
 }
 
@@ -304,6 +398,10 @@ function parsePendingsFromUnknown(data: unknown): LivePending[] {
   }
   if (!data || typeof data !== "object") return [];
   const row = data as Record<string, unknown>;
+  const nestedData =
+    row.data && typeof row.data === "object"
+      ? (row.data as Record<string, unknown>)
+      : null;
   const candidates = [
     row.pending,
     row.pendings,
@@ -312,6 +410,13 @@ function parsePendingsFromUnknown(data: unknown): LivePending[] {
     row.orders,
     row.liveOrders,
     row.live_orders,
+    nestedData?.pending,
+    nestedData?.pendings,
+    nestedData?.pendingOrders,
+    nestedData?.pending_orders,
+    nestedData?.orders,
+    nestedData?.liveOrders,
+    nestedData?.live_orders,
   ];
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
@@ -320,6 +425,12 @@ function parsePendingsFromUnknown(data: unknown): LivePending[] {
         .filter((item): item is LivePending => Boolean(item));
     }
   }
+  if (nestedData) {
+    const nestedParsed = parsePendingsFromUnknown(nestedData);
+    if (nestedParsed.length > 0) return nestedParsed;
+  }
+  const single = normalizePendingOrder(data);
+  if (single) return [single];
   return [];
 }
 
@@ -378,6 +489,10 @@ function clearTimers() {
     window.clearInterval(shared.reconcileTimer);
     shared.reconcileTimer = null;
   }
+  if (shared.healthcheckTimer) {
+    window.clearInterval(shared.healthcheckTimer);
+    shared.healthcheckTimer = null;
+  }
 }
 
 function closeSocket() {
@@ -404,8 +519,28 @@ function scheduleReconnect() {
   shared.reconnectTimer = window.setTimeout(() => {
     shared.reconnectTimer = null;
     if (!shared.shouldReconnect || !shared.accountId) return;
+    debugLog("scheduleReconnect -> ensureConnected", {
+      accountId: shared.accountId,
+      attempt: shared.reconnectAttempts,
+    });
     ensureConnected(shared.accountId);
   }, delay);
+}
+
+function ensureHealthcheckLoop() {
+  if (shared.healthcheckTimer) return;
+  shared.healthcheckTimer = window.setInterval(() => {
+    if (!shared.shouldReconnect || !shared.accountId || shared.listeners.size === 0) return;
+    if (!shared.socket || shared.socket.readyState !== WebSocket.OPEN) return;
+    const now = Date.now();
+    if (shared.lastMessageAt > 0 && now - shared.lastMessageAt > LIVE_SOCKET_STALE_MS) {
+      try {
+        shared.socket.close();
+      } catch {
+        // ignore; onclose handles reconnect
+      }
+    }
+  }, LIVE_SOCKET_HEALTHCHECK_MS);
 }
 
 async function reconcileFromRest() {
@@ -422,14 +557,16 @@ async function reconcileFromRest() {
       : [];
 
     if (!Array.isArray(rows)) return;
-    const next: Record<string, LivePosition> = { ...shared.positionsMap };
+    const next: Record<string, LivePosition> = {};
     for (const row of rows) {
+      if (hasPositionClosedMarkers(row)) continue;
       const pos = normalizePosition(row);
       if (!pos) continue;
-      next[pos.positionId] = mergePosition(next[pos.positionId], pos);
+      next[pos.positionId] = mergePosition(shared.positionsMap[pos.positionId], pos);
     }
-    // Reconcile should never hard-replace the live map because REST is often delayed.
-    // Keep websocket state hot and let close events remove stale rows.
+    // REST /trade/positions is authoritative for currently open positions.
+    // Replace map with reconciled rows to prune stale/closed ghost positions.
+    if (Object.keys(next).length === 0 && Object.keys(shared.positionsMap).length > 0) return;
     shared.positionsMap = next;
     scheduleEmit();
   } catch {
@@ -447,9 +584,27 @@ function ensureReconcileLoop() {
   void reconcileFromRest();
 }
 
+function applySnapshotLikePayload(data: unknown): boolean {
+  const positions = parsePositionsFromUnknown(data);
+  if (positions.length > 0) {
+    applyPositionMerge(positions);
+    return true;
+  }
+
+  const pendings = parsePendingsFromUnknown(data);
+  if (pendings.length > 0) {
+    applyPendingSnapshot(pendings);
+    return true;
+  }
+
+  return false;
+}
+
 function bindSocket(socket: WebSocket, accountId: string) {
   socket.onopen = () => {
+    debugLog("socket.onopen", { accountId });
     shared.reconnectAttempts = 0;
+    shared.lastMessageAt = Date.now();
     socket.send(
       JSON.stringify({
         type: "identify",
@@ -460,8 +615,17 @@ function bindSocket(socket: WebSocket, accountId: string) {
 
   socket.onmessage = (event) => {
     try {
-      const message = JSON.parse(event.data) as SocketMessage;
+      let message: SocketMessage;
+      if (typeof event.data === "string") {
+        message = JSON.parse(event.data) as SocketMessage;
+      } else if (event.data && typeof event.data === "object") {
+        message = event.data as SocketMessage;
+      } else {
+        return;
+      }
+      shared.lastMessageAt = Date.now();
       const messageType = String(message.type ?? "").toLowerCase();
+      debugLog("socket.onmessage", { messageType });
       const payload =
         message.data && typeof message.data === "object"
           ? (message.data as Record<string, unknown>)
@@ -469,17 +633,17 @@ function bindSocket(socket: WebSocket, accountId: string) {
 
       // Defensive close handling: if any message carries positionId + close marker,
       // remove immediately even when backend uses an unexpected message type.
-      if (payload && payload.positionId) {
-        const pid = String(payload.positionId);
+      if (payload) {
+        const pid = getPositionIdFromUnknown(payload);
         const likelyCloseEvent = messageType.includes("close") || messageType.includes("closed");
-        if (likelyCloseEvent || hasPositionClosedMarkers(payload)) {
+        if (pid && (likelyCloseEvent || hasPositionClosedMarkers(payload))) {
           delete shared.positionsMap[pid];
           scheduleEmit();
           return;
         }
       }
 
-      if (message.type === "live_account" && message.data && typeof message.data === "object") {
+      if (messageType === "live_account" && message.data && typeof message.data === "object") {
         const account = normalizeLiveAccount(message.data);
         if (account) shared.account = account;
         const positions = parsePositionsFromUnknown(message.data);
@@ -494,23 +658,16 @@ function bindSocket(socket: WebSocket, accountId: string) {
         return;
       }
 
-      // Generic snapshots fallback for unknown message types.
-      if (payload) {
-        const positions = parsePositionsFromUnknown(payload);
-        if (positions.length > 0) {
-          // Unknown message types may send partial arrays; merge to avoid flicker.
-          applyPositionMerge(positions);
-          return;
-        }
-        const pendings = parsePendingsFromUnknown(payload);
-        if (pendings.length > 0) {
-          applyPendingSnapshot(pendings);
-          return;
-        }
+      // Generic snapshots fallback for unknown message types / payload shapes.
+      if (applySnapshotLikePayload(message.data)) {
+        return;
+      }
+      if (applySnapshotLikePayload(payload)) {
+        return;
       }
 
       if (
-        (message.type === "live_accounts" || message.type === "account_snapshot") &&
+        (messageType === "live_accounts" || messageType === "account_snapshot") &&
         message.data &&
         typeof message.data === "object"
       ) {
@@ -520,10 +677,10 @@ function bindSocket(socket: WebSocket, accountId: string) {
         return;
       }
 
-      if (message.type === "live_position" && message.data && typeof message.data === "object") {
+      if (messageType === "live_position" && message.data && typeof message.data === "object") {
         const row = normalizePosition(message.data);
         if (!row || hasPositionClosedMarkers(message.data)) {
-          const id = (message.data as Record<string, unknown>)?.positionId;
+          const id = getPositionIdFromUnknown(message.data);
           if (id) delete shared.positionsMap[String(id)];
           scheduleEmit();
           return;
@@ -537,13 +694,13 @@ function bindSocket(socket: WebSocket, accountId: string) {
       }
 
       if (
-        (message.type === "position_closed" ||
-          message.type === "live_position_closed" ||
-          message.type === "close_position") &&
+        (messageType === "position_closed" ||
+          messageType === "live_position_closed" ||
+          messageType === "close_position") &&
         message.data &&
         typeof message.data === "object"
       ) {
-        const id = (message.data as Record<string, unknown>)?.positionId;
+        const id = getPositionIdFromUnknown(message.data);
         if (id) {
           delete shared.positionsMap[String(id)];
           scheduleEmit();
@@ -552,7 +709,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
       }
 
       if (
-        (message.type === "live_positions" || message.type === "positions_snapshot") &&
+        (messageType === "live_positions" || messageType === "positions_snapshot") &&
         message.data
       ) {
         const positions = parsePositionsFromUnknown(message.data);
@@ -562,7 +719,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
         return;
       }
 
-      if (message.type === "live_pending") {
+      if (messageType === "live_pending") {
         const pending = normalizePendingOrder(message.data);
         if (!pending) return;
         if (!isPendingActive(pending.status)) {
@@ -576,9 +733,9 @@ function bindSocket(socket: WebSocket, accountId: string) {
       }
 
       if (
-        (message.type === "live_pendings" ||
-          message.type === "pending_snapshot" ||
-          message.type === "live_orders") &&
+        (messageType === "live_pendings" ||
+          messageType === "pending_snapshot" ||
+          messageType === "live_orders") &&
         message.data
       ) {
         const pendings = parsePendingsFromUnknown(message.data);
@@ -587,7 +744,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
       }
 
       if (
-        message.type === "account_snapshot" &&
+        messageType === "account_snapshot" &&
         message.data &&
         typeof message.data === "object"
       ) {
@@ -614,7 +771,8 @@ function bindSocket(socket: WebSocket, accountId: string) {
     }
   };
 
-  socket.onclose = () => {
+  socket.onclose = (event) => {
+    debugLog("socket.onclose", { code: event.code, reason: event.reason });
     if (shared.socket === socket) {
       shared.socket = null;
     }
@@ -623,12 +781,19 @@ function bindSocket(socket: WebSocket, accountId: string) {
     }
   };
 
-  socket.onerror = () => {
+  socket.onerror = (error) => {
+    debugLog("socket.onerror", error);
     // onclose handles reconnect
   };
 }
 
 function ensureConnected(accountId: string) {
+  debugLog("ensureConnected called", {
+    accountId,
+    listeners: shared.listeners.size,
+    hasSocket: Boolean(shared.socket),
+    readyState: shared.socket?.readyState,
+  });
   clearTimers();
 
   if (
@@ -659,8 +824,16 @@ function ensureConnected(accountId: string) {
     shared.socket = null;
   }
 
-  const socketUrl = buildSocketUrl("/account");
+  const baseSocketUrl = buildSocketUrl("/account");
+  const tradeToken = getTradeTokenFromStorageSync();
+  const socketUrl =
+    baseSocketUrl && tradeToken
+      ? `${baseSocketUrl}${baseSocketUrl.includes("?") ? "&" : "?"}token=${encodeURIComponent(
+          tradeToken
+        )}`
+      : baseSocketUrl;
   if (!socketUrl) {
+    debugLog("ensureConnected aborted: socketUrl missing");
     scheduleReconnect();
     return;
   }
@@ -675,6 +848,7 @@ function ensureConnected(accountId: string) {
   shared.socket = socket;
   bindSocket(socket, accountId);
   ensureReconcileLoop();
+  ensureHealthcheckLoop();
 }
 
 function subscribe(listener: Listener) {
@@ -684,6 +858,17 @@ function subscribe(listener: Listener) {
     shared.idleCloseTimer = null;
   }
   listener(snapshot());
+  debugLog("subscribe", { listeners: shared.listeners.size, accountId: shared.accountId });
+
+  const effectiveAccountId = shared.accountId || getEffectiveAccountId();
+  if (
+    effectiveAccountId &&
+    (!shared.socket ||
+      (shared.socket.readyState !== WebSocket.OPEN &&
+        shared.socket.readyState !== WebSocket.CONNECTING))
+  ) {
+    ensureConnected(effectiveAccountId);
+  }
 }
 
 function unsubscribe(listener: Listener) {
@@ -746,9 +931,11 @@ export const useLiveTradeSocket = (accountId?: string) => {
 
     window.addEventListener("focus", syncAccountId);
     window.addEventListener("trade-account-change", syncAccountId);
+    window.addEventListener("trade-token-change", syncAccountId);
     return () => {
       window.removeEventListener("focus", syncAccountId);
       window.removeEventListener("trade-account-change", syncAccountId);
+      window.removeEventListener("trade-token-change", syncAccountId);
     };
   }, [accountId, effectiveAccountId]);
 

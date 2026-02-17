@@ -144,13 +144,43 @@ const firstFiniteNumber = (...values: unknown[]): number | undefined => {
     }
     return undefined;
 };
-const getPnlScale = (symbol: string): number => {
-    const s = String(symbol ?? "").toUpperCase();
-    if (/^[A-Z]{6}$/.test(s)) return 100000; // FX majors like EURUSD
-    if (s.includes("XAU")) return 100;
-    if (s.includes("XAG")) return 5000;
-    if (s.includes("USDT")) return 1; // crypto quoted in USDT
-    return 1;
+
+const deriveLivePnl = (
+    referencePnl: number,
+    referenceCurrentPrice: number,
+    liveCurrentPrice: number,
+    openPrice: number
+): number => {
+    if (!Number.isFinite(referencePnl)) return 0;
+    if (!Number.isFinite(referenceCurrentPrice) || !Number.isFinite(liveCurrentPrice)) {
+        return referencePnl;
+    }
+    if (!Number.isFinite(openPrice) || openPrice <= 0) return referencePnl;
+
+    const referenceDelta = referenceCurrentPrice - openPrice;
+    if (Math.abs(referenceDelta) <= 1e-9) return referencePnl;
+
+    const pnlPerPrice = referencePnl / referenceDelta;
+    if (!Number.isFinite(pnlPerPrice)) return referencePnl;
+
+    const liveDelta = liveCurrentPrice - referenceCurrentPrice;
+    const next = referencePnl + pnlPerPrice * liveDelta;
+    return Number.isFinite(next) ? next : referencePnl;
+};
+const normalizeSymbolKey = (value: string) => String(value ?? "").trim().toUpperCase();
+const findQuoteBySymbol = (
+    quotes: Record<string, { bid?: string; ask?: string } | undefined>,
+    symbol: string
+) => {
+    const raw = String(symbol ?? "").trim();
+    if (!raw) return undefined;
+    const normalized = normalizeSymbolKey(raw);
+    return (
+        quotes[raw] ??
+        quotes[normalized] ??
+        quotes[raw.replace(/\s+/g, "")] ??
+        quotes[normalized.replace(/\s+/g, "")]
+    );
 };
 
 const getAccountIdFromUnknown = (value: unknown): string | undefined => {
@@ -195,13 +225,13 @@ export default function TradePage() {
     const [showOrderSheet, setShowOrderSheet] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const { account, positions, pending } = useLiveTradeSocket(accountId);
-    const [token] = useState<string>(() => getTradeTokenFromStorageSync());
+    const [token, setToken] = useState<string>(() => getTradeTokenFromStorageSync());
 
     const { data: restFallback } = useQuery({
         queryKey: ["trade-live-fallback", accountId ?? null],
         enabled: Boolean(token || accountId),
-        refetchInterval: 3000,
-        staleTime: 1000,
+        refetchInterval: 1000,
+        staleTime: 500,
         gcTime: 10_000,
         retry: 1,
         queryFn: async () => {
@@ -240,6 +270,21 @@ export default function TradePage() {
 
     const effectiveAccount = account ?? restFallback?.account ?? null;
 
+    useEffect(() => {
+        const syncTradeToken = () => {
+            const next = getTradeTokenFromStorageSync();
+            setToken((prev) => (prev === next ? prev : next));
+        };
+
+        syncTradeToken();
+        window.addEventListener("focus", syncTradeToken);
+        window.addEventListener("trade-token-change", syncTradeToken);
+        return () => {
+            window.removeEventListener("focus", syncTradeToken);
+            window.removeEventListener("trade-token-change", syncTradeToken);
+        };
+    }, []);
+
     const socketOrRestPositions = useMemo(() => {
         const rows = Array.isArray(restFallback?.positions) ? restFallback.positions : [];
         const restPositions: LivePosition[] = rows
@@ -275,7 +320,7 @@ export default function TradePage() {
                     String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
                 return {
                     accountId: String(row?.accountId ?? accountId ?? ""),
-                    positionId: String(row?.orderId ?? row?.positionId ?? row?.id ?? row?._id ?? ""),
+                    positionId: String(row?.positionId ?? row?.position_id ?? row?.id ?? row?._id ?? row?.orderId ?? ""),
                     symbol: String(row?.symbol ?? "-"),
                     side,
                     volume: Number(row?.qty ?? row?.volume ?? row?.lot ?? row?.lots ?? row?.size ?? 0),
@@ -356,7 +401,7 @@ export default function TradePage() {
             Array.from(
                 new Set(
                     socketOrRestPending
-                        .map((order) => order?.symbol)
+                        .map((order) => normalizeSymbolKey(order?.symbol ?? ""))
                         .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
                 )
             ),
@@ -367,7 +412,7 @@ export default function TradePage() {
             Array.from(
                 new Set(
                     socketOrRestPositions
-                        .map((pos) => pos?.symbol)
+                        .map((pos) => normalizeSymbolKey(pos?.symbol ?? ""))
                         .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
                 )
             ),
@@ -436,78 +481,23 @@ export default function TradePage() {
     }, [openMenu]);
 
 
-    const accountBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.balance);
-    const accountEquity = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.equity);
-    const accountBonusBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.bonusBalance);
-    const accountBonusLive = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.bonusLive);
-    const accountBonusPercent = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.bonusPercent);
-    const accountUsedMargin = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.usedMargin);
-    const accountFreeMargin = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.freeMargin);
-    const marginLevel =
-        effectiveAccount && accountUsedMargin > 0
-            ? ((accountEquity / accountUsedMargin) * 100).toFixed(2)
-            : "0.00";
-
-    const accountStats: AccountStat[] = effectiveAccount
-        ? [
-            { label: "Balance", value: accountBalance.toFixed(2) },
-            { label: "Credit", value: accountBonusBalance.toFixed(2) },
-            { label: "Equity", value: accountEquity.toFixed(2) },
-            // { label: "Bonus Live", value: accountBonusLive.toFixed(2) },
-            // { label: "Bonus (%)", value: accountBonusPercent.toFixed(2) },
-            { label: "Margin", value: accountUsedMargin.toFixed(2) },
-            { label: "Free margin", value: accountFreeMargin.toFixed(2) },
-            { label: "Margin Level (%)", value: marginLevel },
-        ]
-        : [];
-
-    const pnl =
-        effectiveAccount
-            ? accountEquity - accountBalance
-            : 0;
-    const formattedPnl = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
-    const pnlColorClass =
-        pnl > 0
-            ? "text-[var(--mt-blue)]"
-            : pnl < 0
-                ? "text-[var(--mt-red)]"
-                : "text-[var(--text-muted)]";
-
     const livePositions: Position[] = useMemo(() => {
         return socketOrRestPositions.map((pos) => {
             const openPrice = toSafeNumber(pos.openPrice, 0);
-            const rawCurrentPrice = toSafeNumber(pos.currentPrice, NaN);
-            const liveQuote = pos.symbol ? quotes[pos.symbol] : undefined;
+            const rawCurrentPrice = toSafeNumber(pos.currentPrice, openPrice);
+            const liveQuote = pos.symbol ? findQuoteBySymbol(quotes, pos.symbol) : undefined;
             const quoteSidePrice = firstFiniteNumber(
                 pos.side === "BUY" ? liveQuote?.bid : liveQuote?.ask
             );
-            const hasRawCurrent = Number.isFinite(rawCurrentPrice) && rawCurrentPrice > 0;
             const currentPrice =
                 quoteSidePrice != null && quoteSidePrice > 0
                     ? quoteSidePrice
-                    : hasRawCurrent
+                    : Number.isFinite(rawCurrentPrice) && rawCurrentPrice > 0
                         ? rawCurrentPrice
                         : openPrice;
 
-            const rawPnl = toSafeNumber(pos.floatingPnL, NaN);
-            const hasRawPnl = Number.isFinite(rawPnl);
-            const looksPlaceholderPnl =
-                hasRawPnl &&
-                (Math.abs(rawPnl + 0.03) < 0.000001 ||
-                    (Math.abs(rawPnl) <= 0.05 && hasRawCurrent && isAlmostEqual(rawCurrentPrice, openPrice)));
-            const estimatedPnl =
-                ((currentPrice - openPrice) * (pos.side === "BUY" ? 1 : -1)) *
-                toSafeNumber(pos.volume, 0) *
-                getPnlScale(pos.symbol);
-            const hasLiveQuotePrice = quoteSidePrice != null && quoteSidePrice > 0;
-            const pnl =
-                hasLiveQuotePrice && Number.isFinite(estimatedPnl)
-                    ? estimatedPnl
-                    : hasRawPnl && !looksPlaceholderPnl
-                    ? rawPnl
-                    : Number.isFinite(estimatedPnl)
-                        ? estimatedPnl
-                        : 0;
+            const referencePnl = toSafeNumber(pos.floatingPnL, 0);
+            const pnl = deriveLivePnl(referencePnl, rawCurrentPrice, currentPrice, openPrice);
 
             return {
                 id: pos.positionId,
@@ -528,10 +518,46 @@ export default function TradePage() {
         });
     }, [quotes, socketOrRestPositions]);
 
+    const accountBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.balance);
+    const accountBonusBalance = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.bonusBalance);
+    const fallbackEquity = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.equity);
+    const accountUsedMargin = toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.usedMargin);
+    const totalPositionPnl = livePositions.reduce((sum, pos) => sum + toSafeNumber(pos.profit, 0), 0);
+    const accountEquity = effectiveAccount ? accountBalance + totalPositionPnl : fallbackEquity;
+    const accountFreeMargin =
+        effectiveAccount && accountUsedMargin > 0 ? accountEquity - accountUsedMargin : toSafeNumber((effectiveAccount as Record<string, unknown> | null)?.freeMargin);
+    const marginLevel =
+        effectiveAccount && accountUsedMargin > 0
+            ? ((accountEquity / accountUsedMargin) * 100).toFixed(2)
+            : "0.00";
+
+    const accountStats: AccountStat[] = effectiveAccount
+        ? [
+            { label: "Balance", value: accountBalance.toFixed(2) },
+            { label: "Credit", value: accountBonusBalance.toFixed(2) },
+            { label: "Equity", value: accountEquity.toFixed(2) },
+            { label: "Margin", value: accountUsedMargin.toFixed(2) },
+            { label: "Free margin", value: accountFreeMargin.toFixed(2) },
+            { label: "Margin Level (%)", value: marginLevel },
+        ]
+        : [];
+
+    const pnl =
+        effectiveAccount
+            ? accountEquity - accountBalance
+            : 0;
+    const formattedPnl = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USD`;
+    const pnlColorClass =
+        pnl > 0
+            ? "text-[var(--mt-blue)]"
+            : pnl < 0
+                ? "text-[var(--mt-red)]"
+                : "text-[var(--text-muted)]";
+
     const pendingWithLive = useMemo<PendingOrder[]>(() => {
         return socketOrRestPending.map((order) => {
             const directCurrentPrice = order.currentPrice;
-            const liveQuote = order.symbol ? quotes[order.symbol] : undefined;
+            const liveQuote = order.symbol ? findQuoteBySymbol(quotes, order.symbol) : undefined;
             const side = String(order.side ?? "").toUpperCase();
             const quoteCurrentPrice = side === "BUY" ? liveQuote?.ask : liveQuote?.bid;
             return {
