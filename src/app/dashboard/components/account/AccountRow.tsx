@@ -309,7 +309,7 @@ export default function AccountRow({
                                 </button>
 
                                 {showActions && (
-                                    <div className="absolute right-0 mt-2 w-48 rounded-lg bg-[var(--bg-card)] shadow-lg border border-[var(--border-soft)]">
+                                    <div className="absolute right-0 mt-2 w-48 rounded-lg bg-[var(--bg-card)] shadow-lg border border-[var(--border-soft)] z-[999]">
                                         <button
                                             onClick={() => {
                                                 setPasswordModal({ type: "trade" });

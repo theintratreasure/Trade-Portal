@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
+import { useLiveTradeSocket } from "@/hooks/useLiveTradeSocket";
 import { useTheme } from "@/app/providers";
 
 import TopBarSlot from "../components/layout/TopBarSlot";
@@ -26,7 +27,12 @@ import { clearClientCookie, clearTradeTokenCookie } from "@/lib/tradeToken";
 
 export default function TradeSettingsPage() {
   const router = useRouter();
-  const { data: account, isLoading } = useTradeAccount();
+  const { data: account, isLoading, refetch } = useTradeAccount();
+  const accountId =
+    account?.accountId ?? account?._id ?? account?.id ?? "";
+  const { account: liveAccount } = useLiveTradeSocket(
+    accountId ? String(accountId) : undefined
+  );
   const { theme, toggleTheme } = useTheme();
 
 const { language, setLanguage } = useLanguage();
@@ -69,6 +75,23 @@ const t = translations[language];
     localStorage.setItem("trade-lang", language);
   }, [language]);
 
+  useEffect(() => {
+    const refresh = () => {
+      void refetch();
+    };
+
+    refresh();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("trade-account-change", refresh);
+    window.addEventListener("trade-token-change", refresh);
+
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("trade-account-change", refresh);
+      window.removeEventListener("trade-token-change", refresh);
+    };
+  }, [refetch]);
+
   const setQuoteViewAndPersist = (next: "simple" | "advanced") => {
     setQuoteView(next);
     if (typeof window !== "undefined") {
@@ -88,6 +111,13 @@ const t = translations[language];
       </div>
     );
   }
+
+  const accountNumber = String(
+    account?.accountNumber ?? account?.account_number ?? "--"
+  );
+  const currency = String(account?.currency ?? "");
+  const effectiveBalance =
+    liveAccount?.balance ?? account?.balance ?? 0;
 
   const cardClass =
     "rounded-xl p-4 lg:p-5 border border-[var(--border-soft)] shadow-sm lg:shadow-md bg-[var(--bg-plan)] md:bg-[var(--bg-glass)]";
@@ -117,10 +147,10 @@ const t = translations[language];
           </div>
 
           <div className="space-y-3 text-sm">
-            <Row label="Account No" value={account?.accountNumber} />
+            <Row label="Account No" value={accountNumber} />
             <Row
               label="Balance"
-              value={`${account?.balance?.toFixed(2)} ${account?.currency}`}
+              value={`${Number(effectiveBalance).toFixed(2)} ${currency}`}
             />
           </div>
         </div>
