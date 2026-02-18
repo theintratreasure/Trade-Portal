@@ -72,14 +72,19 @@ function splitPrice(price?: string): SplitPrice {
 }
 
 function decimalDiff(bid: string, ask: string): string {
-  if (!Number.isFinite(Number(bid)) || !Number.isFinite(Number(ask))) {
+  const bidNum = Number(bid);
+  const askNum = Number(ask);
+  if (!Number.isFinite(bidNum) || !Number.isFinite(askNum)) {
     return "---";
   }
-  const bidDec = bid.split(".")[1] ?? "0";
-  const askDec = ask.split(".")[1] ?? "0";
 
-  const diff = Math.abs(Number(bidDec) - Number(askDec));
-  return diff.toString().padStart(3,);
+  const bidDecimals = bid.split(".")[1]?.length ?? 0;
+  const askDecimals = ask.split(".")[1]?.length ?? 0;
+  const digits = Math.max(bidDecimals, askDecimals, 1);
+  const factor = 10 ** digits;
+
+  const diffPoints = Math.round(Math.abs((askNum - bidNum) * factor));
+  return diffPoints.toString();
 }
 
 function QuoteRow({ live, viewMode = "advanced" }: Props) {

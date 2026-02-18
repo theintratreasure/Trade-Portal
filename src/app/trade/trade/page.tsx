@@ -575,16 +575,20 @@ export default function TradePage() {
     const accountCredit = toSafeNumber(
         firstFiniteNumber(accountForUi?.credit, accountForUi?.bonusBalance)
     );
-    const fallbackEquity = toSafeNumber(accountForUi?.equity);
-    const accountUsedMargin = toSafeNumber(accountForUi?.usedMargin);
+    const accountEquity = toSafeNumber(
+        firstFiniteNumber(accountForUi?.equity, accountForUi?.accountEquity)
+    );
+    const accountUsedMargin = toSafeNumber(
+        firstFiniteNumber(accountForUi?.usedMargin, accountForUi?.used_margin, accountForUi?.margin)
+    );
+    const accountFreeMargin = toSafeNumber(
+        firstFiniteNumber(accountForUi?.freeMargin, accountForUi?.free_margin)
+    );
+    const accountMarginLevel = toSafeNumber(
+        firstFiniteNumber(accountForUi?.marginLevel, accountForUi?.margin_level)
+    );
     const totalPositionPnl = livePositions.reduce((sum, pos) => sum + toSafeNumber(pos.profit, 0), 0);
-    const accountEquity = accountForUi ? accountBalance + accountCredit : fallbackEquity;
-    const accountFreeMargin =
-        accountForUi && accountUsedMargin > 0 ? accountEquity - accountUsedMargin : toSafeNumber(accountForUi?.freeMargin);
-    const marginLevel =
-        accountForUi && accountUsedMargin > 0
-            ? ((accountEquity / accountUsedMargin) * 100).toFixed(2)
-            : "0.00";
+    const marginLevel = accountMarginLevel.toFixed(2);
 
     const accountStats: AccountStat[] = accountForUi
         ? [
