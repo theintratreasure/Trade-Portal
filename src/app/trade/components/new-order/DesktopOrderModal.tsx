@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useMarketOrder, usePendingOrder } from "@/hooks/trade/useTrade";
 import { useMarketQuotes } from "@/hooks/useMarketQuotes";
@@ -41,6 +41,8 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
   const [expiration, setExpiration] = useState<"GTC" | "TODAY" | "SPECIFIED">("GTC");
   const [specifiedDate, setSpecifiedDate] = useState<Date | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
 
   const token = useMemo(() => getTradeTokenFromStorageSync(), []);
   const quotes = useMarketQuotes(token);
@@ -53,8 +55,15 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
   const lot = Math.max(MIN_LOT, Number(lotInput || 0));
 
   const themeColor = side === "BUY" ? "var(--mt-blue)" : "var(--mt-red)";
+  const isLocked = isSubmitting || submitLockRef.current || isPending;
+  const handleClose = () => {
+    if (isLocked) return;
+    onClose();
+  };
 
   const handleSubmit = () => {
+    if (submitLockRef.current || isSubmitting || isPending) return;
+
     if (!symbol || !Number.isFinite(lot) || lot < MIN_LOT) {
       setToast({
         type: "error",
@@ -62,6 +71,19 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
       });
       return;
     }
+
+    if (tab !== "MARKET" && expiration === "SPECIFIED" && !specifiedDate) {
+      setToast({ type: "error", message: "Select expiration date" });
+      return;
+    }
+
+    submitLockRef.current = true;
+    setIsSubmitting(true);
+
+    const unlock = () => {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
+    };
 
     if (tab === "MARKET") {
       marketOrder(
@@ -74,10 +96,11 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
         },
         {
           onSuccess: () => {
-            setToast({ type: "success", message: "Order executed" });
-            setTimeout(onClose, 1200);
+            unlock();
+            onClose();
           },
           onError: (err: unknown) => {
+            unlock();
             setToast({
               type: "error",
               message: getErrorMessage(err, "Market order failed"),
@@ -106,22 +129,19 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
     if (tp !== "") payload.takeProfit = Number(tp);
 
     if (expiration === "SPECIFIED") {
-      if (!specifiedDate) {
-        setToast({ type: "error", message: "Select expiration date" });
-        return;
-      }
       payload.expireType = "TIME";
-      payload.expireAt = specifiedDate.toISOString();
+      payload.expireAt = specifiedDate!.toISOString();
     } else {
       payload.expireType = expiration;
     }
 
     pendingOrder(payload, {
       onSuccess: () => {
-        setToast({ type: "success", message: "Pending order placed" });
-        setTimeout(onClose, 1200);
+        unlock();
+        onClose();
       },
       onError: (err: unknown) => {
+        unlock();
         setToast({
           type: "error",
           message: getErrorMessage(err, "Order failed"),
@@ -133,7 +153,7 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
   return (
     <>
       <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center">
-        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+        <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
 
         <div className="relative w-[min(92vw,520px)] bg-[var(--bg-card)] rounded-xl shadow-xl border border-[var(--border-soft)] overflow-hidden">
           <div
@@ -147,13 +167,14 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
             </div>
 
             <button
+              disabled={isLocked}
               onClick={() => setSide((s) => (s === "BUY" ? "SELL" : "BUY"))}
-              className="px-4 py-1 bg-[var(--bg-card)] text-[var(--text-main)] font-bold rounded-md"
+              className="px-4 py-1 bg-[var(--bg-card)] text-[var(--text-main)] font-bold rounded-md disabled:opacity-60"
             >
               {side}
             </button>
 
-            <button onClick={onClose}>
+            <button onClick={handleClose} disabled={isLocked} className="disabled:opacity-60">
               <X size={20} />
             </button>
           </div>
@@ -162,10 +183,11 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
             {ORDER_TABS.map((t) => (
               <button
                 key={t}
+                disabled={isLocked}
                 onClick={() => setTab(t)}
                 className={`flex-1 py-2 text-sm font-semibold ${
                   tab === t ? "border-b-2 border-[var(--primary)]" : "text-[var(--text-muted)]"
-                }`}
+                } disabled:opacity-60`}
               >
                 {t}
               </button>
@@ -248,7 +270,7 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
                 {expiration === "SPECIFIED" && (
                   <input
                     type="datetime-local"
-                    className="mt-2 w-full px-2 py-1.5 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-md"
+                    className="mt-2 w-full px-2 py-1.5 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-md text-[var(--text-main)] [color-scheme:light] dark:[color-scheme:dark]"
                     value={
                       specifiedDate
                         ? new Date(
@@ -271,11 +293,11 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
           <div className="px-4 py-3 border-t border-[var(--border-soft)] flex justify-end">
             <button
               onClick={handleSubmit}
-              disabled={isPending}
+              disabled={isLocked}
               className="px-6 py-2 rounded-lg text-[var(--text-main)] font-semibold"
               style={{ background: themeColor }}
             >
-              {isPending ? "Processing..." : side}
+              {isLocked ? "Processing..." : side}
             </button>
           </div>
         </div>

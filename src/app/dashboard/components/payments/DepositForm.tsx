@@ -18,7 +18,7 @@ import { uploadToCloudinary, type CloudinaryUploadResult } from "@/services/clou
 import { getClientIp } from "../../../../../utils/getClientIp";
 import type { CurrencyCode } from "@/services/conversion.service";
 
-type DepositMethod = "UPI" | "BANK" | "CRYPTO" | "USDT";
+type DepositMethod = "UPI" | "BANK" | "CRYPTO" | "USDT" | "INTERNATIONAL";
 type PaymentMethodOption = {
   value: string;
   label: string;
@@ -95,8 +95,8 @@ export default function DepositForm() {
 
         return {
           value: pm._id || fallbackValue,
-          label: title || "USDT",
-          method: "USDT" as const,
+          label: title || "International",
+          method: "INTERNATIONAL" as const,
           sourceCurrency: "USDT" as const,
         };
       })
@@ -106,8 +106,8 @@ export default function DepositForm() {
     return [
       {
         value: "fallback-usdt",
-        label: "USDT",
-        method: "USDT",
+        label: "International",
+        method: "INTERNATIONAL",
         sourceCurrency: "USDT",
       },
     ];
@@ -118,7 +118,7 @@ export default function DepositForm() {
     [methodOptions, selectedMethodKey]
   );
 
-  const method = selectedMethodOption?.method || "USDT";
+  const method = selectedMethodOption?.method || "INTERNATIONAL";
   const sourceCurrency: CurrencyCode = selectedMethodOption?.sourceCurrency || "USDT";
   const selectedMethodLabel = selectedMethodOption?.label || method;
 

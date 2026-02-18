@@ -92,6 +92,7 @@ export default function NewOrderPage() {
         message: string;
     } | null>(null);
     const [processingSide, setProcessingSide] = useState<"BUY" | "SELL" | null>(null);
+    const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
 
     const STEP = 0.0001; // adjust per symbol
     const marketMutation = useMarketOrder();
@@ -248,8 +249,9 @@ export default function NewOrderPage() {
 
 
     const handleMarketOrder = (side: "BUY" | "SELL") => {
-        if (!symbol || volume <= 0) return;
+        if (isOrderSubmitting || !symbol || volume <= 0) return;
 
+        setIsOrderSubmitting(true);
         setProcessingSide(side);
 
         // 🔵 Show QUEUE screen immediately
@@ -310,13 +312,16 @@ export default function NewOrderPage() {
                 },
                 onSettled: () => {
                     setProcessingSide(null);
+                    setIsOrderSubmitting(false);
                 },
             }
         );
     };
 
     const handlePendingOrder = () => {
-        if (!symbol || volume <= 0 || price === "") return;
+        if (isOrderSubmitting || !symbol || volume <= 0 || price === "") return;
+
+        setIsOrderSubmitting(true);
 
         const mapOrderType = {
             "BUY LIMIT": "BUY_LIMIT",
@@ -413,6 +418,9 @@ export default function NewOrderPage() {
                         setOrderResult(null);
                     }, 1500);
                 }, 700);
+            },
+            onSettled: () => {
+                setIsOrderSubmitting(false);
             },
         });
 
@@ -922,7 +930,7 @@ export default function NewOrderPage() {
                     {orderType === "MARKET EXECUTION" ? (
                         <div className="grid grid-cols-2">
                             <button
-                                disabled={processingSide !== null}
+                                disabled={isOrderSubmitting || processingSide !== null}
                                 className="text-red-500 py-4 text-xl font-bold border-r border-gray-800 hover:bg-red-900/20 transition-colors disabled:opacity-50"
                                 onClick={() => handleMarketOrder("SELL")}
                             >
@@ -933,7 +941,7 @@ export default function NewOrderPage() {
 
 
                             <button
-                                disabled={processingSide !== null}
+                                disabled={isOrderSubmitting || processingSide !== null}
                                 className="text-[var(--mt-blue)] py-4 text-xl font-bold hover:bg-blue-900/20 transition-colors disabled:opacity-50"
                                 onClick={() => handleMarketOrder("BUY")}
                             >
@@ -945,11 +953,11 @@ export default function NewOrderPage() {
                         </div>
                     ) : (
                         <button
-                            disabled={pendingMutation.isPending}
+                            disabled={isOrderSubmitting || pendingMutation.isPending}
                             className="w-full py-4 text-xl font-bold text-[var(--text-main)] hover:bg-white/10 transition-colors disabled:opacity-50"
                             onClick={handlePendingOrder}
                         >
-                            {pendingMutation.isPending ? "PROCESSING..." : "PLACE"}
+                            {isOrderSubmitting || pendingMutation.isPending ? "PROCESSING..." : "PLACE"}
                         </button>
 
                     )}
