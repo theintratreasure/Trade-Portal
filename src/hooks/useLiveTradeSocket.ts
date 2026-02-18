@@ -929,11 +929,26 @@ export const useLiveTradeSocket = (accountId?: string) => {
       ensureConnected(next);
     };
 
+    const handleVisibleOrResume = () => {
+      if (document.visibilityState && document.visibilityState !== "visible") return;
+      const next = getEffectiveAccountId(accountId);
+      if (!next) return;
+      setEffectiveAccountId((prev) => (prev === next ? prev : next));
+      ensureConnected(next);
+      void reconcileFromRest();
+    };
+
     window.addEventListener("focus", syncAccountId);
+    window.addEventListener("pageshow", handleVisibleOrResume);
+    window.addEventListener("online", handleVisibleOrResume);
+    document.addEventListener("visibilitychange", handleVisibleOrResume);
     window.addEventListener("trade-account-change", syncAccountId);
     window.addEventListener("trade-token-change", syncAccountId);
     return () => {
       window.removeEventListener("focus", syncAccountId);
+      window.removeEventListener("pageshow", handleVisibleOrResume);
+      window.removeEventListener("online", handleVisibleOrResume);
+      document.removeEventListener("visibilitychange", handleVisibleOrResume);
       window.removeEventListener("trade-account-change", syncAccountId);
       window.removeEventListener("trade-token-change", syncAccountId);
     };

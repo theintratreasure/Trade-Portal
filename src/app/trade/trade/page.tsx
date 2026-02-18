@@ -12,7 +12,6 @@ import TopBarSlot from "../components/layout/TopBarSlot";
 import TradeTopBar from "../components/layout/TradeTopBar";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { useLiveTradeSocket, type LivePosition } from "@/hooks/useLiveTradeSocket";
-import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import DeleteOrderModal from "../components/trade/DeleteOrderModal";
 import OrderActionSheet from "../components/trade/OrderActionSheet";
 import MobilePositionItem from "../components/trade/MobilePositionItem";
@@ -144,55 +143,6 @@ const firstFiniteNumber = (...values: unknown[]): number | undefined => {
         if (Number.isFinite(n)) return n;
     }
     return undefined;
-};
-
-const deriveLivePnl = (
-    referencePnl: number,
-    referenceCurrentPrice: number,
-    liveCurrentPrice: number,
-    openPrice: number
-): number => {
-    if (!Number.isFinite(referencePnl)) return 0;
-    if (!Number.isFinite(referenceCurrentPrice) || !Number.isFinite(liveCurrentPrice)) {
-        return referencePnl;
-    }
-    if (!Number.isFinite(openPrice) || openPrice <= 0) return referencePnl;
-
-    const referenceDelta = referenceCurrentPrice - openPrice;
-    // Guard against division blow-ups when current/open are nearly equal.
-    const minReferenceDelta = Math.max(1e-6, Math.abs(openPrice) * 0.000002);
-    if (Math.abs(referenceDelta) <= minReferenceDelta) return referencePnl;
-
-    const pnlPerPrice = referencePnl / referenceDelta;
-    if (!Number.isFinite(pnlPerPrice)) return referencePnl;
-
-    const liveDelta = liveCurrentPrice - referenceCurrentPrice;
-    const rawAdjustment = pnlPerPrice * liveDelta;
-    if (!Number.isFinite(rawAdjustment)) return referencePnl;
-
-    // Clamp one-tick adjustment to avoid transient spikes from noisy ticks.
-    const maxTickAdjustment = Math.max(25, Math.abs(referencePnl) * 1.5);
-    const safeAdjustment = Math.max(
-        -maxTickAdjustment,
-        Math.min(maxTickAdjustment, rawAdjustment)
-    );
-    const next = referencePnl + safeAdjustment;
-    return Number.isFinite(next) ? next : referencePnl;
-};
-const normalizeSymbolKey = (value: string) => String(value ?? "").trim().toUpperCase();
-const findQuoteBySymbol = (
-    quotes: Record<string, { bid?: string; ask?: string } | undefined>,
-    symbol: string
-) => {
-    const raw = String(symbol ?? "").trim();
-    if (!raw) return undefined;
-    const normalized = normalizeSymbolKey(raw);
-    return (
-        quotes[raw] ??
-        quotes[normalized] ??
-        quotes[raw.replace(/\s+/g, "")] ??
-        quotes[normalized.replace(/\s+/g, "")]
-    );
 };
 
 const getAccountIdFromUnknown = (value: unknown): string | undefined => {
@@ -459,33 +409,6 @@ export default function TradePage() {
     const positionsForUi =
         socketOrRestPositions.length > 0 ? socketOrRestPositions : displayPositionsSource;
 
-    const pendingSymbols = useMemo(
-        () =>
-            Array.from(
-                new Set(
-                    socketOrRestPending
-                        .map((order) => normalizeSymbolKey(order?.symbol ?? ""))
-                        .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
-                )
-            ),
-        [socketOrRestPending]
-    );
-    const positionSymbols = useMemo(
-        () =>
-            Array.from(
-                new Set(
-                    socketOrRestPositions
-                        .map((pos) => normalizeSymbolKey(pos?.symbol ?? ""))
-                        .filter((symbol): symbol is string => typeof symbol === "string" && symbol.length > 0)
-                )
-            ),
-        [socketOrRestPositions]
-    );
-    const quoteSymbols = useMemo(
-        () => Array.from(new Set([...pendingSymbols, ...positionSymbols])),
-        [pendingSymbols, positionSymbols]
-    );
-    const quotes = useMarketQuotes(token, quoteSymbols);
     const [openMenu, setOpenMenu] = useState<DesktopMenuState | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -547,20 +470,8 @@ export default function TradePage() {
     const livePositions: Position[] = useMemo(() => {
         return positionsForUi.map((pos) => {
             const openPrice = toSafeNumber(pos.openPrice, 0);
-            const rawCurrentPrice = toSafeNumber(pos.currentPrice, openPrice);
-            const liveQuote = pos.symbol ? findQuoteBySymbol(quotes, pos.symbol) : undefined;
-            const quoteSidePrice = firstFiniteNumber(
-                pos.side === "BUY" ? liveQuote?.bid : liveQuote?.ask
-            );
-            const currentPrice =
-                quoteSidePrice != null && quoteSidePrice > 0
-                    ? quoteSidePrice
-                    : Number.isFinite(rawCurrentPrice) && rawCurrentPrice > 0
-                        ? rawCurrentPrice
-                        : openPrice;
-
-            const referencePnl = toSafeNumber(pos.floatingPnL, 0);
-            const pnl = deriveLivePnl(referencePnl, rawCurrentPrice, currentPrice, openPrice);
+            const currentPrice = toSafeNumber(pos.currentPrice, openPrice);
+            const pnl = toSafeNumber(pos.floatingPnL, 0);
 
             return {
                 id: pos.positionId,
@@ -579,7 +490,7 @@ export default function TradePage() {
                 takeProfit: pos.takeProfit == null ? null : toSafeNumber(pos.takeProfit, 0),
             };
         });
-    }, [positionsForUi, quotes]);
+    }, [positionsForUi]);
 
     const accountForUi = displayAccount;
     const accountBalance = toSafeNumber(accountForUi?.balance);
@@ -626,16 +537,12 @@ export default function TradePage() {
 
     const pendingWithLive = useMemo<PendingOrder[]>(() => {
         return socketOrRestPending.map((order) => {
-            const directCurrentPrice = order.currentPrice;
-            const liveQuote = order.symbol ? findQuoteBySymbol(quotes, order.symbol) : undefined;
-            const side = String(order.side ?? "").toUpperCase();
-            const quoteCurrentPrice = side === "BUY" ? liveQuote?.ask : liveQuote?.bid;
             return {
                 ...order,
-                currentPrice: directCurrentPrice ?? quoteCurrentPrice ?? "-",
+                currentPrice: order.currentPrice ?? "-",
             } as PendingOrder;
         });
-    }, [socketOrRestPending, quotes]);
+    }, [socketOrRestPending]);
 
     const router = useRouter();
     const positionsGridTemplate =

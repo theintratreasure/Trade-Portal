@@ -302,7 +302,6 @@ function ensureSocket(token: string, accountId: string) {
         shared.cache[symbol] ?? shared.buffer[symbol] ?? getPlaceholder(symbol);
       const aliases = shared.symbolAliases.get(symbol) ?? buildSymbolAliases(symbol);
       shared.symbolAliases.set(symbol, aliases);
-      aliases.forEach((alias) => socket.subscribe(alias));
     }
   }
 
@@ -409,14 +408,36 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       setAccountId((prev) => (prev === next ? prev : next));
     };
 
+    const handleVisibleOrResume = () => {
+      if (document.visibilityState && document.visibilityState !== "visible") return;
+      const next = getEffectiveAccountId();
+      setAccountId((prev) => (prev === next ? prev : next));
+      if (!token) return;
+      ensureSocket(token, next);
+      for (const symbol of ownedSymbolsRef.current) {
+        const aliases = shared.symbolAliases.get(symbol) ?? buildSymbolAliases(symbol);
+        aliases.forEach((alias) => {
+          shared.socket?.unsubscribe(alias);
+          shared.socket?.subscribe(alias);
+        });
+        shared.lastTickAt.set(symbol, Date.now());
+      }
+    };
+
     syncAccountId();
     window.addEventListener("focus", syncAccountId);
+    window.addEventListener("pageshow", handleVisibleOrResume);
+    window.addEventListener("online", handleVisibleOrResume);
+    document.addEventListener("visibilitychange", handleVisibleOrResume);
     window.addEventListener("trade-account-change", syncAccountId);
     return () => {
       window.removeEventListener("focus", syncAccountId);
+      window.removeEventListener("pageshow", handleVisibleOrResume);
+      window.removeEventListener("online", handleVisibleOrResume);
+      document.removeEventListener("visibilitychange", handleVisibleOrResume);
       window.removeEventListener("trade-account-change", syncAccountId);
     };
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
