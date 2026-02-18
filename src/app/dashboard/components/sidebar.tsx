@@ -18,7 +18,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import type { ComponentType } from "react";
 
 const items = [
@@ -58,6 +58,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const { data: accounts } = useMyAccounts();
   const { data: user } = useUserMe();
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -79,10 +80,16 @@ export default function Sidebar({
     });
   }, [router]);
 
-  const navigateTo = (href: string) => {
-    onClose?.();
-    router.push(href);
-  };
+  const navigateTo = useCallback(
+    (href: string) => {
+      onClose?.();
+      if (pathname === href || isPending) return;
+      startTransition(() => {
+        router.push(href);
+      });
+    },
+    [isPending, onClose, pathname, router]
+  );
 
   // Function to get first live account, fallback to first demo account
   const getFirstTradingAccount = () => {
@@ -103,17 +110,22 @@ export default function Sidebar({
   const NavButton = ({
     label,
     icon: Icon,
+    href,
     active,
     onClick,
   }: {
     label: string;
     icon: ComponentType<{ size?: number; className?: string }>;
+    href: string;
     active: boolean;
     onClick: () => void;
   }) => (
     <div className="relative group">
       <button
         onClick={onClick}
+        onMouseEnter={() => router.prefetch(href)}
+        onFocus={() => router.prefetch(href)}
+        onTouchStart={() => router.prefetch(href)}
         className={`
           flex items-center gap-3 w-full rounded-xl px-3 py-2.5 transition-all duration-200
           ${active
@@ -263,6 +275,9 @@ export default function Sidebar({
                     return (
                       <button
                         key={sub.label}
+                        onMouseEnter={() => router.prefetch(sub.href)}
+                        onFocus={() => router.prefetch(sub.href)}
+                        onTouchStart={() => router.prefetch(sub.href)}
                         onClick={() => {
                           setPaymentOpen(false);
                           navigateTo(sub.href);

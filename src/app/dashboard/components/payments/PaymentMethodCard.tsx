@@ -94,6 +94,17 @@ export default function PaymentMethodCard({ method }: { method: PaymentMethod })
                             <CopyField label="IFSC Code" value={method.ifsc!} />
                         </div>
                     )}
+
+                    {method.type === "INTERNATIONAL" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {method.international_name ? (
+                                <CopyField label="Account Holder Name" value={method.international_name} />
+                            ) : null}
+                            {method.international_email ? (
+                                <CopyField label="Email" value={method.international_email} />
+                            ) : null}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
