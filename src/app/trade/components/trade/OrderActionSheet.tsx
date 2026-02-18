@@ -46,7 +46,7 @@ export default function OrderActionSheet({
         <div className="fixed inset-0 z-[999] flex items-end bg-black/40 md:items-center md:justify-center">
             <div className="absolute inset-0" onClick={onClose} />
 
-            <div className="relative w-full bg-[var(--bg-plan)] md:w-[420px] md:bg-[var(--bg-card)]">
+            <div className="relative w-full bg-[var(--bg-plan)] md:w-[420px] md:bg-[var(--bg-card)] max-h-[85dvh] overflow-y-auto ios-momentum-scroll pb-[env(safe-area-inset-bottom)]">
                 <div className="p-2 border-b border-[var(--border-soft)]">
                     <div className="flex justify-between items-center pt-[10px] pb-[8px]">
                         <div className="text-left">

@@ -159,13 +159,24 @@ const deriveLivePnl = (
     if (!Number.isFinite(openPrice) || openPrice <= 0) return referencePnl;
 
     const referenceDelta = referenceCurrentPrice - openPrice;
-    if (Math.abs(referenceDelta) <= 1e-9) return referencePnl;
+    // Guard against division blow-ups when current/open are nearly equal.
+    const minReferenceDelta = Math.max(1e-6, Math.abs(openPrice) * 0.000002);
+    if (Math.abs(referenceDelta) <= minReferenceDelta) return referencePnl;
 
     const pnlPerPrice = referencePnl / referenceDelta;
     if (!Number.isFinite(pnlPerPrice)) return referencePnl;
 
     const liveDelta = liveCurrentPrice - referenceCurrentPrice;
-    const next = referencePnl + pnlPerPrice * liveDelta;
+    const rawAdjustment = pnlPerPrice * liveDelta;
+    if (!Number.isFinite(rawAdjustment)) return referencePnl;
+
+    // Clamp one-tick adjustment to avoid transient spikes from noisy ticks.
+    const maxTickAdjustment = Math.max(25, Math.abs(referencePnl) * 1.5);
+    const safeAdjustment = Math.max(
+        -maxTickAdjustment,
+        Math.min(maxTickAdjustment, rawAdjustment)
+    );
+    const next = referencePnl + safeAdjustment;
     return Number.isFinite(next) ? next : referencePnl;
 };
 const normalizeSymbolKey = (value: string) => String(value ?? "").trim().toUpperCase();

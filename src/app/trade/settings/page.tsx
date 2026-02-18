@@ -128,7 +128,7 @@ const t = translations[language];
         <TradeTopBar title="Settings" showMenu />
       </TopBarSlot>
 
-       <div className="flex-1 overflow-y-auto w-full h-[calc(80vh)] md:h-[calc(100vh)] px-4 py-4">
+       <div className="flex-1 overflow-y-auto w-full h-[calc(80dvh)] md:h-[calc(100dvh)] px-4 py-4">
         <div className="mx-auto w-full max-w-5xl">
           <div className="hidden md:block mb-4">
             <h1 className="text-2xl font-semibold">Settings</h1>

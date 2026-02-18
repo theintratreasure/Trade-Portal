@@ -20,13 +20,7 @@ export default function PositionActionSheet({ pos, open, onClose }: ActionSheetP
             <div className="absolute inset-0" onClick={onClose} />
 
             {/* SHEET */}
-            <div className="
-        relative w-full
-        bg-[var(--bg-plan)]
-        md:w-[420px]
-        md:bg-[var(--bg-card)]
-        overflow-hidden
-      ">
+            <div className="relative w-full bg-[var(--bg-plan)] md:w-[420px] md:bg-[var(--bg-card)] max-h-[85dvh] overflow-y-auto ios-momentum-scroll pb-[env(safe-area-inset-bottom)]">
 
                 {/* ================= POSITION HEADER ================= */}
                 <div className="p-2 border-b border-[var(--border-soft)]">

@@ -321,7 +321,7 @@ export default function ClosePositionPage() {
         </div>
       </div>
 
-      <div className="hidden md:flex h-[calc(100vh-60px)] bg-[var(--bg-main)] text-[var(--text-main)] relative overflow-hidden">
+      <div className="hidden md:flex h-[calc(100dvh-60px)] bg-[var(--bg-main)] text-[var(--text-main)] relative overflow-hidden">
 
         {/* Ambient Glow */}
         <div className="absolute inset-0 pointer-events-none">

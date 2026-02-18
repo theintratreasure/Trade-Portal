@@ -86,7 +86,7 @@ function TradeLayoutInner({
                 <div className="flex flex-col min-h-screen">
                     <div id="trade-topbar-slot" />
 
-                    <main className="flex-1 overflow-y-auto pb-[64px] mt-14">
+                    <main className="flex-1 overflow-y-auto ios-momentum-scroll pb-[64px] mt-14">
                         {children}
                     </main>
 
@@ -110,7 +110,7 @@ function TradeLayoutInner({
                         {quotesOpen && <TradeQuotesPanel />}
                     </div>
 
-                    <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--bg-card)]">
+                    <main className="flex-1 min-w-0 overflow-y-auto ios-momentum-scroll bg-[var(--bg-card)]">
                         {children}
                     </main>
                 </div>

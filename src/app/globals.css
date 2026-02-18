@@ -84,13 +84,13 @@ body {
   color: var(--text-main);
   font-family: Trebuchet MS, Roboto, Ubuntu, sans-serif;
   min-height: 100%;
-  
+
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   height: 100%;
-  overflow: hidden;
+  overscroll-behavior-y: none;
 }
 
 /* Safari text auto-resize guard */
@@ -312,6 +312,32 @@ textarea {
 .no-touch-callout {
   -webkit-touch-callout: none;
   user-select: none;
+}
+
+/* iOS Safari viewport + fixed overlay stability */
+@supports (-webkit-touch-callout: none) {
+  html {
+    height: -webkit-fill-available;
+  }
+
+  body {
+    min-height: -webkit-fill-available;
+  }
+
+  .min-h-screen {
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+  }
+
+  .h-screen {
+    height: 100dvh;
+    height: -webkit-fill-available;
+  }
+}
+
+.ios-momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 @keyframes slideDown {

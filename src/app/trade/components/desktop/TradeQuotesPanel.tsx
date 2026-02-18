@@ -11,7 +11,7 @@ export default function TradeQuotesPanel() {
       className={`
         hidden md:flex relative z-10 flex-col
         transition-all duration-300 ease-in-out
-        h-[calc(100vh)]
+        h-[calc(100dvh)]
         ${quotesOpen ? "w-[340px] opacity-100 pointer-events-auto" : "w-0 opacity-0 pointer-events-none"}
       `}
       style={{

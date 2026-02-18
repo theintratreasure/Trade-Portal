@@ -27,7 +27,7 @@ export default function HistoryActionSheet({
 
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative w-full bg-[var(--bg-plan)] md:w-[420px] md:bg-[var(--bg-card)] overflow-hidden">
+      <div className="relative w-full bg-[var(--bg-plan)] md:w-[420px] md:bg-[var(--bg-card)] max-h-[85dvh] overflow-y-auto ios-momentum-scroll pb-[env(safe-area-inset-bottom)]">
 
         {/* HEADER */}
         <div className="p-3 border-b border-[var(--border-soft)]">
