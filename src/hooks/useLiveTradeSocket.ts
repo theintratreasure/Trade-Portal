@@ -83,6 +83,7 @@ const shared = {
   reconcileInFlight: false,
   healthcheckTimer: null as number | null,
   lastMessageAt: 0,
+  resumeGuardUntil: 0,
 };
 
 function debugLog(message: string, data?: unknown) {
@@ -302,6 +303,7 @@ function mergePosition(prev: LivePosition | undefined, next: LivePosition): Live
   const nextOpen = isFinitePositive(next.openPrice) ? next.openPrice : prev.openPrice;
   const nextCurrent = isFinitePositive(next.currentPrice) ? next.currentPrice : prev.currentPrice;
   const nextPnl = Number.isFinite(next.floatingPnL) ? next.floatingPnL : prev.floatingPnL;
+  const inResumeGuard = Date.now() < shared.resumeGuardUntil;
 
   const looksLikeResetTick =
     isFinitePositive(nextOpen) &&
@@ -313,15 +315,27 @@ function mergePosition(prev: LivePosition | undefined, next: LivePosition): Live
     Number.isFinite(nextPnl) &&
     Math.abs(nextPnl) <= 0.05;
 
+  const ratioVsPrev =
+    isFinitePositive(prev.currentPrice) && isFinitePositive(nextCurrent)
+      ? nextCurrent / prev.currentPrice
+      : 1;
+  const looksLikeResumeGlitch =
+    inResumeGuard &&
+    isFinitePositive(prev.currentPrice) &&
+    isFinitePositive(nextCurrent) &&
+    Number.isFinite(nextPnl) &&
+    Math.abs(nextPnl) <= 0.2 &&
+    (ratioVsPrev < 0.5 || ratioVsPrev > 1.5);
+
   return {
     ...prev,
     ...next,
     accountId: next.accountId || prev.accountId,
     symbol: next.symbol && next.symbol !== "-" ? next.symbol : prev.symbol,
     volume: Number.isFinite(next.volume) && next.volume > 0 ? next.volume : prev.volume,
-    openPrice: nextOpen,
-    currentPrice: looksLikeResetTick ? prev.currentPrice : nextCurrent,
-    floatingPnL: looksLikeResetTick ? prev.floatingPnL : nextPnl,
+    openPrice: looksLikeResumeGlitch ? prev.openPrice : nextOpen,
+    currentPrice: looksLikeResetTick || looksLikeResumeGlitch ? prev.currentPrice : nextCurrent,
+    floatingPnL: looksLikeResetTick || looksLikeResumeGlitch ? prev.floatingPnL : nextPnl,
   };
 }
 
@@ -933,6 +947,7 @@ export const useLiveTradeSocket = (accountId?: string) => {
       if (document.visibilityState && document.visibilityState !== "visible") return;
       const next = getEffectiveAccountId(accountId);
       if (!next) return;
+      shared.resumeGuardUntil = Date.now() + 2200;
       setEffectiveAccountId((prev) => (prev === next ? prev : next));
       ensureConnected(next);
       void reconcileFromRest();

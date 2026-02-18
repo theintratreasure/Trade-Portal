@@ -216,7 +216,7 @@ export default function ChartContent() {
   }, [displaySymbol, tradeBid, tradeAsk]);
 
   return (
-    <div className="h-screen w-full overflow-hidden flex flex-col bg-[var(--bg-plan)] md:bg-[var(--bg-card)] pb-30 md:pb-0">
+    <div className="min-h-full w-full overflow-hidden flex flex-col bg-[var(--bg-plan)] md:bg-[var(--bg-card)] pb-30 md:pb-0">
       <TopBarSlot>
         <TradeTopBar
           title={`Chart - ${displaySymbol}`}

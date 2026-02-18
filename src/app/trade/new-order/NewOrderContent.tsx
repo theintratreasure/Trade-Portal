@@ -512,7 +512,7 @@ export default function NewOrderPage() {
 
             </div> */}
 
-            <div className="md:hidden relative min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col overflow-y-auto pb-[calc(180px+env(safe-area-inset-bottom))] md:px-6 ">
+            <div className="md:hidden relative min-h-full bg-[var(--bg-plan)] md:bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col pb-[calc(180px+env(safe-area-inset-bottom))] md:px-6 ">
 
                 {/* MARKET EXECUTION */}
                 <div className="relative border-b border-gray-800 py-3">

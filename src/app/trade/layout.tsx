@@ -104,6 +104,24 @@ function TradeLayoutInner({
         };
     }, []);
 
+    useEffect(() => {
+        if (typeof document === "undefined") return;
+
+        const html = document.documentElement;
+        const body = document.body;
+        const prevHtmlOverflow = html.style.overflow;
+        const prevBodyOverflow = body.style.overflow;
+
+        // Keep a single scroll container inside trade layout to avoid double scrollbars.
+        html.style.overflow = "hidden";
+        body.style.overflow = "hidden";
+
+        return () => {
+            html.style.overflow = prevHtmlOverflow;
+            body.style.overflow = prevBodyOverflow;
+        };
+    }, []);
+
     if (!authChecked || !hasTradeToken) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[var(--bg-plan)]">
@@ -118,7 +136,10 @@ function TradeLayoutInner({
                 <div className="flex flex-col min-h-screen">
                     <div id="trade-topbar-slot" />
 
-                    <main className="flex-1 overflow-y-auto ios-momentum-scroll hide-scrollbar pb-[64px] mt-14">
+                    <main
+                        data-trade-main-scroll
+                        className="flex-1 overflow-y-auto ios-momentum-scroll hide-scrollbar pb-[64px] mt-14"
+                    >
                         {children}
                     </main>
 
@@ -142,7 +163,10 @@ function TradeLayoutInner({
                         {quotesOpen && <TradeQuotesPanel />}
                     </div>
 
-                    <main className="flex-1 min-w-0 overflow-y-auto ios-momentum-scroll bg-[var(--bg-card)]">
+                    <main
+                        data-trade-main-scroll
+                        className="flex-1 min-w-0 overflow-y-auto ios-momentum-scroll bg-[var(--bg-card)]"
+                    >
                         {children}
                     </main>
                 </div>

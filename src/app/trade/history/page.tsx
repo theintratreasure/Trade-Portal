@@ -405,7 +405,7 @@ export default function TradeHistory() {
   useEffect(() => {
     setExpandedId(null);
 
-    const container = document.querySelector("[data-history-scroll]");
+    const container = document.querySelector<HTMLElement>("[data-trade-main-scroll]");
     if (container) {
       container.scrollTop = 0;
     }
@@ -569,7 +569,7 @@ export default function TradeHistory() {
       </TopBarSlot>
 
       {/* BODY */}
-      <div data-history-scroll className="px-2 md:px-5 pt-1 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100dvh-60px)] overflow-y-auto pb-7 md:pb-10">
+      <div data-history-scroll className="px-2 md:px-5 pt-1 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-full pb-7 md:pb-10">
         {/* DEBUG PANEL */}
 
         <HistoryTabs activeTab={activeTab} onChange={onTabChange} />

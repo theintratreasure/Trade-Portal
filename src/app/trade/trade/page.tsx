@@ -145,6 +145,32 @@ const firstFiniteNumber = (...values: unknown[]): number | undefined => {
     return undefined;
 };
 
+const isLikelyResumeNoise = (prev: LivePosition, next: LivePosition) => {
+    const prevCurrent = Number(prev.currentPrice);
+    const nextCurrent = Number(next.currentPrice);
+    const prevOpen = Number(prev.openPrice);
+    const nextOpen = Number(next.openPrice);
+    const prevPnl = Number(prev.floatingPnL);
+    const nextPnl = Number(next.floatingPnL);
+
+    if (!Number.isFinite(nextCurrent) || nextCurrent <= 0) return true;
+    if (!Number.isFinite(nextOpen) || nextOpen <= 0) return true;
+
+    const currentJumpRatio =
+        Number.isFinite(prevCurrent) && prevCurrent > 0
+            ? Math.abs(nextCurrent - prevCurrent) / prevCurrent
+            : 0;
+    const openJumpRatio =
+        Number.isFinite(prevOpen) && prevOpen > 0
+            ? Math.abs(nextOpen - prevOpen) / prevOpen
+            : 0;
+    const pnlNearZero = Number.isFinite(nextPnl) && Math.abs(nextPnl) <= 0.2;
+    const prevPnlMeaningful = Number.isFinite(prevPnl) && Math.abs(prevPnl) > 0.5;
+
+    // Typical resume glitch signature: sharp price snap + near-zero pnl placeholder.
+    return (currentJumpRatio > 0.2 || openJumpRatio > 0.2) && (pnlNearZero || prevPnlMeaningful);
+};
+
 const getAccountIdFromUnknown = (value: unknown): string | undefined => {
     if (!value || typeof value !== "object") return undefined;
     const row = value as Record<string, unknown>;
@@ -190,6 +216,11 @@ export default function TradePage() {
         if (typeof window === "undefined") return null;
         return sessionStorage.getItem("trade-close-success");
     });
+    const [resumeGuardActive, setResumeGuardActive] = useState(false);
+    const [isResumeSettling, setIsResumeSettling] = useState(false);
+    const resumeGuardTimerRef = useRef<number | null>(null);
+    const resumeSettleTimerRef = useRef<number | null>(null);
+    const emptyPositionsTimerRef = useRef<number | null>(null);
     const { account, positions, pending } = useLiveTradeSocket(accountId);
     const [token, setToken] = useState<string>(() => getTradeTokenFromStorageSync());
 
@@ -265,6 +296,50 @@ export default function TradePage() {
         return () => {
             window.removeEventListener("focus", syncTradeToken);
             window.removeEventListener("trade-token-change", syncTradeToken);
+        };
+    }, []);
+
+    useEffect(() => {
+        const markResumeGuard = () => {
+            if (document.visibilityState && document.visibilityState !== "visible") return;
+            setResumeGuardActive(true);
+            setIsResumeSettling(true);
+            if (resumeGuardTimerRef.current) {
+                window.clearTimeout(resumeGuardTimerRef.current);
+            }
+            resumeGuardTimerRef.current = window.setTimeout(() => {
+                setResumeGuardActive(false);
+                resumeGuardTimerRef.current = null;
+            }, 2200);
+            if (resumeSettleTimerRef.current) {
+                window.clearTimeout(resumeSettleTimerRef.current);
+            }
+            // Keep previously stable UI for a short window after resume.
+            resumeSettleTimerRef.current = window.setTimeout(() => {
+                setIsResumeSettling(false);
+                resumeSettleTimerRef.current = null;
+            }, 1800);
+        };
+
+        window.addEventListener("pageshow", markResumeGuard);
+        document.addEventListener("visibilitychange", markResumeGuard);
+        window.addEventListener("focus", markResumeGuard);
+        return () => {
+            window.removeEventListener("pageshow", markResumeGuard);
+            document.removeEventListener("visibilitychange", markResumeGuard);
+            window.removeEventListener("focus", markResumeGuard);
+            if (resumeGuardTimerRef.current) {
+                window.clearTimeout(resumeGuardTimerRef.current);
+                resumeGuardTimerRef.current = null;
+            }
+            if (resumeSettleTimerRef.current) {
+                window.clearTimeout(resumeSettleTimerRef.current);
+                resumeSettleTimerRef.current = null;
+            }
+            if (emptyPositionsTimerRef.current) {
+                window.clearTimeout(emptyPositionsTimerRef.current);
+                emptyPositionsTimerRef.current = null;
+            }
         };
     }, []);
 
@@ -359,16 +434,27 @@ export default function TradePage() {
                 !isAlmostEqual(prev.currentPrice, prev.openPrice) &&
                 Number.isFinite(nextPnl) &&
                 Math.abs(nextPnl) <= 0.05;
+            const ratioVsPrev =
+                isFinitePositive(prev.currentPrice) && isFinitePositive(nextCurrent)
+                    ? nextCurrent / prev.currentPrice
+                    : 1;
+            const looksLikeResumeGlitch =
+                resumeGuardActive &&
+                isFinitePositive(prev.currentPrice) &&
+                isFinitePositive(nextCurrent) &&
+                Number.isFinite(nextPnl) &&
+                Math.abs(nextPnl) <= 0.2 &&
+                (ratioVsPrev < 0.5 || ratioVsPrev > 1.5);
             merged.set(item.positionId, {
                 ...prev,
                 ...item,
-                openPrice: nextOpen,
-                currentPrice: looksLikeResetTick ? prev.currentPrice : nextCurrent,
-                floatingPnL: looksLikeResetTick ? prev.floatingPnL : nextPnl,
+                openPrice: looksLikeResumeGlitch ? prev.openPrice : nextOpen,
+                currentPrice: looksLikeResetTick || looksLikeResumeGlitch ? prev.currentPrice : nextCurrent,
+                floatingPnL: looksLikeResetTick || looksLikeResumeGlitch ? prev.floatingPnL : nextPnl,
             });
         }
         return Array.from(merged.values());
-    }, [accountId, positions, restFallback]);
+    }, [accountId, positions, restFallback, resumeGuardActive]);
 
     const socketOrRestPending = useMemo(() => {
         if (pending.length > 0) return pending;
@@ -397,20 +483,43 @@ export default function TradePage() {
     const [displayPositionsSource, setDisplayPositionsSource] = useState<LivePosition[]>([]);
     useEffect(() => {
         if (socketOrRestPositions.length > 0) {
+            if (emptyPositionsTimerRef.current) {
+                window.clearTimeout(emptyPositionsTimerRef.current);
+                emptyPositionsTimerRef.current = null;
+            }
             const syncTimer = window.setTimeout(() => {
-                setDisplayPositionsSource(socketOrRestPositions);
+                setDisplayPositionsSource((prev) => {
+                    if (isResumeSettling && prev.length > 0) return prev;
+                    if (prev.length === 0) return socketOrRestPositions;
+
+                    const prevMap = new Map(prev.map((item) => [item.positionId, item]));
+                    const nextList = socketOrRestPositions.map((item) => {
+                        const prevItem = prevMap.get(item.positionId);
+                        if (!prevItem) return item;
+                        if (!resumeGuardActive) return item;
+                        return isLikelyResumeNoise(prevItem, item) ? prevItem : item;
+                    });
+                    return nextList;
+                });
             }, 0);
             return () => window.clearTimeout(syncTimer);
         }
 
-        const clearTimer = window.setTimeout(() => {
+        // Avoid flicker when stream briefly drops on app resume/reconnect.
+        emptyPositionsTimerRef.current = window.setTimeout(() => {
             setDisplayPositionsSource([]);
-        }, 450);
-        return () => window.clearTimeout(clearTimer);
-    }, [socketOrRestPositions]);
+            emptyPositionsTimerRef.current = null;
+        }, isResumeSettling || resumeGuardActive ? 2500 : 900);
+        return () => {
+            if (emptyPositionsTimerRef.current) {
+                window.clearTimeout(emptyPositionsTimerRef.current);
+                emptyPositionsTimerRef.current = null;
+            }
+        };
+    }, [socketOrRestPositions, resumeGuardActive, isResumeSettling]);
 
     const positionsForUi =
-        socketOrRestPositions.length > 0 ? socketOrRestPositions : displayPositionsSource;
+        displayPositionsSource.length > 0 ? displayPositionsSource : socketOrRestPositions;
 
     const [openMenu, setOpenMenu] = useState<DesktopMenuState | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -574,7 +683,7 @@ export default function TradePage() {
                 />
             </TopBarSlot>
 
-            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] h-[calc(100dvh-3.5rem)] md:h-full overflow-y-auto pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-5">
+            <div className="px-2 md:px-0 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-full pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-5">
 
                 {/* ================= MOBILE (UNCHANGED) ================= */}
                 <div className="md:hidden pb-[calc(4rem+env(safe-area-inset-bottom))]">
