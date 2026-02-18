@@ -72,6 +72,38 @@ function TradeLayoutInner({
         };
     }, [router]);
 
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const refreshAfterResume = () => {
+            if (document.visibilityState === "hidden") return;
+
+            const scrollers = document.querySelectorAll<HTMLElement>(".ios-momentum-scroll");
+            scrollers.forEach((el) => {
+                const top = el.scrollTop;
+                el.style.setProperty("-webkit-overflow-scrolling", "auto");
+                // Force reflow to fix iOS frozen scroll containers after app resume.
+                void el.offsetHeight;
+                el.style.setProperty("-webkit-overflow-scrolling", "touch");
+                el.scrollTop = top;
+            });
+
+            window.requestAnimationFrame(() => {
+                window.dispatchEvent(new Event("resize"));
+            });
+        };
+
+        window.addEventListener("pageshow", refreshAfterResume);
+        window.addEventListener("focus", refreshAfterResume);
+        document.addEventListener("visibilitychange", refreshAfterResume);
+
+        return () => {
+            window.removeEventListener("pageshow", refreshAfterResume);
+            window.removeEventListener("focus", refreshAfterResume);
+            document.removeEventListener("visibilitychange", refreshAfterResume);
+        };
+    }, []);
+
     if (!authChecked || !hasTradeToken) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[var(--bg-plan)]">
@@ -86,7 +118,7 @@ function TradeLayoutInner({
                 <div className="flex flex-col min-h-screen">
                     <div id="trade-topbar-slot" />
 
-                    <main className="flex-1 overflow-y-auto ios-momentum-scroll pb-[64px] mt-14">
+                    <main className="flex-1 overflow-y-auto ios-momentum-scroll hide-scrollbar pb-[64px] mt-14">
                         {children}
                     </main>
 

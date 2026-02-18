@@ -97,7 +97,7 @@ export default function QuotesPage() {
                 />
             </TopBarSlot>
 
-            <div className="text-[var(--text-main)] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-screen overflow-x-hidden">
+            <div className="text-[var(--text-main)] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-full overflow-x-hidden">
                 <QuotesList
                     viewMode={viewMode}
                     onSelect={(symbol) => {

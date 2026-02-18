@@ -217,6 +217,18 @@ textarea {
   -ms-overflow-style: none;
 }
 
+/* Mobile/touch: keep scrolling but hide visual scrollbar rails/thumbs */
+@media (hover: none) and (pointer: coarse) {
+  * {
+    scrollbar-width: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
 @keyframes slideUp {
   from {
     transform: translateY(100%);
