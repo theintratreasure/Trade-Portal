@@ -16,7 +16,7 @@ export type InstrumentItem = {
 
 export async function fetchWatchlist(limit = 50, token?: string): Promise<WatchlistItem[]> {
   try {
-    const config: Record<string, any> = { params: { limit } };
+    const config: Record<string, unknown> = { params: { limit } };
 
     // If token provided, attach Authorization header (works with bearer tokens).
     // If your API uses cookies/session, token can be omitted.
@@ -40,7 +40,7 @@ export async function fetchWatchlist(limit = 50, token?: string): Promise<Watchl
   }
 }
 
-export async function searchInstruments(query: string, limit = 40) {
+export async function searchInstruments(query: string, limit = 200) {
   const { data } = await tradeApi.get(
     "/watchlist/search/instruments",
     {
@@ -53,7 +53,7 @@ export async function searchInstruments(query: string, limit = 40) {
 
 export async function fetchBySegment(
   segment: string,
-  limit = 40
+  limit = 200
 ) {
   const { data } = await tradeApi.get(
     `/watchlist/segment/${segment}`,

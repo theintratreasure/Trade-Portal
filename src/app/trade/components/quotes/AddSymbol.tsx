@@ -72,7 +72,7 @@ export default function AddSymbol({
         onClose={onClose}
       />
     ) : (
-      <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-primary)]">
+      <div className="fixed inset-0 z-[9999] bg-[var(--bg-plan)] md:bg-[var(--bg-primary)] flex flex-col">
 
         {/* HEADER */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-soft)]">
@@ -85,7 +85,9 @@ export default function AddSymbol({
           </div>
         </div>
 
-        <AddSymbolSearch  />
+        <div className="flex-1 min-h-0">
+          <AddSymbolSearch />
+        </div>
       </div>
     ),
     document.body
