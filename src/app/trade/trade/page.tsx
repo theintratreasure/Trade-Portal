@@ -135,6 +135,12 @@ const toFixedSafe = (value: unknown, digits = 2, fallback = "0.00") => {
     return Number.isFinite(n) ? n.toFixed(digits) : fallback;
 };
 
+const toTrimmedPrice = (value: unknown, maxDigits = 4, fallback = "-") => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return n.toFixed(maxDigits).replace(/\.?0+$/, "");
+};
+
 const isFinitePositive = (value: number) => Number.isFinite(value) && value > 0;
 const isAlmostEqual = (a: number, b: number, epsilon = 1e-9) => Math.abs(a - b) <= epsilon;
 const firstFiniteNumber = (...values: unknown[]): number | undefined => {
@@ -590,8 +596,8 @@ export default function TradePage() {
                 pair: pos.symbol,
                 type: pos.side.toLowerCase(),
                 lot: toSafeNumber(pos.volume),
-                from: toFixedSafe(openPrice, 2, "-"),
-                to: toFixedSafe(currentPrice, 2, "-"),
+                from: toTrimmedPrice(openPrice, 4, "-"),
+                to: toTrimmedPrice(currentPrice, 4, "-"),
                 profit: pnl,
                 openTime: pos.openTime
                     ? formatOpenTime24(pos.openTime)

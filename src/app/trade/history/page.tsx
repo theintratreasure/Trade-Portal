@@ -49,6 +49,7 @@ const LongPressRow = ({
       {...longPress}
       onContextMenu={(e) => e.preventDefault()}
       className="select-none"
+      style={{ touchAction: "pan-y" }}
     >
       {children}
     </div>
@@ -569,7 +570,11 @@ export default function TradeHistory() {
       </TopBarSlot>
 
       {/* BODY */}
-      <div data-history-scroll className="px-2 md:px-5 pt-1 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-full pb-7 md:pb-10">
+      <div
+        data-history-scroll
+        className="px-2 md:px-5 pt-1 text-[13px] bg-[var(--bg-plan)] md:bg-[var(--bg-card)] min-h-full pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12"
+        style={{ touchAction: "pan-y" }}
+      >
         {/* DEBUG PANEL */}
 
         <HistoryTabs activeTab={activeTab} onChange={onTabChange} />
@@ -641,7 +646,7 @@ export default function TradeHistory() {
 
         <div className="transition-opacity duration-200">
           {activeTab === "orders" && (
-            <>
+            <div className="mb-6">
               <div className="md:hidden">
               {/* SUMMARY */}
               {symbolOrderSummary && (
@@ -802,13 +807,12 @@ export default function TradeHistory() {
                   </span>
                 )}
               </div>
-            </>
+            </div>
           )}
 
 
           {activeTab === "positions" && (
-
-            <>
+            <div className="mb-6">
               <div className="md:hidden">
 
               {/* SUMMARY */}
@@ -1040,11 +1044,11 @@ export default function TradeHistory() {
                   </span>
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {activeTab === "deals" && (
-            <>
+            <div className="mb-6">
               <div className="md:hidden">
               {/* SUMMARY */}
               <div className="space-y-[6px] mb-3">
@@ -1256,7 +1260,7 @@ export default function TradeHistory() {
                   </span>
                 )}
               </div>
-            </>
+            </div>
           )}
 
 
