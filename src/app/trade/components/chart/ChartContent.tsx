@@ -100,6 +100,7 @@ export default function ChartContent() {
   const [theme, setTheme] = useState<string>("dark");
   const [isDesktop, setIsDesktop] = useState<boolean>(false);
   const [tradeOpen, setTradeOpen] = useState<boolean>(false);
+  const [chartSurface, setChartSurface] = useState<string>("#0f172a");
 
   const initialToken = getTradeTokenFromStorageSync();
   const [token] = useState<string>(initialToken);
@@ -122,10 +123,14 @@ export default function ChartContent() {
   }, [paramSymbol]);
 
   // theme sync (keep your background/theme behavior unchanged)
- useEffect(() => {
+useEffect(() => {
   const updateTheme = () => {
     const stored = localStorage.getItem("theme") || "dark";
     setTheme(stored);
+    const style = getComputedStyle(document.documentElement);
+    const plan = style.getPropertyValue("--bg-plan").trim();
+    const card = style.getPropertyValue("--bg-card").trim();
+    setChartSurface(isDesktop ? (card || "#111827") : (plan || "#0f172a"));
   };
 
   updateTheme();
@@ -137,7 +142,7 @@ export default function ChartContent() {
     window.removeEventListener("storage", updateTheme);
     window.removeEventListener("themeChange", updateTheme);
   };
-}, []);
+}, [isDesktop]);
 
   // screen resize
   useEffect(() => {
@@ -170,7 +175,7 @@ export default function ChartContent() {
       widgetNode.style.height = "100%";
       host.appendChild(widgetNode);
 
-      const chartBg = theme === "dark" ? (isDesktop ? "#111827" : "#000000") : "#ffffff";
+      const chartBg = chartSurface;
 
       new window.TradingView.widget({
         autosize: true,
@@ -204,7 +209,7 @@ export default function ChartContent() {
       cancelled = true;
       containerEl.innerHTML = "";
     };
-  }, [currentSymbol, theme, isDesktop]);
+  }, [chartSurface, currentSymbol, theme]);
 
   // If you want programmatic symbol change (e.g., user selects a symbol from your UI),
   // call setCurrentSymbol("USDJPY") and the embed will be recreated with that symbol.
@@ -216,7 +221,7 @@ export default function ChartContent() {
   }, [displaySymbol, tradeBid, tradeAsk]);
 
   return (
-    <div className="min-h-full w-full overflow-hidden flex flex-col bg-[var(--bg-plan)] md:bg-[var(--bg-card)] pb-30 md:pb-0">
+    <div className="h-full min-h-0 w-full overflow-hidden flex flex-col bg-[var(--bg-plan)] md:bg-[var(--bg-card)]">
       <TopBarSlot>
         <TradeTopBar
           title={`Chart - ${displaySymbol}`}
@@ -247,7 +252,7 @@ export default function ChartContent() {
         />
       </TopBarSlot>
 
-      <div ref={containerRef} className="flex-1 w-full" />
+      <div ref={containerRef} className="flex-1 min-h-0 w-full" />
     </div>
   );
 }

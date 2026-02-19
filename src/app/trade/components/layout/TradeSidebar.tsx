@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useTradeSidebar } from "./TradeSidebarContext";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
+import { getCookieValue } from "@/lib/tradeToken";
 
 
 
@@ -30,6 +31,25 @@ export default function TradeSidebar() {
   const ref = useRef<HTMLDivElement>(null);
   const { accountId } = useParams<{ accountId: string }>();
   const { data: account } = useTradeAccount();
+  const accountTypeRaw = String(
+    account?.accountType ?? account?.account_type ?? ""
+  ).toLowerCase();
+  const sessionTypeRaw = String(
+    account?.sessionType ?? getCookieValue("sessionType") ?? ""
+  ).toUpperCase();
+  const isWatchOnly = sessionTypeRaw === "WATCH";
+  const ribbonLabel = isWatchOnly
+    ? "WATCH ONLY"
+    : accountTypeRaw === "demo"
+      ? "DEMO"
+      : accountTypeRaw === "live"
+        ? "LIVE"
+        : "";
+  const ribbonBackground = isWatchOnly
+    ? "var(--bg-muted-card)"
+    : accountTypeRaw === "demo"
+      ? "var(--success)"
+      : "var(--mt-red)";
 
   useEffect(() => {
     function handle(e: MouseEvent) {
@@ -70,35 +90,17 @@ export default function TradeSidebar() {
         }}
       >
         {/* PROFILE HEADER */}
-        {account?.accountType && (
+        {ribbonLabel && (
           <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none">
             <div
               className="absolute right-[-34px] top-[12px] rotate-45 text-[11px] font-semibold px-10 py-[4px] text-center shadow-md"
               style={{
-                background:
-                  account?.accountType === "demo"
-                    ? "var(--success)"   // Green for Demo
-                    : "var(--mt-red)",  // Red for Live
+                background: ribbonBackground,
                 color: "#ffffff",
                 letterSpacing: "0.5px",
               }}
             >
-              {account?.accountType === "demo" ? "DEMO" : "LIVE"}
-            </div>
-          </div>
-        )}
-
-        {account?.sessionType === "WATCH" && (
-          <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none">
-            <div
-              className="absolute right-[-20px] top-[44px] rotate-45 text-[10px] font-semibold px-8 py-[3px] text-center shadow-md"
-              style={{
-                background: "var(--bg-muted-card)", // grey tone
-                color: "#ffffff",
-                letterSpacing: "0.5px",
-              }}
-            >
-              WATCH ONLY
+              {ribbonLabel}
             </div>
           </div>
         )}

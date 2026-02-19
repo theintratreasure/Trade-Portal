@@ -23,7 +23,18 @@ import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { useLanguage } from "../components/LanguageProvider";
 import { translations } from "@/types/translations";
-import { clearClientCookie, clearTradeTokenCookie } from "@/lib/tradeToken";
+import {
+  TRADE_LOGIN_REMEMBER_KEY,
+} from "@/lib/tradeLoginAccounts";
+import {
+  clearClientCookie,
+  clearTradeTokenCookie,
+  getCookieValue,
+} from "@/lib/tradeToken";
+
+const TRADE_LOGIN_ACCOUNTS_KEY = "trade-login-accounts";
+const TRADE_AUTH_STATE_KEY = "trade-auth-state";
+const TRADE_AUTH_LOGGED_OUT = "trade-logged-out";
 
 export default function TradeSettingsPage() {
   const router = useRouter();
@@ -46,15 +57,23 @@ const t = translations[language];
   });
 
   const handleLogout = () => {
-    clearTradeTokenCookie();
+    clearTradeTokenCookie({ silent: true });
     clearClientCookie("accountId");
     clearClientCookie("sessionType");
+    clearClientCookie("tradeSessionType");
+    clearClientCookie("tradeAccount");
     if (typeof window !== "undefined") {
       localStorage.removeItem("tradeAccountId");
+      localStorage.removeItem("tradeToken");
+      localStorage.removeItem("trade-lang");
+      localStorage.removeItem("trade-quote-view");
+      localStorage.removeItem(TRADE_LOGIN_REMEMBER_KEY);
+      localStorage.removeItem(TRADE_LOGIN_ACCOUNTS_KEY);
+      localStorage.setItem(TRADE_AUTH_STATE_KEY, TRADE_AUTH_LOGGED_OUT);
       window.dispatchEvent(new Event("trade-account-change"));
     }
 
-    window.location.href = "/trade-login";
+    window.location.replace("/trade-login");
   };
   useEffect(() => {
     const langMap: Record<string, string> = {
@@ -115,6 +134,24 @@ const t = translations[language];
   const accountNumber = String(
     account?.accountNumber ?? account?.account_number ?? "--"
   );
+  const accountTypeRaw = String(
+    account?.accountType ?? account?.account_type ?? ""
+  ).toLowerCase();
+  const accountTypeLabel =
+    accountTypeRaw === "demo"
+      ? "Demo"
+      : accountTypeRaw === "live"
+      ? "Live"
+      : "--";
+  const sessionTypeRaw = String(
+    account?.sessionType ?? getCookieValue("sessionType") ?? ""
+  ).toUpperCase();
+  const sessionTypeLabel =
+    sessionTypeRaw === "WATCH"
+      ? "Watch Only"
+      : sessionTypeRaw === "TRADE"
+      ? "Trade"
+      : "--";
   const currency = String(account?.currency ?? "");
   const effectiveBalance =
     liveAccount?.balance ?? account?.balance ?? 0;
@@ -148,6 +185,8 @@ const t = translations[language];
 
           <div className="space-y-3 text-sm">
             <Row label="Account No" value={accountNumber} />
+            <Row label="Account Type" value={accountTypeLabel} />
+            <Row label="Session Type" value={sessionTypeLabel} />
             <Row
               label="Balance"
               value={`${Number(effectiveBalance).toFixed(2)} ${currency}`}

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { App as CapacitorApp, BackButtonListenerEvent } from "@capacitor/app";
 
 export default function BackHandler() {
@@ -12,12 +12,23 @@ export default function BackHandler() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    let handler: any;
+    let handler: PluginListenerHandle | undefined;
 
     const setupListener = async () => {
       handler = await CapacitorApp.addListener(
         "backButton",
         (event: BackButtonListenerEvent) => {
+          if (pathname?.startsWith("/trade-login")) {
+            const tradeAuthState =
+              typeof window !== "undefined"
+                ? localStorage.getItem("trade-auth-state")
+                : null;
+            if (tradeAuthState === "trade-logged-out") {
+              router.replace("/");
+              return;
+            }
+          }
+
           if (pathname?.startsWith("/trade") && pathname !== "/trade/quotes") {
             router.replace("/trade/quotes");
             return;

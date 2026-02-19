@@ -66,11 +66,13 @@ export function setTradeTokenCookie(token: string, maxAgeSeconds = 43200) {
   }
 }
 
-export function clearTradeTokenCookie() {
+export function clearTradeTokenCookie(options?: { silent?: boolean }) {
   if (typeof document === "undefined") return;
   clearClientCookie("tradeToken");
   if (typeof window !== "undefined") {
     localStorage.removeItem("tradeToken");
-    window.dispatchEvent(new Event("trade-token-change"));
+    if (!options?.silent) {
+      window.dispatchEvent(new Event("trade-token-change"));
+    }
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TradeSidebarProvider } from "./components/layout/TradeSidebarContext";
 import TradeBottomNav from "./components/layout/TradeBottomNav";
@@ -12,6 +12,9 @@ import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { LanguageProvider } from "./components/LanguageProvider";
 import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
 import GlobalLoader from "../components/ui/GlobalLoader";
+
+const TRADE_AUTH_STATE_KEY = "trade-auth-state";
+const TRADE_AUTH_LOGGED_OUT = "trade-logged-out";
 
 export default function TradeLayoutClient({
     children,
@@ -43,6 +46,8 @@ function TradeLayoutInner({
     const [isDesktop, setIsDesktop] = useState<boolean>(false);
     const [authChecked, setAuthChecked] = useState(false);
     const [hasTradeToken, setHasTradeToken] = useState(false);
+    const [showExitConfirm, setShowExitConfirm] = useState(false);
+    const ignoreNextPopRef = useRef(false);
 
     useEffect(() => {
         const mq = window.matchMedia("(min-width: 768px)");
@@ -59,7 +64,15 @@ function TradeLayoutInner({
             setHasTradeToken(isAuthed);
             setAuthChecked(true);
             if (!isAuthed) {
-                router.replace("/trade-login");
+                if (typeof window !== "undefined") {
+                    const tradeAuthState = localStorage.getItem(TRADE_AUTH_STATE_KEY);
+                    router.replace(
+                        tradeAuthState === TRADE_AUTH_LOGGED_OUT ? "/" : "/trade-login"
+                    );
+                } else {
+                    router.replace("/trade-login");
+                }
+                return;
             }
         };
 
@@ -71,6 +84,41 @@ function TradeLayoutInner({
             window.removeEventListener("trade-token-change", syncAuth);
         };
     }, [router]);
+
+    useEffect(() => {
+        if (typeof window === "undefined" || !hasTradeToken) return;
+
+        const onPopState = () => {
+            if (ignoreNextPopRef.current) {
+                ignoreNextPopRef.current = false;
+                return;
+            }
+
+            const nextPath = window.location.pathname;
+            if (nextPath.startsWith("/trade")) {
+                return;
+            }
+
+            ignoreNextPopRef.current = true;
+            window.history.go(1);
+            setShowExitConfirm(true);
+        };
+
+        window.addEventListener("popstate", onPopState);
+        return () => {
+            window.removeEventListener("popstate", onPopState);
+        };
+    }, [hasTradeToken]);
+
+    const stayInTradePanel = () => {
+        setShowExitConfirm(false);
+    };
+
+    const closeTradePanel = () => {
+        setShowExitConfirm(false);
+        ignoreNextPopRef.current = true;
+        window.history.back();
+    };
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -169,6 +217,34 @@ function TradeLayoutInner({
                     >
                         {children}
                     </main>
+                </div>
+            )}
+
+            {showExitConfirm && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-4">
+                    <div className="w-full max-w-md rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-plan)] p-5 shadow-[0_18px_46px_rgba(15,23,42,0.35)] md:bg-[var(--bg-card)]">
+                        <h3 className="text-base font-semibold text-[var(--text-main)]">
+                            Close Trade Panel?
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                            Are you sure you want to close the trade panel and go back?
+                        </p>
+
+                        <div className="mt-5 flex items-center justify-end gap-2">
+                            <button
+                                onClick={stayInTradePanel}
+                                className="rounded-lg border border-[var(--border-soft)] bg-[var(--bg-glass)] px-4 py-2 text-sm font-medium text-[var(--text-main)] transition hover:opacity-90"
+                            >
+                                Stay
+                            </button>
+                            <button
+                                onClick={closeTradePanel}
+                                className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--text-main)] transition hover:opacity-90"
+                            >
+                                Close Panel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

@@ -16,6 +16,10 @@ import {
 } from "@/lib/tradeLoginAccounts";
 import { setClientCookie, setTradeTokenCookie } from "@/lib/tradeToken";
 
+const TRADE_AUTH_STATE_KEY = "trade-auth-state";
+const TRADE_AUTH_LOGGED_IN = "trade-logged-in";
+const TRADE_AUTH_LOGGED_OUT = "trade-logged-out";
+
 export default function TradeLogin() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -46,6 +50,17 @@ export default function TradeLogin() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isLoggedOut =
+      localStorage.getItem(TRADE_AUTH_STATE_KEY) === TRADE_AUTH_LOGGED_OUT;
+    if (!isLoggedOut) return;
+
+    // One-shot hard exit from trade-login after explicit trade logout.
+    localStorage.removeItem(TRADE_AUTH_STATE_KEY);
+    window.location.replace("/");
+  }, []);
+
   const loginWithCredentials = useCallback(
     (accountNumber: string, password: string) => {
       if (!accountNumber || !password) {
@@ -66,6 +81,7 @@ export default function TradeLogin() {
             setClientCookie("sessionType", String(res.sessionType), 43200);
             setClientCookie("accountId", String(accountId), 43200);
             if (typeof window !== "undefined") {
+              localStorage.setItem(TRADE_AUTH_STATE_KEY, TRADE_AUTH_LOGGED_IN);
               localStorage.setItem("tradeAccountId", String(accountId));
               window.dispatchEvent(new Event("trade-account-change"));
             }
@@ -113,7 +129,7 @@ export default function TradeLogin() {
 
             <div className="relative z-10 space-y-6">
               <div className="flex items-center justify-between gap-2">
-                <BackButton  />
+                <BackButton to="/" />
                 <button
                   onClick={() => router.push("/")}
                   className="inline-flex items-center justify-center rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] h-10 w-10 transition hover:bg-[var(--bg-glass)]"
