@@ -6,6 +6,7 @@ import QuoteRow from "./QuoteRow";
 import { QuoteLiveState } from "@/types/market";
 import { useEffect, useMemo, useState } from "react";
 import { getTradeTokenFromStorageSync } from "@/lib/tradeToken";
+import { useWatchlist } from "@/hooks/watchlist/useWatchlist";
 
 type Props = {
   onSelect: (symbol: string) => void;
@@ -34,24 +35,48 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
   }, []);
 
   const liveQuotes = useMarketQuotes(token);
+  const { data: watchlist } = useWatchlist();
 
-  // filter out undefined entries (TypeScript-safe)
-  const rows = useMemo(
-    () =>
-      Object.values(liveQuotes).filter(
-        (q): q is QuoteLiveState =>
-          Boolean(
-            q &&
-              typeof q.symbol === "string" &&
-              q.symbol.length > 0 &&
-              Number.isFinite(Number(q.bid)) &&
-              Number.isFinite(Number(q.ask)) &&
-              Number(q.bid) > 0 &&
-              Number(q.ask) > 0
-          )
-      ),
-    [liveQuotes]
-  );
+  const rows = useMemo(() => {
+    const normalize = (value: string) => String(value ?? "").trim().toUpperCase();
+    const watchlistSymbols = (watchlist ?? [])
+      .map((item) => normalize(item.code))
+      .filter((symbol) => symbol.length > 0);
+
+    const quoteMap = new Map<string, QuoteLiveState>();
+    for (const q of Object.values(liveQuotes)) {
+      if (!q || typeof q.symbol !== "string") continue;
+      const symbol = normalize(q.symbol);
+      if (!symbol) continue;
+      quoteMap.set(symbol, q);
+    }
+
+    const ensurePlaceholder = (symbol: string): QuoteLiveState => ({
+      symbol,
+      bid: "--",
+      ask: "--",
+      bidVolume: "--",
+      askVolume: "--",
+      bidDir: "same",
+      askDir: "same",
+    });
+
+    const output: QuoteLiveState[] = [];
+    const seen = new Set<string>();
+
+    for (const symbol of watchlistSymbols) {
+      output.push(quoteMap.get(symbol) ?? ensurePlaceholder(symbol));
+      seen.add(symbol);
+    }
+
+    for (const [symbol, quote] of quoteMap.entries()) {
+      if (seen.has(symbol)) continue;
+      output.push(quote);
+      seen.add(symbol);
+    }
+
+    return output;
+  }, [liveQuotes, watchlist]);
 
   return (
     <div className="pb-[64px] overflow-x-hidden">
