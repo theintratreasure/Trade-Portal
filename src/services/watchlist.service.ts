@@ -14,6 +14,13 @@ export type InstrumentItem = {
   isAdded?: boolean;
 };
 
+const SEGMENT_ALIASES: Record<string, string[]> = {
+  INDICES: ["INDICES", "INDEX"],
+  INDEX: ["INDEX", "INDICES"],
+  METAL: ["METAL", "METALS"],
+  METALS: ["METALS", "METAL"],
+};
+
 export async function fetchWatchlist(limit = 50, token?: string): Promise<WatchlistItem[]> {
   try {
     const config: Record<string, unknown> = { params: { limit } };
@@ -55,14 +62,32 @@ export async function fetchBySegment(
   segment: string,
   limit = 200
 ) {
-  const { data } = await tradeApi.get(
-    `/watchlist/segment/${segment}`,
-    {
-      params: { limit },
-    }
+  const normalized = String(segment ?? "").trim().toUpperCase();
+  const aliases = Array.from(
+    new Set([...(SEGMENT_ALIASES[normalized] ?? []), normalized].filter(Boolean))
   );
 
-  return data.data;
+  const responses = await Promise.allSettled(
+    aliases.map((key) =>
+      tradeApi.get(`/watchlist/segment/${encodeURIComponent(key)}`, {
+        params: { limit },
+      })
+    )
+  );
+
+  const merged = new Map<string, InstrumentItem>();
+  for (const result of responses) {
+    if (result.status !== "fulfilled") continue;
+    const list = result.value?.data?.data;
+    if (!Array.isArray(list)) continue;
+    for (const item of list as InstrumentItem[]) {
+      const code = String(item?.code ?? "").trim().toUpperCase();
+      if (!code || merged.has(code)) continue;
+      merged.set(code, item);
+    }
+  }
+
+  return Array.from(merged.values());
 }
 
 export async function addToWatchlist(code: string) {

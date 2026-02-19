@@ -42,7 +42,7 @@ const shared = {
   flushTimer: null as number | null,
 };
 
-const QUOTES_FAST_FLUSH_INTERVAL_MS = 50;
+const QUOTES_FAST_FLUSH_INTERVAL_MS = 20;
 const QUOTES_STALE_RESUBSCRIBE_MS = 12000;
 const QUOTES_HEALTHCHECK_MS = 4000;
 
