@@ -193,9 +193,18 @@ function normalizePosition(data: unknown): LivePosition | null {
     row.pair != null ||
     row.instrument != null ||
     row.openPrice != null ||
+    row.open_price != null ||
     row.currentPrice != null ||
+    row.current_price != null ||
     row.floatingPnL != null ||
-    row.profitLoss != null;
+    row.floating_pnl != null ||
+    row.profitLoss != null ||
+    row.profit_loss != null ||
+    row.unrealizedPnL != null ||
+    row.unrealized_pnl != null ||
+    row.unrealisedPnL != null ||
+    row.unrealised_pnl != null ||
+    row.pnl != null;
   const source =
     nestedData &&
     !hasRowPositionKeys &&
@@ -206,9 +215,18 @@ function normalizePosition(data: unknown): LivePosition | null {
       nestedData.pair != null ||
       nestedData.instrument != null ||
       nestedData.openPrice != null ||
+      nestedData.open_price != null ||
       nestedData.currentPrice != null ||
+      nestedData.current_price != null ||
       nestedData.floatingPnL != null ||
-      nestedData.profitLoss != null)
+      nestedData.floating_pnl != null ||
+      nestedData.profitLoss != null ||
+      nestedData.profit_loss != null ||
+      nestedData.unrealizedPnL != null ||
+      nestedData.unrealized_pnl != null ||
+      nestedData.unrealisedPnL != null ||
+      nestedData.unrealised_pnl != null ||
+      nestedData.pnl != null)
       ? nestedData
       : row;
   const id =
@@ -226,9 +244,18 @@ function normalizePosition(data: unknown): LivePosition | null {
     source.pair != null ||
     source.instrument != null ||
     source.openPrice != null ||
+    source.open_price != null ||
     source.currentPrice != null ||
+    source.current_price != null ||
     source.floatingPnL != null ||
-    source.profitLoss != null;
+    source.floating_pnl != null ||
+    source.profitLoss != null ||
+    source.profit_loss != null ||
+    source.unrealizedPnL != null ||
+    source.unrealized_pnl != null ||
+    source.unrealisedPnL != null ||
+    source.unrealised_pnl != null ||
+    source.pnl != null;
   if (!hasTradeShape) return null;
 
   const rawOpenPrice = toNumberOrUndefined(
@@ -245,20 +272,30 @@ function normalizePosition(data: unknown): LivePosition | null {
       source.close_price ??
       source.marketPrice ??
       source.market_price ??
+      source.markPrice ??
+      source.mark_price ??
       source.ltp ??
       source.lastPrice ??
-      source.last_price
+      source.last_price ??
+      source.bid ??
+      source.ask
   );
   const rawFloatingPnL = toNumberOrUndefined(
     source.floatingPnL ??
       source.floating_pnl ??
+      source.floatingProfit ??
+      source.floating_profit ??
       source.profitLoss ??
       source.profit_loss ??
       source.unrealizedPnL ??
       source.unrealisedPnL ??
+      source.unrealized_pnl ??
+      source.unrealised_pnl ??
       source.pnl ??
       source.profit ??
-      source.pl
+      source.pl ??
+      source.profitUsd ??
+      source.profit_usd
   );
 
   return {
@@ -801,7 +838,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
   };
 }
 
-function ensureConnected(accountId: string) {
+function ensureConnected(accountId: string, forceReconnect = false) {
   debugLog("ensureConnected called", {
     accountId,
     listeners: shared.listeners.size,
@@ -811,6 +848,7 @@ function ensureConnected(accountId: string) {
   clearTimers();
 
   if (
+    !forceReconnect &&
     shared.socket &&
     shared.accountId === accountId &&
     (shared.socket.readyState === WebSocket.OPEN ||
@@ -949,7 +987,7 @@ export const useLiveTradeSocket = (accountId?: string) => {
       if (!next) return;
       shared.resumeGuardUntil = Date.now() + 2200;
       setEffectiveAccountId((prev) => (prev === next ? prev : next));
-      ensureConnected(next);
+      ensureConnected(next, true);
       void reconcileFromRest();
     };
 

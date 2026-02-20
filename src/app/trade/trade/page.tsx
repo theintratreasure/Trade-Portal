@@ -379,22 +379,32 @@ export default function TradePage() {
                         row?.close_price,
                         row?.marketPrice,
                         row?.market_price,
+                        row?.markPrice,
+                        row?.mark_price,
                         row?.ltp,
                         row?.lastPrice,
-                        row?.last_price
+                        row?.last_price,
+                        row?.bid,
+                        row?.ask
                     ) ?? openPrice;
                 const floatingPnL =
                     firstFiniteNumber(
                         row?.floatingPnL,
                         row?.floating_pnl,
+                        row?.floatingProfit,
+                        row?.floating_profit,
                         row?.profitLoss,
                         row?.profit_loss,
                         row?.unrealizedPnL,
                         row?.unrealisedPnL,
+                        row?.unrealized_pnl,
+                        row?.unrealised_pnl,
                         row?.pnl,
                         row?.profit,
-                        row?.pl
-                    ) ?? 0;
+                        row?.pl,
+                        row?.profitUsd,
+                        row?.profit_usd
+                    ) ?? Number.NaN;
                 const side: LivePosition["side"] =
                     String(row?.side ?? "BUY").toUpperCase() === "SELL" ? "SELL" : "BUY";
                 return {

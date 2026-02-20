@@ -19,12 +19,26 @@ function compactSymbol(value: string): string {
 }
 
 function buildSymbolAliases(symbol: string): string[] {
+  const aliases = new Set<string>();
+  const addAlias = (value: string) => {
+    const normalized = normalizeSymbol(value);
+    if (!normalized) return;
+    aliases.add(normalized);
+    const compact = normalized.replace(/[^A-Z0-9]/g, "");
+    if (compact) aliases.add(compact);
+  };
+
   const normalized = normalizeSymbol(symbol);
-  const aliases = new Set<string>([normalized]);
-  if (normalized.startsWith("BTC")) {
-    aliases.add(`XBT${normalized.slice(3)}`);
-  } else if (normalized.startsWith("XBT")) {
-    aliases.add(`BTC${normalized.slice(3)}`);
+  addAlias(normalized);
+  addAlias(compactSymbol(normalized));
+
+  const seed = Array.from(aliases);
+  for (const candidate of seed) {
+    if (candidate.startsWith("BTC")) {
+      addAlias(`XBT${candidate.slice(3)}`);
+    } else if (candidate.startsWith("XBT")) {
+      addAlias(`BTC${candidate.slice(3)}`);
+    }
   }
   return Array.from(aliases);
 }
@@ -39,12 +53,14 @@ const shared = {
   symbolRefCounts: new Map<string, number>(),
   symbolAliases: new Map<string, string[]>(),
   lastTickAt: new Map<string, number>(),
+  lastSocketMessageAt: 0,
   flushTimer: null as number | null,
 };
 
 const QUOTES_FAST_FLUSH_INTERVAL_MS = 20;
 const QUOTES_STALE_RESUBSCRIBE_MS = 12000;
 const QUOTES_HEALTHCHECK_MS = 4000; // udpated
+const QUOTES_SOCKET_STALE_RECONNECT_MS = 18000;
 
 function getNumber(...values: unknown[]): number | undefined {
   for (const v of values) {
@@ -84,10 +100,12 @@ function scheduleEmit() {
 function handleIncomingQuote(msg: unknown) {
   try {
     const payload = (msg ?? {}) as Record<string, unknown>;
+    shared.lastSocketMessageAt = Date.now();
     const nestedData =
       payload.data && typeof payload.data === "object"
         ? (payload.data as Record<string, unknown>)
         : undefined;
+    const messageType = String(payload.type ?? payload.event ?? "").toLowerCase();
 
     if (payload.status === "subscribed" && typeof payload.symbol === "string") {
       const sym = normalizeSymbol(payload.symbol);
@@ -145,12 +163,28 @@ function handleIncomingQuote(msg: unknown) {
       return;
     }
 
+    const resolvedSymbol = normalizeSymbol(
+      String(
+        nestedData?.code ??
+          nestedData?.symbol ??
+          nestedData?.instrument ??
+          nestedData?.pair ??
+          payload.symbol ??
+          payload.code ??
+          ""
+      )
+    );
+    const hasOrderbookArrays =
+      Array.isArray(nestedData?.bids) ||
+      Array.isArray(nestedData?.asks) ||
+      Array.isArray(payload.bids) ||
+      Array.isArray(payload.asks);
+
     if (
-      payload.type === "orderbook" &&
-      nestedData &&
-      typeof nestedData.code === "string"
+      (messageType === "orderbook" || hasOrderbookArrays) &&
+      resolvedSymbol
     ) {
-      const symbol = normalizeSymbol(nestedData.code);
+      const symbol = resolvedSymbol;
       const symbolCompact = compactSymbol(symbol);
       const aliasKeys = new Set<string>();
       for (const key of Object.keys(shared.buffer)) {
@@ -163,16 +197,36 @@ function handleIncomingQuote(msg: unknown) {
         aliasKeys.add(symbol);
       }
 
-      const bids = Array.isArray(nestedData.bids)
+      const bids = Array.isArray(nestedData?.bids)
         ? (nestedData.bids as Array<Record<string, unknown>>)
+        : Array.isArray(payload.bids)
+        ? (payload.bids as Array<Record<string, unknown>>)
         : [];
-      const asks = Array.isArray(nestedData.asks)
+      const asks = Array.isArray(nestedData?.asks)
         ? (nestedData.asks as Array<Record<string, unknown>>)
+        : Array.isArray(payload.asks)
+        ? (payload.asks as Array<Record<string, unknown>>)
         : [];
       const bid = bids[0];
       const ask = asks[0];
+      const bidPrice = getNumber(
+        bid?.price,
+        bid?.p,
+        nestedData?.bid,
+        nestedData?.bidPrice,
+        payload.bid,
+        payload.bidPrice
+      );
+      const askPrice = getNumber(
+        ask?.price,
+        ask?.p,
+        nestedData?.ask,
+        nestedData?.askPrice,
+        payload.ask,
+        payload.askPrice
+      );
 
-      if (!bid || !ask || Number(bid.price) <= 0 || Number(ask.price) <= 0) return;
+      if (!bidPrice || !askPrice || bidPrice <= 0 || askPrice <= 0) return;
 
       for (const key of aliasKeys) {
         if (!shared.buffer[key]) {
@@ -182,24 +236,24 @@ function handleIncomingQuote(msg: unknown) {
 
       const baseKey = [...aliasKeys][0];
       const old = (shared.buffer[baseKey] ?? getPlaceholder(baseKey)) as QuoteLiveState;
-      const currentPrice = Number(bid.price);
+      const currentPrice = bidPrice;
       const dayClose = typeof old.dayClose === "number" ? old.dayClose : 0;
 
       const dayHigh = getNumber(
-        nestedData.dayHigh,
-        nestedData.day_high,
-        nestedData.high,
-        nestedData.h,
+        nestedData?.dayHigh,
+        nestedData?.day_high,
+        nestedData?.high,
+        nestedData?.h,
         payload.dayHigh,
         payload.day_high,
         payload.high,
         payload.h
       );
       const dayLow = getNumber(
-        nestedData.dayLow,
-        nestedData.day_low,
-        nestedData.low,
-        nestedData.l,
+        nestedData?.dayLow,
+        nestedData?.day_low,
+        nestedData?.low,
+        nestedData?.l,
         payload.dayLow,
         payload.day_low,
         payload.low,
@@ -211,8 +265,16 @@ function handleIncomingQuote(msg: unknown) {
       const nextLow =
         dayLow ?? (typeof old.low === "number" ? Math.min(old.low, currentPrice) : currentPrice);
 
-      const tickTime = nestedData.tick_time
-        ? new Date(Number(nestedData.tick_time)).toLocaleTimeString("en-US", {
+      const tickTimeRaw = getNumber(
+        nestedData?.tick_time,
+        nestedData?.tickTime,
+        nestedData?.timestamp,
+        payload.tick_time,
+        payload.tickTime,
+        payload.timestamp
+      );
+      const tickTime = tickTimeRaw
+        ? new Date(Number(tickTimeRaw)).toLocaleTimeString("en-US", {
             hour12: false,
           })
         : undefined;
@@ -224,10 +286,14 @@ function handleIncomingQuote(msg: unknown) {
         changePercent = (change / dayClose) * 100;
       }
 
-      const nextBid = String(bid.price);
-      const nextAsk = String(ask.price);
-      const nextBidVolume = String(bid.volume ?? "--");
-      const nextAskVolume = String(ask.volume ?? "--");
+      const nextBid = String(bidPrice);
+      const nextAsk = String(askPrice);
+      const nextBidVolume = String(
+        getNumber(bid?.volume, bid?.v, nestedData?.bidVolume, payload.bidVolume) ?? "--"
+      );
+      const nextAskVolume = String(
+        getNumber(ask?.volume, ask?.v, nestedData?.askVolume, payload.askVolume) ?? "--"
+      );
       const nextBidDir =
         old.bid === "--"
           ? "same"
@@ -239,9 +305,9 @@ function handleIncomingQuote(msg: unknown) {
       const nextAskDir =
         old.ask === "--"
           ? "same"
-          : Number(ask.price) > Number(old.ask)
+          : askPrice > Number(old.ask)
           ? "up"
-          : Number(ask.price) < Number(old.ask)
+          : askPrice < Number(old.ask)
           ? "down"
           : old.askDir;
 
@@ -273,9 +339,9 @@ function handleIncomingQuote(msg: unknown) {
   }
 }
 
-function ensureSocket(token: string, accountId: string) {
+function ensureSocket(token: string, accountId: string, forceReconnect = false) {
   const normalizedAccountId = accountId || null;
-  if (shared.socket && shared.token === token) {
+  if (!forceReconnect && shared.socket && shared.token === token) {
     shared.accountId = normalizedAccountId;
     shared.socket.setAccountId(accountId || undefined);
     return;
@@ -307,6 +373,7 @@ function ensureSocket(token: string, accountId: string) {
 
   const socket = new MarketSocket();
   shared.socket = socket;
+  shared.lastSocketMessageAt = Date.now();
   socket.connect(token, handleIncomingQuote, accountId || undefined);
 
   for (const [symbol, count] of shared.symbolRefCounts) {
@@ -413,7 +480,7 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
       const next = getEffectiveAccountId();
       setAccountId((prev) => (prev === next ? prev : next));
       if (!token) return;
-      ensureSocket(token, next);
+      ensureSocket(token, next, true);
       for (const symbol of ownedSymbolsRef.current) {
         const aliases = shared.symbolAliases.get(symbol) ?? buildSymbolAliases(symbol);
         aliases.forEach((alias) => {
@@ -495,6 +562,13 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
     const timer = window.setInterval(() => {
       if (!shared.socket?.isOpen()) return;
       const now = Date.now();
+      if (
+        shared.lastSocketMessageAt > 0 &&
+        now - shared.lastSocketMessageAt > QUOTES_SOCKET_STALE_RECONNECT_MS
+      ) {
+        ensureSocket(token, accountId, true);
+        return;
+      }
       for (const symbol of ownedSymbolsRef.current) {
         const last = shared.lastTickAt.get(symbol) ?? 0;
         if (!last || now - last < QUOTES_STALE_RESUBSCRIBE_MS) continue;
@@ -508,7 +582,7 @@ export function useMarketQuotes(token?: string, extraSymbols: string[] = []) {
     }, QUOTES_HEALTHCHECK_MS);
 
     return () => window.clearInterval(timer);
-  }, [token]);
+  }, [accountId, token]);
 
   return token ? quotes : {};
 }
