@@ -25,7 +25,13 @@ export class MarketSocket {
 
     // close existing socket first (safe)
     if (this.socket) {
-      try { this.socket.close(); } catch {}
+      try {
+        this.socket.onopen = null;
+        this.socket.onmessage = null;
+        this.socket.onclose = null;
+        this.socket.onerror = null;
+        this.socket.close();
+      } catch {}
       this.socket = null;
     }
 
@@ -33,15 +39,18 @@ export class MarketSocket {
     const base = this.urlBase || getSocketBaseUrl();
     const url = `${buildSocketUrl("/market")}?token=${encoded}`;
 
+    let ws: WebSocket;
     try {
-      this.socket = new WebSocket(url || `${base}/market?token=${encoded}`);
+      ws = new WebSocket(url || `${base}/market?token=${encoded}`);
     } catch (e) {
       console.warn("[MarketSocket] websocket creation failed", e);
       this.scheduleReconnect();
       return;
     }
+    this.socket = ws;
 
-    this.socket.onopen = () => {
+    ws.onopen = () => {
+      if (this.socket !== ws) return;
       this.reconnectAttempts = 0;
       this.sentSubscriptions.clear();
       if (this.reconnectTimer) {
@@ -56,7 +65,8 @@ export class MarketSocket {
       console.debug("[MarketSocket] connected, flushed subscriptions:", Array.from(this.pendingSubscriptions));
     };
 
-    this.socket.onmessage = (ev) => {
+    ws.onmessage = (ev) => {
+      if (this.socket !== ws) return;
       try {
         const parsed = JSON.parse(ev.data);
         if (this.onMessageCb) this.onMessageCb(parsed);
@@ -65,14 +75,17 @@ export class MarketSocket {
       }
     };
 
-    this.socket.onclose = (ev) => {
+    ws.onclose = (ev) => {
+      if (this.socket !== ws) return;
       console.warn("[MarketSocket] closed", ev);
+      this.socket = null;
       if (this.shouldReconnect) {
         this.scheduleReconnect();
       }
     };
 
-    this.socket.onerror = (ev) => {
+    ws.onerror = (ev) => {
+      if (this.socket !== ws) return;
       console.warn("[MarketSocket] error", ev);
       // allow onclose to handle reconnect/backoff
     };
@@ -168,6 +181,12 @@ export class MarketSocket {
       this.reconnectTimer = null;
     }
     try {
+      if (this.socket) {
+        this.socket.onopen = null;
+        this.socket.onmessage = null;
+        this.socket.onclose = null;
+        this.socket.onerror = null;
+      }
       this.socket?.close();
     } catch {}
     this.socket = null;

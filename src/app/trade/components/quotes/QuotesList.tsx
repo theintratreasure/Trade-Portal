@@ -13,6 +13,12 @@ type Props = {
   viewMode: "advanced" | "simple";
 };
 
+const normalizeSymbol = (value: string) => String(value ?? "").trim().toUpperCase();
+const compactSymbol = (value: string) =>
+  normalizeSymbol(value)
+    .replace(/[^A-Z0-9]/g, "")
+    .replace(/^XBT/, "BTC");
+
 export default function QuotesList({ onSelect, viewMode }: Props) {
   const [token, setToken] = useState<string | undefined>(() => {
     const next = getTradeTokenFromStorageSync();
@@ -37,7 +43,6 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
   const liveQuotes = useMarketQuotes(token);
   const { data: watchlist } = useWatchlist();
 
-  const normalize = (value: string) => String(value ?? "").trim().toUpperCase();
   const hasValidBidAsk = (q: QuoteLiveState | undefined): q is QuoteLiveState => {
     if (!q) return false;
     const bid = Number(q.bid);
@@ -48,7 +53,7 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
   const watchlistSymbols = useMemo(
     () =>
       (watchlist ?? [])
-        .map((item) => normalize(item.code))
+        .map((item) => normalizeSymbol(item.code))
         .filter((symbol) => symbol.length > 0),
     [watchlist]
   );
@@ -57,7 +62,7 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
     const next = new Map<string, QuoteLiveState>();
     for (const q of Object.values(liveQuotes)) {
       if (!q || typeof q.symbol !== "string") continue;
-      const symbol = normalize(q.symbol);
+      const symbol = normalizeSymbol(q.symbol);
       if (!symbol) continue;
       if (!hasValidBidAsk(q)) continue;
       next.set(symbol, q);
@@ -66,20 +71,24 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
   }, [liveQuotes]);
 
   const rows = useMemo(() => {
-    const watchlistReady =
-      watchlistSymbols.length === 0 || watchlistSymbols.every((symbol) => quoteMap.has(symbol));
-    if (!watchlistReady) {
-      return [];
-    }
-
     const output: QuoteLiveState[] = [];
     const seen = new Set<string>();
+    const compactLookup = new Map<string, QuoteLiveState>();
+
+    for (const [symbol, q] of quoteMap.entries()) {
+      const key = compactSymbol(symbol);
+      if (!compactLookup.has(key)) {
+        compactLookup.set(key, q);
+      }
+    }
 
     for (const symbol of watchlistSymbols) {
-      const q = quoteMap.get(symbol);
+      const q = quoteMap.get(symbol) ?? compactLookup.get(compactSymbol(symbol));
       if (!q) continue;
+      const normalizedQSymbol = normalizeSymbol(q.symbol);
+      if (seen.has(normalizedQSymbol)) continue;
       output.push(q);
-      seen.add(symbol);
+      seen.add(normalizedQSymbol);
     }
 
     for (const [symbol, q] of quoteMap.entries()) {
