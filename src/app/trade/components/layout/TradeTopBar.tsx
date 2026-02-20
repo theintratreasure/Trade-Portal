@@ -54,7 +54,7 @@ export default function TradeTopBar({
   };
 
   return (
-    <header className="fixed top-0 w-full z-[666] h-14 flex items-center justify-between px-3 bg-[var(--bg-plan)] border-b border-[var(--border-soft)]">
+    <header className="h-14 w-full flex items-center justify-between px-3 bg-[var(--bg-plan)] border-b border-[var(--border-soft)] backdrop-blur">
 
       {/* LEFT */}
       <div className="flex items-center gap-3">

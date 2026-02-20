@@ -182,11 +182,11 @@ function TradeLayoutInner({
         <div className="min-h-screen mt-font mt-numbers bg-[var(--bg-plan)] md:bg-[var(--bg-card)]">
             {!isDesktop ? (
                 <div className="flex h-[100dvh] min-h-0 flex-col">
-                    <div id="trade-topbar-slot" />
+                    <div id="trade-topbar-slot" className="relative z-[666] h-14 shrink-0" />
 
                     <main
                         data-trade-main-scroll
-                        className="mt-14 min-h-0 flex-1 overflow-y-auto ios-momentum-scroll hide-scrollbar pb-[64px]"
+                        className="min-h-0 flex-1 overflow-y-auto ios-momentum-scroll hide-scrollbar pb-[64px]"
                     >
                         {children}
                     </main>

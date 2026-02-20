@@ -39,7 +39,7 @@ export default function TradeSidebar() {
   ).toUpperCase();
   const isWatchOnly = sessionTypeRaw === "WATCH";
   const ribbonLabel = isWatchOnly
-    ? "WATCH ONLY"
+    ? "READ ONLY"
     : accountTypeRaw === "demo"
       ? "DEMO"
       : accountTypeRaw === "live"
@@ -162,7 +162,7 @@ export default function TradeSidebar() {
             onClick={() => go(`${base}/history`)}
           />
 
-         
+
           <Item
             icon={Settings}
             label="Settings"
@@ -191,7 +191,7 @@ export default function TradeSidebar() {
           <Item
             icon={Info}
             label="About"
-            onClick={() => go("/about")}
+            onClick={() => window.open("https://www.alstrades.com/about", "_blank")}
           />
         </div>
       </aside >
