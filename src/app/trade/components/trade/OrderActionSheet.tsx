@@ -25,6 +25,28 @@ const formatDateTime24 = (value: string | number | Date | null | undefined) => {
     });
 };
 
+const formatOrderTypeLabel = (value: unknown) =>
+    String(value ?? "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+
+const getDecimalPlacesFromUnknown = (value: unknown): number => {
+    const raw = String(value ?? "").trim();
+    if (!raw || raw === "-" || raw === "--") return 0;
+    if (!raw.includes(".")) return 0;
+    const decimals = raw.split(".")[1] ?? "";
+    return Math.max(0, decimals.replace(/0+$/, "").length);
+};
+
+const formatPriceByPrecision = (value: unknown, precision: number, fallback = "-") => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    const safePrecision = Math.min(8, Math.max(0, precision));
+    return n.toFixed(safePrecision).replace(/\.?0+$/, "");
+};
+
 export default function OrderActionSheet({
     order,
     open,
@@ -41,6 +63,18 @@ export default function OrderActionSheet({
             ? "PLACED"
             : (statusRaw ?? "PENDING");
     const currentPriceValue = order.currentPrice ?? order.current_price ?? order.ltp ?? "-";
+    const rowPrecision = Math.min(
+        8,
+        Math.max(
+            0,
+            Math.max(
+                getDecimalPlacesFromUnknown(order.price),
+                getDecimalPlacesFromUnknown(currentPriceValue),
+                getDecimalPlacesFromUnknown(order.stopLoss),
+                getDecimalPlacesFromUnknown(order.takeProfit)
+            ) || 5
+        )
+    );
 
     return (
         <div className="fixed inset-0 z-[999] flex items-end bg-black/40 md:items-center md:justify-center">
@@ -59,12 +93,12 @@ export default function OrderActionSheet({
                                             : "text-[var(--mt-red)]"
                                     }
                                 >
-                                    {order.side} {order.volume}
+                                    {order.side} {order.volume} {formatOrderTypeLabel(order.orderType)}
                                 </span>
                             </div>
 
                             <div className="mt-price-line">
-                                {order.price} → {currentPriceValue}
+                                {formatPriceByPrecision(order.price, rowPrecision)} {"->"} {formatPriceByPrecision(currentPriceValue, rowPrecision)}
                             </div>
                         </div>
 
@@ -83,17 +117,17 @@ export default function OrderActionSheet({
 
                         <div className="flex justify-between mr-2">
                             <span>S / L:</span>
-                            <span>{order.stopLoss ?? "-"}</span>
+                            <span>{formatPriceByPrecision(order.stopLoss, rowPrecision)}</span>
                         </div>
 
                         <div className="flex justify-between mr-2">
                             <span>T / P:</span>
-                            <span>{order.takeProfit ?? "-"}</span>
+                            <span>{formatPriceByPrecision(order.takeProfit, rowPrecision)}</span>
                         </div>
 
                         <div className="flex justify-between mr-2">
-                            <span>Type:</span>
-                            <span>{order.orderType}</span>
+                            <span>Lot:</span>
+                            <span>{order.volume}</span>
                         </div>
 
                         <div className="flex justify-between mr-2">
@@ -142,3 +176,4 @@ export default function OrderActionSheet({
         </div>
     );
 }
+

@@ -103,11 +103,86 @@ export function removeLivePositionFromCache(positionId: string) {
   }
 }
 
+export function removeLivePendingFromCache(orderId: string) {
+  if (!orderId) return;
+  let changed = false;
+  if (shared.pendingMap[orderId]) {
+    delete shared.pendingMap[orderId];
+    changed = true;
+  }
+  // Defensive cleanup: some malformed payloads can use orderId as positionId.
+  if (shared.positionsMap[orderId]) {
+    delete shared.positionsMap[orderId];
+    changed = true;
+  }
+  if (changed) {
+    scheduleEmit();
+  }
+}
+
 const toNumberOrUndefined = (value: unknown): number | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
+
+const toUpperText = (value: unknown): string => String(value ?? "").trim().toUpperCase();
+const toUpperOrderType = (value: unknown): string =>
+  toUpperText(value).replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+
+function isLimitOrStopOrderType(value: unknown): boolean {
+  const t = toUpperOrderType(value);
+  return t.includes("LIMIT") || t.includes("STOP");
+}
+
+function isPendingOrderWithoutPositionId(row: Record<string, unknown>): boolean {
+  const hasPositionId = row.positionId != null || row.position_id != null;
+  if (hasPositionId) return false;
+  const hasOrderId = row.orderId != null || row.order_id != null || row.id != null || row._id != null;
+  if (!hasOrderId) return false;
+  return isLimitOrStopOrderType(row.orderType ?? row.order_type ?? row.type);
+}
+
+function isTerminalOrderStatus(status: unknown): boolean {
+  const s = toUpperText(status);
+  if (!s) return false;
+  return (
+    s === "CLOSE" ||
+    s.includes("CANCEL") ||
+    s.includes("REJECT") ||
+    s.includes("FILL") ||
+    s.includes("EXECUT") ||
+    s.includes("CLOSE") ||
+    s.includes("DELETE") ||
+    s.includes("EXPIRE") ||
+    s.includes("COMPLETE") ||
+    s.includes("TRIGGERED")
+  );
+}
+
+function isPendingLikeOrderPayload(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const row = data as Record<string, unknown>;
+
+  const status = toUpperText(row.status ?? row.orderStatus ?? row.state ?? row.order_state);
+  if (isTerminalOrderStatus(status)) return false;
+  if (
+    status === "PENDING" ||
+    status === "PLACED" ||
+    status === "OPEN" ||
+    status === "NEW" ||
+    status === "ACTIVE" ||
+    status === "TRIGGER_PENDING" ||
+    status === "WAITING" ||
+    status === "QUEUED"
+  ) {
+    return true;
+  }
+
+  if (row.pendingOrderId != null || row.pending_order_id != null) return true;
+
+  return isPendingOrderWithoutPositionId(row);
+}
 
 function normalizeLiveAccount(data: unknown): LiveAccount | null {
   if (!data || typeof data !== "object") return null;
@@ -146,16 +221,27 @@ function normalizePendingOrder(data: unknown): LivePending | null {
     row.orderId != null ||
     row.order_id != null ||
     row.pendingOrderId != null ||
-    row.symbol != null;
+    row.pending_order_id != null ||
+    row.orderType != null ||
+    row.order_type != null ||
+    row.type != null ||
+    row.orderStatus != null ||
+    row.order_state != null;
   const source =
     nestedData &&
     !hasRowOrderKeys &&
     (nestedData.orderId != null ||
       nestedData.order_id != null ||
       nestedData.pendingOrderId != null ||
-      nestedData.symbol != null)
+      nestedData.pending_order_id != null ||
+      nestedData.orderType != null ||
+      nestedData.order_type != null ||
+      nestedData.type != null ||
+      nestedData.orderStatus != null ||
+      nestedData.order_state != null)
       ? nestedData
       : row;
+  if (!isPendingLikeOrderPayload(source)) return null;
   const orderId = source.orderId ?? source.order_id ?? source.pendingOrderId ?? source.id ?? source._id;
   if (!orderId) return null;
 
@@ -181,10 +267,13 @@ function normalizePendingOrder(data: unknown): LivePending | null {
 function normalizePosition(data: unknown): LivePosition | null {
   if (!data || typeof data !== "object") return null;
   const row = data as Record<string, unknown>;
+  if (isPendingOrderWithoutPositionId(row)) return null;
+  if (isPendingLikeOrderPayload(row)) return null;
   const nestedData =
     row.data && typeof row.data === "object"
       ? (row.data as Record<string, unknown>)
       : null;
+  if (isPendingLikeOrderPayload(nestedData)) return null;
   const hasRowPositionKeys =
     row.positionId != null ||
     row.position_id != null ||
@@ -229,6 +318,11 @@ function normalizePosition(data: unknown): LivePosition | null {
       nestedData.pnl != null)
       ? nestedData
       : row;
+  if (isPendingOrderWithoutPositionId(source)) return null;
+  if (isTerminalOrderStatus(source.status ?? source.orderStatus ?? source.state ?? source.order_state)) {
+    const hasExplicitPositionId = source.positionId != null || source.position_id != null;
+    if (!hasExplicitPositionId) return null;
+  }
   const id =
     source.positionId ??
     source.position_id ??
@@ -236,6 +330,7 @@ function normalizePosition(data: unknown): LivePosition | null {
     source._id ??
     source.orderId;
   if (!id) return null;
+  const hasExplicitPositionId = source.positionId != null || source.position_id != null;
   const hasTradeShape =
     source.positionId != null ||
     source.position_id != null ||
@@ -298,14 +393,26 @@ function normalizePosition(data: unknown): LivePosition | null {
       source.profit_usd
   );
 
+  const symbol = String(source.symbol ?? source.pair ?? source.instrument ?? source.code ?? "-");
+  const volume = Number(source.volume ?? source.lot ?? source.qty ?? source.lots ?? source.size ?? 0);
+  const openPrice = rawOpenPrice ?? 0;
+  const currentPrice = rawCurrentPrice ?? rawOpenPrice ?? 0;
+  const hasMeaningfulMarketData =
+    (Number.isFinite(volume) && volume > 0) ||
+    (Number.isFinite(openPrice) && openPrice > 0) ||
+    (Number.isFinite(currentPrice) && currentPrice > 0);
+  if (!hasExplicitPositionId && (!symbol || symbol === "-" || !hasMeaningfulMarketData)) {
+    return null;
+  }
+
   return {
     accountId: String(source.accountId ?? source.account_id ?? ""),
     positionId: String(id),
-    symbol: String(source.symbol ?? source.pair ?? source.instrument ?? source.code ?? "-"),
+    symbol,
     side: String(source.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
-    volume: Number(source.volume ?? source.lot ?? source.qty ?? source.lots ?? source.size ?? 0),
-    openPrice: rawOpenPrice ?? 0,
-    currentPrice: rawCurrentPrice ?? rawOpenPrice ?? 0,
+    volume,
+    openPrice,
+    currentPrice,
     floatingPnL: rawFloatingPnL ?? Number.NaN,
     stopLoss: (source.stopLoss ?? source.stop_loss ?? null) as number | null,
     takeProfit: (source.takeProfit ?? source.take_profit ?? null) as number | null,
@@ -377,8 +484,8 @@ function mergePosition(prev: LivePosition | undefined, next: LivePosition): Live
 }
 
 function isPendingActive(status: unknown): boolean {
-  const s = String(status ?? "PENDING").toUpperCase();
-  return s === "PENDING" || s === "PLACED" || s === "OPEN";
+  if (isTerminalOrderStatus(status)) return false;
+  return true;
 }
 
 function isPositionActive(status: unknown): boolean {
@@ -506,6 +613,21 @@ function applyPendingSnapshot(items: LivePending[]) {
   scheduleEmit();
 }
 
+function applyPendingMerge(items: LivePending[]) {
+  if (items.length === 0) return;
+  const next: Record<string, LivePending> = { ...shared.pendingMap };
+  for (const item of items) {
+    if (!item.orderId) continue;
+    if (isPendingActive(item.status)) {
+      next[item.orderId] = item;
+    } else {
+      delete next[item.orderId];
+    }
+  }
+  shared.pendingMap = next;
+  scheduleEmit();
+}
+
 function snapshot(): Snapshot {
   return {
     account: shared.account,
@@ -598,9 +720,15 @@ async function reconcileFromRest() {
   if (!shared.accountId || shared.reconcileInFlight || shared.listeners.size === 0) return;
   shared.reconcileInFlight = true;
   try {
-    const { data } = await tradeApi.get("/trade/positions", {
-      params: { page: 1, limit: 200 },
-    });
+    const [positionsRes, ordersRes] = await Promise.all([
+      tradeApi.get("/trade/positions", {
+        params: { page: 1, limit: 200 },
+      }),
+      tradeApi.get("/trade/orders", {
+        params: { page: 1, limit: 200 },
+      }),
+    ]);
+    const data = positionsRes.data;
     const rows = Array.isArray(data?.positions)
       ? data.positions
       : Array.isArray(data?.data?.positions)
@@ -617,8 +745,14 @@ async function reconcileFromRest() {
     }
     // REST /trade/positions is authoritative for currently open positions.
     // Replace map with reconciled rows to prune stale/closed ghost positions.
-    if (Object.keys(next).length === 0 && Object.keys(shared.positionsMap).length > 0) return;
-    shared.positionsMap = next;
+    const shouldKeepExistingPositions =
+      Object.keys(next).length === 0 && Object.keys(shared.positionsMap).length > 0;
+    if (!shouldKeepExistingPositions) {
+      shared.positionsMap = next;
+    }
+
+    const pendingRows = parsePendingsFromUnknown(ordersRes.data);
+    applyPendingSnapshot(pendingRows);
     scheduleEmit();
   } catch {
     // ignore reconcile errors; websocket remains primary source
@@ -637,14 +771,15 @@ function ensureReconcileLoop() {
 
 function applySnapshotLikePayload(data: unknown): boolean {
   const positions = parsePositionsFromUnknown(data);
+  const pendings = parsePendingsFromUnknown(data);
+
   if (positions.length > 0) {
     applyPositionMerge(positions);
-    return true;
   }
-
-  const pendings = parsePendingsFromUnknown(data);
   if (pendings.length > 0) {
-    applyPendingSnapshot(pendings);
+    applyPendingMerge(pendings);
+  }
+  if (positions.length > 0 || pendings.length > 0) {
     return true;
   }
 
@@ -703,7 +838,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
         }
         const pendings = parsePendingsFromUnknown(message.data);
         if (pendings.length > 0) {
-          applyPendingSnapshot(pendings);
+          applyPendingMerge(pendings);
         }
         scheduleEmit();
         return;
@@ -790,7 +925,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
         message.data
       ) {
         const pendings = parsePendingsFromUnknown(message.data);
-        applyPendingSnapshot(pendings);
+        applyPendingMerge(pendings);
         return;
       }
 
@@ -813,7 +948,7 @@ function bindSocket(socket: WebSocket, accountId: string) {
         }
         const pendings = parsePendingsFromUnknown(message.data);
         if (pendings.length > 0) {
-          applyPendingSnapshot(pendings);
+          applyPendingMerge(pendings);
         }
         scheduleEmit();
       }

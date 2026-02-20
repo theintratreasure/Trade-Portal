@@ -47,12 +47,32 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
   const token = useMemo(() => getTradeTokenFromStorageSync(), []);
   const quotes = useMarketQuotes(token);
 
-  if (!open) return null;
-
   const live = symbol ? quotes[symbol] : undefined;
   const bid = Number(live?.bid ?? 0);
   const ask = Number(live?.ask ?? 0);
   const lot = Math.max(MIN_LOT, Number(lotInput || 0));
+  const pricePrecision = useMemo(() => {
+    const getDecimals = (value: unknown) => {
+      const raw = String(value ?? "").trim();
+      if (!raw || raw === "--") return 0;
+      const num = Number(raw);
+      if (!Number.isFinite(num)) return 0;
+      const decimals = raw.split(".")[1]?.replace(/0+$/, "").length ?? 0;
+      return Math.max(0, decimals);
+    };
+    const detected = Math.max(getDecimals(live?.bid), getDecimals(live?.ask));
+    return Math.min(8, Math.max(0, detected || 5));
+  }, [live?.ask, live?.bid]);
+  const priceStep = useMemo(() => {
+    if (pricePrecision <= 0) return 1;
+    return Number((1 / Math.pow(10, pricePrecision)).toFixed(pricePrecision));
+  }, [pricePrecision]);
+  const roundToPricePrecision = (value: number) => {
+    if (!Number.isFinite(value)) return 0;
+    return Number(value.toFixed(pricePrecision));
+  };
+
+  if (!open) return null;
 
   const themeColor = side === "BUY" ? "var(--mt-blue)" : "var(--mt-red)";
   const isLocked = isSubmitting || submitLockRef.current || isPending;
@@ -122,11 +142,11 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
       side,
       orderType: pendingType as PendingOrderPayload["orderType"],
       volume: lot,
-      price: Number(price),
+      price: roundToPricePrecision(Number(price)),
     };
 
-    if (sl !== "") payload.stopLoss = Number(sl);
-    if (tp !== "") payload.takeProfit = Number(tp);
+    if (sl !== "") payload.stopLoss = roundToPricePrecision(Number(sl));
+    if (tp !== "") payload.takeProfit = roundToPricePrecision(Number(tp));
 
     if (expiration === "SPECIFIED") {
       payload.expireType = "TIME";
@@ -225,7 +245,10 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
                 <input
                   type="number"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value === "" ? "" : Number(e.target.value))}
+                  step={priceStep}
+                  onChange={(e) =>
+                    setPrice(e.target.value === "" ? "" : roundToPricePrecision(Number(e.target.value)))
+                  }
                   className="mt-2 w-full px-2 py-1.5 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-md"
                 />
               </div>
@@ -236,7 +259,10 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
               <input
                 type="number"
                 value={sl}
-                onChange={(e) => setSl(e.target.value === "" ? "" : Number(e.target.value))}
+                step={priceStep}
+                onChange={(e) =>
+                  setSl(e.target.value === "" ? "" : roundToPricePrecision(Number(e.target.value)))
+                }
                 className="mt-2 w-full px-2 py-1.5 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-md"
               />
             </div>
@@ -246,7 +272,10 @@ export default function DesktopOrderModal({ open, onClose, symbol }: Props) {
               <input
                 type="number"
                 value={tp}
-                onChange={(e) => setTp(e.target.value === "" ? "" : Number(e.target.value))}
+                step={priceStep}
+                onChange={(e) =>
+                  setTp(e.target.value === "" ? "" : roundToPricePrecision(Number(e.target.value)))
+                }
                 className="mt-2 w-full px-2 py-1.5 bg-[var(--bg-plan)] border border-[var(--border-soft)] rounded-md"
               />
             </div>

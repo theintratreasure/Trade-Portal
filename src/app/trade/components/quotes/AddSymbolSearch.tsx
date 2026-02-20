@@ -20,7 +20,7 @@ type Mode = "idle" | "search" | "segment";
 const SEGMENTS = [
     { key: "FOREX", label: "Forex", },
     { key: "INDICES", label: "Indices", },
-    { key: "METAL", label: "Metals", },
+    { key: "METAL", label: "COMMODITIES", },
     { key: "CRYPTO", label: "CRYPTO", },
 ];
 

@@ -141,6 +141,31 @@ const toTrimmedPrice = (value: unknown, maxDigits = 4, fallback = "-") => {
     return n.toFixed(maxDigits).replace(/\.?0+$/, "");
 };
 
+const getDecimalPlacesFromUnknown = (value: unknown): number => {
+    const raw = String(value ?? "").trim();
+    if (!raw || raw === "-" || raw === "--") return 0;
+    if (!raw.includes(".")) return 0;
+    const decimals = raw.split(".")[1] ?? "";
+    return Math.max(0, decimals.replace(/0+$/, "").length);
+};
+
+const formatPriceByPrecision = (value: unknown, precision: number, fallback = "-") => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    const safePrecision = Math.min(8, Math.max(0, precision));
+    return n.toFixed(safePrecision).replace(/\.?0+$/, "");
+};
+
+const getPendingRowPrecision = (order: PendingOrder): number => {
+    const inferred = Math.max(
+        getDecimalPlacesFromUnknown(order.price),
+        getDecimalPlacesFromUnknown(order.currentPrice),
+        getDecimalPlacesFromUnknown(order.stopLoss),
+        getDecimalPlacesFromUnknown(order.takeProfit)
+    );
+    return Math.min(8, Math.max(0, inferred || 5));
+};
+
 const isFinitePositive = (value: number) => Number.isFinite(value) && value > 0;
 const isAlmostEqual = (a: number, b: number, epsilon = 1e-9) => Math.abs(a - b) <= epsilon;
 const firstFiniteNumber = (...values: unknown[]): number | undefined => {
@@ -150,6 +175,64 @@ const firstFiniteNumber = (...values: unknown[]): number | undefined => {
     }
     return undefined;
 };
+
+const toUpperText = (value: unknown) => String(value ?? "").trim().toUpperCase();
+const formatOrderTypeLabel = (value: unknown) =>
+    String(value ?? "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
+
+function isLimitOrStopOrderType(value: unknown): boolean {
+    const orderType = toUpperText(value).replace(/[_-]+/g, " ");
+    return orderType.includes("LIMIT") || orderType.includes("STOP");
+}
+
+function isPendingOrderWithoutPositionId(row: Record<string, unknown>): boolean {
+    const hasPositionId = row?.positionId != null || row?.position_id != null;
+    if (hasPositionId) return false;
+    const hasOrderId = row?.orderId != null || row?.order_id != null || row?.id != null || row?._id != null;
+    if (!hasOrderId) return false;
+    return isLimitOrStopOrderType(row?.orderType ?? row?.order_type ?? row?.type);
+}
+
+function isTerminalOrderStatus(status: unknown): boolean {
+    const s = toUpperText(status);
+    if (!s) return false;
+    return (
+        s === "CLOSE" ||
+        s.includes("CANCEL") ||
+        s.includes("REJECT") ||
+        s.includes("FILL") ||
+        s.includes("EXECUT") ||
+        s.includes("CLOSE") ||
+        s.includes("DELETE") ||
+        s.includes("EXPIRE") ||
+        s.includes("COMPLETE") ||
+        s.includes("TRIGGERED")
+    );
+}
+
+function isPendingLikeOrderRow(row: Record<string, unknown>): boolean {
+    const status = toUpperText(row?.status ?? row?.orderStatus ?? row?.state ?? row?.order_state);
+    if (isTerminalOrderStatus(status)) return false;
+    if (
+        status === "PENDING" ||
+        status === "PLACED" ||
+        status === "OPEN" ||
+        status === "NEW" ||
+        status === "ACTIVE" ||
+        status === "TRIGGER_PENDING" ||
+        status === "WAITING" ||
+        status === "QUEUED"
+    ) {
+        return true;
+    }
+    if (row?.pendingOrderId != null || row?.pending_order_id != null) return true;
+
+    return isPendingOrderWithoutPositionId(row);
+}
 
 const isLikelyResumeNoise = (prev: LivePosition, next: LivePosition) => {
     const prevCurrent = Number(prev.currentPrice);
@@ -185,6 +268,8 @@ const getAccountIdFromUnknown = (value: unknown): string | undefined => {
 };
 
 function isActivePositionRow(row: Record<string, unknown>): boolean {
+    if (isPendingOrderWithoutPositionId(row)) return false;
+    if (isPendingLikeOrderRow(row)) return false;
     const status = String(
         row?.status ?? row?.state ?? row?.positionStatus ?? row?.position_status ?? "OPEN"
     ).toUpperCase();
@@ -264,7 +349,19 @@ export default function TradePage() {
                 ? ordersRes.data.orders
                 : Array.isArray(ordersRes.data?.data?.orders)
                     ? ordersRes.data.data.orders
-                    : [];
+                    : Array.isArray(ordersRes.data?.pendingOrders)
+                        ? ordersRes.data.pendingOrders
+                        : Array.isArray(ordersRes.data?.data?.pendingOrders)
+                            ? ordersRes.data.data.pendingOrders
+                            : Array.isArray(ordersRes.data?.pending)
+                                ? ordersRes.data.pending
+                                : Array.isArray(ordersRes.data?.data?.pending)
+                                    ? ordersRes.data.data.pending
+                                    : Array.isArray(ordersRes.data?.liveOrders)
+                                        ? ordersRes.data.liveOrders
+                                        : Array.isArray(ordersRes.data?.data?.liveOrders)
+                                            ? ordersRes.data.data.liveOrders
+                                            : [];
 
             return {
                 account: accountRow,
@@ -473,14 +570,9 @@ export default function TradePage() {
     }, [accountId, positions, restFallback, resumeGuardActive]);
 
     const socketOrRestPending = useMemo(() => {
-        if (pending.length > 0) return pending;
-
         const rows = Array.isArray(restFallback?.orders) ? restFallback.orders : [];
-        return rows
-            .filter((row: Record<string, unknown>) => {
-                const status = String(row?.status ?? "").toUpperCase();
-                return status === "PENDING" || status === "PLACED" || status === "OPEN";
-            })
+        const restPending: PendingOrder[] = rows
+            .filter((row: Record<string, unknown>) => isPendingLikeOrderRow(row))
             .map((row: Record<string, unknown>) => ({
                 orderId: String(row?.orderId ?? row?.id ?? row?._id ?? ""),
                 symbol: String(row?.symbol ?? "-"),
@@ -491,9 +583,24 @@ export default function TradePage() {
                 stopLoss: (row?.stopLoss ?? null) as number | null,
                 takeProfit: (row?.takeProfit ?? null) as number | null,
                 createdAt: Number(new Date(String(row?.openTime ?? row?.createdAt ?? 0)).getTime()),
-                currentPrice: undefined,
+                currentPrice: null,
                 status: String(row?.status ?? "PENDING"),
             }));
+
+        const merged = new Map<string, PendingOrder>();
+        for (const item of restPending) {
+            if (!item.orderId) continue;
+            if (isTerminalOrderStatus(item.status)) continue;
+            merged.set(item.orderId, item);
+        }
+        for (const item of pending) {
+            if (!item.orderId) continue;
+            if (isTerminalOrderStatus(item.status)) continue;
+            const normalized: PendingOrder = { ...item };
+            const prev = merged.get(item.orderId);
+            merged.set(item.orderId, prev ? { ...prev, ...normalized } : normalized);
+        }
+        return Array.from(merged.values());
     }, [pending, restFallback]);
 
     const [displayPositionsSource, setDisplayPositionsSource] = useState<LivePosition[]>([]);
@@ -1020,7 +1127,9 @@ export default function TradePage() {
 
                                 {/* Rows */}
                                 {pendingWithLive.length > 0 ? (
-                                    pendingWithLive.map((order) => (
+                                    pendingWithLive.map((order) => {
+                                        const rowPrecision = getPendingRowPrecision(order);
+                                        return (
                                         <div
                                             key={order.orderId}
                                             className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
@@ -1043,18 +1152,20 @@ export default function TradePage() {
                                                         : "text-[var(--mt-red)]"
                                                 }
                                             >
-                                                {order.orderType}
+                                                {formatOrderTypeLabel(order.orderType)}
                                             </div>
 
-                                            <div>{order.volume}</div>
+                                            <div>
+                                                {order.volume} {formatOrderTypeLabel(order.orderType)}
+                                            </div>
 
-                                            <div>{order.price}</div>
+                                            <div>{formatPriceByPrecision(order.price, rowPrecision)}</div>
 
-                                            <div>{order.stopLoss ?? "-"}</div>
+                                            <div>{formatPriceByPrecision(order.stopLoss, rowPrecision)}</div>
 
-                                            <div>{order.takeProfit ?? "-"}</div>
+                                            <div>{formatPriceByPrecision(order.takeProfit, rowPrecision)}</div>
 
-                                            <div>{order.currentPrice ?? "-"}</div>
+                                            <div>{formatPriceByPrecision(order.currentPrice, rowPrecision)}</div>
 
                                             <div className="text-right font-semibold text-[var(--text-muted)]">
                                                 {(order.status ?? order.orderStatus ?? order.state ?? "PENDING")
@@ -1112,7 +1223,8 @@ export default function TradePage() {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))
+                                        );
+                                    })
                                 ) : (
                                     <div className="text-center py-8 text-[var(--text-muted)]">
                                         No Pending Orders

@@ -37,46 +37,59 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
   const liveQuotes = useMarketQuotes(token);
   const { data: watchlist } = useWatchlist();
 
-  const rows = useMemo(() => {
-    const normalize = (value: string) => String(value ?? "").trim().toUpperCase();
-    const watchlistSymbols = (watchlist ?? [])
-      .map((item) => normalize(item.code))
-      .filter((symbol) => symbol.length > 0);
+  const normalize = (value: string) => String(value ?? "").trim().toUpperCase();
+  const hasValidBidAsk = (q: QuoteLiveState | undefined): q is QuoteLiveState => {
+    if (!q) return false;
+    const bid = Number(q.bid);
+    const ask = Number(q.ask);
+    return Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > 0;
+  };
 
-    const quoteMap = new Map<string, QuoteLiveState>();
+  const watchlistSymbols = useMemo(
+    () =>
+      (watchlist ?? [])
+        .map((item) => normalize(item.code))
+        .filter((symbol) => symbol.length > 0),
+    [watchlist]
+  );
+
+  const quoteMap = useMemo(() => {
+    const next = new Map<string, QuoteLiveState>();
     for (const q of Object.values(liveQuotes)) {
       if (!q || typeof q.symbol !== "string") continue;
       const symbol = normalize(q.symbol);
       if (!symbol) continue;
-      quoteMap.set(symbol, q);
+      if (!hasValidBidAsk(q)) continue;
+      next.set(symbol, q);
     }
+    return next;
+  }, [liveQuotes]);
 
-    const ensurePlaceholder = (symbol: string): QuoteLiveState => ({
-      symbol,
-      bid: "--",
-      ask: "--",
-      bidVolume: "--",
-      askVolume: "--",
-      bidDir: "same",
-      askDir: "same",
-    });
+  const rows = useMemo(() => {
+    const watchlistReady =
+      watchlistSymbols.length === 0 || watchlistSymbols.every((symbol) => quoteMap.has(symbol));
+    if (!watchlistReady) {
+      return [];
+    }
 
     const output: QuoteLiveState[] = [];
     const seen = new Set<string>();
 
     for (const symbol of watchlistSymbols) {
-      output.push(quoteMap.get(symbol) ?? ensurePlaceholder(symbol));
+      const q = quoteMap.get(symbol);
+      if (!q) continue;
+      output.push(q);
       seen.add(symbol);
     }
 
-    for (const [symbol, quote] of quoteMap.entries()) {
+    for (const [symbol, q] of quoteMap.entries()) {
       if (seen.has(symbol)) continue;
-      output.push(quote);
+      output.push(q);
       seen.add(symbol);
     }
 
     return output;
-  }, [liveQuotes, watchlist]);
+  }, [quoteMap, watchlistSymbols]);
 
   return (
     <div className="pb-[64px] overflow-x-hidden">

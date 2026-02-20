@@ -2,6 +2,7 @@
 
 import { Toast } from "@/app/components/ui/Toast";
 import { useCancelPendingOrder } from "@/hooks/useCancelPendingOrder";
+import { removeLivePendingFromCache } from "@/hooks/useLiveTradeSocket";
 import { useState } from "react";
 
 type DeleteOrderModalProps = {
@@ -18,6 +19,11 @@ export default function DeleteOrderModal({
     
     const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
     const { mutate, isPending } = useCancelPendingOrder();
+    const orderTypeLabel = String(order?.orderType ?? "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
 
     if (!open || !order) return null;
 
@@ -33,7 +39,7 @@ export default function DeleteOrderModal({
                 <div className="text-sm mb-6">
                     Delete order: #{order.orderId.slice(0, 10)}{" "}
                     {order.side?.toLowerCase()}{" "}
-                    {order.orderType?.toLowerCase()} <br />
+                    {orderTypeLabel} <br />
                     {order.volume} {order.symbol} at {order.price}?
                 </div>
 
@@ -48,6 +54,7 @@ export default function DeleteOrderModal({
                         onClick={() => {
                            mutate(order.orderId, {
     onSuccess: (res: any) => {
+        removeLivePendingFromCache(String(order.orderId ?? ""));
         setToast({
             type: "success",
             message: res?.message || "Order deleted successfully",

@@ -106,7 +106,7 @@ export default function DashboardLayout({
     <>
     <KycReminderModal kycStatus={user?.kycStatus} />
     <div
-      className={`relative h-screen overflow-hidden text-[var(--text-main)] ${isTradePage ? "bg-[var(--bg-plan)]" : "bg-[var(--bg-main)]"
+      className={`relative h-[100dvh] overflow-hidden text-[var(--text-main)] ${isTradePage ? "bg-[var(--bg-plan)]" : "bg-[var(--bg-main)]"
         }`}
     >
       {/* Background blobs */}
@@ -139,7 +139,7 @@ export default function DashboardLayout({
 
           {/* CONTENT â€” ONLY THIS SCROLLS */}
           <main
-            className={`flex-1 overflow-y-auto ${isTradePage ? "p-0" : "p-2 md:p-4"
+            className={`flex-1 overflow-y-auto ios-momentum-scroll ${isTradePage ? "p-0" : "p-2 md:p-4"
               }`}
           >
             {children}

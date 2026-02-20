@@ -12,7 +12,7 @@ export default function DepositPage() {
   const { data, isLoading } = useActivePaymentMethods();
 
   return (
-    <div className="space-y-4 md:space-y-6 p-2 md:p-6 pb-24 md:pb-6">
+    <div className="space-y-4 md:space-y-6 p-2 md:p-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6">
       <h1 className="text-2xl font-semibold">Deposit funds</h1>
 
       {isLoading ? (
@@ -52,7 +52,7 @@ export default function DepositPage() {
   </div>
 
 </div>
-      <div className="mt-8">
+      <div className="mt-8 ios-momentum-scroll">
   <h2 className="text-lg font-semibold">Deposit History</h2>
   <DepositHistory />
 </div>

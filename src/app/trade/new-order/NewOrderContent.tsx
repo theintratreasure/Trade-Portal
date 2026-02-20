@@ -94,7 +94,6 @@ export default function NewOrderPage() {
     const [processingSide, setProcessingSide] = useState<"BUY" | "SELL" | null>(null);
     const [isOrderSubmitting, setIsOrderSubmitting] = useState(false);
 
-    const STEP = 0.0001; // adjust per symbol
     const marketMutation = useMarketOrder();
     const pendingMutation = usePendingOrder();
     const selectedType = search.get("type");
@@ -220,6 +219,29 @@ export default function NewOrderPage() {
         return (bid + ask) / 2;
     }, [live?.bid, live?.ask]);
 
+    const pricePrecision = useMemo(() => {
+        const getDecimals = (value: unknown) => {
+            const raw = String(value ?? "").trim();
+            if (!raw || raw === "--") return 0;
+            const num = Number(raw);
+            if (!Number.isFinite(num)) return 0;
+            const decimals = raw.split(".")[1]?.replace(/0+$/, "").length ?? 0;
+            return Math.max(0, decimals);
+        };
+        const detected = Math.max(getDecimals(live?.bid), getDecimals(live?.ask));
+        return Math.min(8, Math.max(0, detected || 5));
+    }, [live?.ask, live?.bid]);
+
+    const priceStep = useMemo(() => {
+        if (pricePrecision <= 0) return 1;
+        return Number((1 / Math.pow(10, pricePrecision)).toFixed(pricePrecision));
+    }, [pricePrecision]);
+
+    const roundToPricePrecision = (value: number) => {
+        if (!Number.isFinite(value)) return 0;
+        return Number(value.toFixed(pricePrecision));
+    };
+
     const stepButtons = useMemo(() => {
         if (!midPrice) return [];
         if (midPrice < 1) return [-0.5, -0.1, -0.01, 0.01, 0.1, 0.5];
@@ -322,6 +344,7 @@ export default function NewOrderPage() {
         if (isOrderSubmitting || !symbol || volume <= 0 || price === "") return;
 
         setIsOrderSubmitting(true);
+        const releaseSubmitLock = () => setIsOrderSubmitting(false);
 
         const mapOrderType = {
             "BUY LIMIT": "BUY_LIMIT",
@@ -333,7 +356,10 @@ export default function NewOrderPage() {
         const apiOrderType =
             mapOrderType[orderType as keyof typeof mapOrderType];
 
-        if (!apiOrderType) return;
+        if (!apiOrderType) {
+            releaseSubmitLock();
+            return;
+        }
 
         const side: "BUY" | "SELL" =
             orderType.includes("BUY") ? "BUY" : "SELL";
@@ -343,18 +369,18 @@ export default function NewOrderPage() {
             symbol,
             side,
             orderType: apiOrderType,
-            price: Number(price),
+            price: roundToPricePrecision(Number(price)),
             volume: Number(volume),
         };
 
         // Optional SL
         if (sl !== "") {
-            payload.stopLoss = Number(sl);
+            payload.stopLoss = roundToPricePrecision(Number(sl));
         }
 
         // Optional TP
         if (tp !== "") {
-            payload.takeProfit = Number(tp);
+            payload.takeProfit = roundToPricePrecision(Number(tp));
         }
 
         // Expiration logic
@@ -364,6 +390,7 @@ export default function NewOrderPage() {
                     type: "error",
                     message: "Please select expiration date",
                 });
+                releaseSubmitLock();
                 return;
             }
 
@@ -677,8 +704,8 @@ export default function NewOrderPage() {
                                 className="text-[var(--mt-blue)] text-xl font-bold"
                                 onClick={() => {
                                     const base = price === "" ? Number(live?.bid ?? 0) : price;
-                                    const value = Math.max(0, base - STEP);
-                                    setPrice(Number(value.toFixed(5)));
+                                    const value = Math.max(0, base - priceStep);
+                                    setPrice(roundToPricePrecision(value));
                                 }}
                             >
                                 −
@@ -689,7 +716,7 @@ export default function NewOrderPage() {
                                 type="number"
                                 value={price === "" ? "" : price}
                                 min="0"
-                                step="0.00001"
+                                step={priceStep}
                                 onChange={(e) => {
                                     const val = e.target.value;
 
@@ -700,7 +727,7 @@ export default function NewOrderPage() {
 
                                     const num = Number(val);
                                     if (!isNaN(num) && num >= 0) {
-                                        setPrice(num);
+                                        setPrice(roundToPricePrecision(num));
                                     }
                                 }}
                                 placeholder="Price"
@@ -712,8 +739,8 @@ export default function NewOrderPage() {
                                 className="text-[var(--mt-blue)] text-xl font-bold"
                                 onClick={() => {
                                     const base = price === "" ? Number(live?.ask ?? 0) : price;
-                                    const value = base + STEP;
-                                    setPrice(Number(value.toFixed(5)));
+                                    const value = base + priceStep;
+                                    setPrice(roundToPricePrecision(value));
                                 }}
                             >
                                 +
@@ -737,10 +764,10 @@ export default function NewOrderPage() {
                             onClick={() => {
                                 const value =
                                     sl === ""
-                                        ? Number(live?.bid ?? 0) - STEP
-                                        : sl - STEP;
+                                        ? Number(live?.bid ?? 0) - priceStep
+                                        : sl - priceStep;
 
-                                setSl(Number(value.toFixed(5)));
+                                setSl(roundToPricePrecision(value));
                             }}
 
                         >
@@ -751,7 +778,7 @@ export default function NewOrderPage() {
                             type="number"
                             value={sl === "" ? "" : sl}
                             min="0"
-                            step="0.00001"
+                            step={priceStep}
                             onChange={(e) => {
                                 const val = e.target.value;
 
@@ -762,7 +789,7 @@ export default function NewOrderPage() {
 
                                 const num = Number(val);
                                 if (!isNaN(num) && num >= 0) {
-                                    setSl(num);
+                                    setSl(roundToPricePrecision(num));
                                 }
                             }}
                             placeholder="SL"
@@ -774,10 +801,10 @@ export default function NewOrderPage() {
                             onClick={() => {
                                 const value =
                                     sl === ""
-                                        ? Number(live?.bid ?? 0) + STEP
-                                        : sl + STEP;
+                                        ? Number(live?.bid ?? 0) + priceStep
+                                        : sl + priceStep;
 
-                                setSl(Number(value.toFixed(5)));
+                                setSl(roundToPricePrecision(value));
                             }}
 
                         >
@@ -796,10 +823,10 @@ export default function NewOrderPage() {
                             onClick={() => {
                                 const value =
                                     tp === ""
-                                        ? Number(live?.bid ?? 0) - STEP
-                                        : tp - STEP;
+                                        ? Number(live?.bid ?? 0) - priceStep
+                                        : tp - priceStep;
 
-                                setTp(Number(value.toFixed(5)));
+                                setTp(roundToPricePrecision(value));
                             }}
                         >
                             −
@@ -807,9 +834,9 @@ export default function NewOrderPage() {
 
                         <input
                             type="number"
-                            value={tp}
+                            value={tp === "" ? "" : tp}
                             min="0"
-                            step="0.00001"
+                            step={priceStep}
                             onChange={(e) => {
                                 const val = e.target.value;
 
@@ -820,7 +847,7 @@ export default function NewOrderPage() {
 
                                 const num = Number(val);
                                 if (!isNaN(num) && num >= 0) {
-                                    setTp(num);
+                                    setTp(roundToPricePrecision(num));
                                 }
                             }}
 
@@ -833,10 +860,10 @@ export default function NewOrderPage() {
                             onClick={() => {
                                 const value =
                                     tp === ""
-                                        ? Number(live?.bid ?? 0) + STEP
-                                        : tp + STEP;
+                                        ? Number(live?.bid ?? 0) + priceStep
+                                        : tp + priceStep;
 
-                                setTp(Number(value.toFixed(5)));
+                                setTp(roundToPricePrecision(value));
                             }}
 
                         >

@@ -118,7 +118,7 @@ export default function OpenAccountPage() {
   const currentStep = !selectedPlan ? 2 : 3;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] pb-28 md:pb-24">
+    <div className="min-h-screen bg-[var(--bg-main)] pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-24">
       <div className="mx-auto w-full max-w-5xl px-2.5 pt-3 min-[360px]:px-3 min-[360px]:pt-4 md:px-6 md:pt-6">
         <button
           onClick={() => router.back()}
@@ -280,7 +280,7 @@ export default function OpenAccountPage() {
               <h2 className="text-sm font-semibold min-[360px]:text-base">Account Created Successfully</h2>
             </div>
 
-            <div className="max-h-[70vh] space-y-3 overflow-y-auto p-4">
+            <div className="max-h-[70vh] space-y-3 overflow-y-auto ios-momentum-scroll p-4">
               <InfoField label="Account Number" value={createdAccount.account_number} />
               <InfoField label="Account Type" value={createdAccount.account_type} />
               <InfoField label="Plan Name" value={createdAccount.plan_name} />

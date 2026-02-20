@@ -56,6 +56,13 @@ const LongPressRow = ({
   );
 };
 
+const formatOrderTypeLabel = (value: unknown) =>
+  String(value ?? "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
 const HistoryTabs = memo(
   ({
     activeTab,
@@ -708,7 +715,7 @@ export default function TradeHistory() {
 
                           <div className="mt-price-line">
                             {order.qty.toFixed(2)} / {order.qty.toFixed(2)} at{" "}
-                            {order.orderType.toLowerCase()}
+                            {formatOrderTypeLabel(order.orderType)}
                           </div>
                         </div>
 
@@ -778,7 +785,7 @@ export default function TradeHistory() {
                             <div>{formatDateTime24(order.openTime)}</div>
                             <div className="font-semibold">{order.symbol ?? "-"}</div>
                             <div className={String(order.side).toUpperCase() === "BUY" ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
-                              {order.orderType ?? "-"}
+                              {formatOrderTypeLabel(order.orderType) || "-"}
                             </div>
                             <div>{Number(order.qty ?? 0).toFixed(2)}</div>
                             <div>{Number(order.price ?? 0).toFixed(2)}</div>
