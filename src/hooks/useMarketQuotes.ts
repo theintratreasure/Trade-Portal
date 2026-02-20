@@ -44,7 +44,7 @@ const shared = {
 
 const QUOTES_FAST_FLUSH_INTERVAL_MS = 20;
 const QUOTES_STALE_RESUBSCRIBE_MS = 12000;
-const QUOTES_HEALTHCHECK_MS = 4000;
+const QUOTES_HEALTHCHECK_MS = 4000; // udpated
 
 function getNumber(...values: unknown[]): number | undefined {
   for (const v of values) {
