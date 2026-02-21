@@ -19,6 +19,36 @@ const compactSymbol = (value: string) =>
     .replace(/[^A-Z0-9]/g, "")
     .replace(/^XBT/, "BTC");
 
+const hasValidBidAsk = (q: QuoteLiveState | undefined): q is QuoteLiveState => {
+  if (!q) return false;
+  const bid = Number(q.bid);
+  const ask = Number(q.ask);
+  return Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > 0;
+};
+
+const getFallbackPrice = (q: QuoteLiveState): number | undefined => {
+  const dayClose = Number(q.dayClose);
+  if (Number.isFinite(dayClose) && dayClose > 0) return dayClose;
+  const high = Number(q.high);
+  if (Number.isFinite(high) && high > 0) return high;
+  const low = Number(q.low);
+  if (Number.isFinite(low) && low > 0) return low;
+  return undefined;
+};
+
+const normalizeForDisplay = (q: QuoteLiveState): QuoteLiveState => {
+  if (hasValidBidAsk(q)) return q;
+  const fallback = getFallbackPrice(q);
+  if (!fallback) return q;
+  const next = { ...q };
+  const fallbackText = String(fallback);
+  if (!Number.isFinite(Number(next.bid)) || Number(next.bid) <= 0) next.bid = fallbackText;
+  if (!Number.isFinite(Number(next.ask)) || Number(next.ask) <= 0) next.ask = fallbackText;
+  if (typeof next.high !== "number") next.high = fallback;
+  if (typeof next.low !== "number") next.low = fallback;
+  return next;
+};
+
 export default function QuotesList({ onSelect, viewMode }: Props) {
   const [token, setToken] = useState<string | undefined>(() => {
     const next = getTradeTokenFromStorageSync();
@@ -43,13 +73,6 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
   const liveQuotes = useMarketQuotes(token);
   const { data: watchlist } = useWatchlist();
 
-  const hasValidBidAsk = (q: QuoteLiveState | undefined): q is QuoteLiveState => {
-    if (!q) return false;
-    const bid = Number(q.bid);
-    const ask = Number(q.ask);
-    return Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > 0;
-  };
-
   const watchlistSymbols = useMemo(
     () =>
       (watchlist ?? [])
@@ -64,8 +87,7 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
       if (!q || typeof q.symbol !== "string") continue;
       const symbol = normalizeSymbol(q.symbol);
       if (!symbol) continue;
-      if (!hasValidBidAsk(q)) continue;
-      next.set(symbol, q);
+      next.set(symbol, normalizeForDisplay(q));
     }
     return next;
   }, [liveQuotes]);
@@ -83,8 +105,18 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
     }
 
     for (const symbol of watchlistSymbols) {
-      const q = quoteMap.get(symbol) ?? compactLookup.get(compactSymbol(symbol));
-      if (!q) continue;
+      const q =
+        quoteMap.get(symbol) ??
+        compactLookup.get(compactSymbol(symbol)) ??
+        ({
+          symbol,
+          bid: "--",
+          ask: "--",
+          bidVolume: "--",
+          askVolume: "--",
+          bidDir: "same",
+          askDir: "same",
+        } as QuoteLiveState);
       const normalizedQSymbol = normalizeSymbol(q.symbol);
       if (seen.has(normalizedQSymbol)) continue;
       output.push(q);

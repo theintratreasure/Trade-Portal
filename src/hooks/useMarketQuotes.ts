@@ -71,6 +71,10 @@ function getNumber(...values: unknown[]): number | undefined {
   return undefined;
 }
 
+function isPositiveNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 function getPlaceholder(symbol: string): QuoteLiveState {
   const normalized = normalizeSymbol(symbol);
   return {
@@ -144,6 +148,16 @@ function handleIncomingQuote(msg: unknown) {
         nestedData?.dayClose,
         nestedData?.day_close
       );
+      const curBidNum = Number(cur.bid);
+      const curAskNum = Number(cur.ask);
+      const hasLiveBidAsk =
+        Number.isFinite(curBidNum) &&
+        curBidNum > 0 &&
+        Number.isFinite(curAskNum) &&
+        curAskNum > 0;
+      const subscribeFallbackPrice = isPositiveNumber(dayCloseNum)
+        ? String(dayCloseNum)
+        : undefined;
 
       shared.buffer[sym] = {
         ...cur,
@@ -151,10 +165,10 @@ function handleIncomingQuote(msg: unknown) {
         low: dayLow ?? cur.low,
         dayOpen: dayOpen ?? cur.dayOpen,
         dayClose: dayCloseNum ?? cur.dayClose,
-        // Keep bid/ask untouched on subscribe ack. Real tradable prices must come
-        // from orderbook ticks; using dayClose here causes brief PnL spikes.
-        bid: cur.bid,
-        ask: cur.ask,
+        // On subscribe ack (often when market is closed), use dayClose as a display fallback
+        // if live bid/ask is unavailable. Real orderbook ticks still override this immediately.
+        bid: hasLiveBidAsk ? cur.bid : subscribeFallbackPrice ?? cur.bid,
+        ask: hasLiveBidAsk ? cur.ask : subscribeFallbackPrice ?? cur.ask,
         bidDir: "same",
         askDir: "same",
       };
@@ -179,9 +193,38 @@ function handleIncomingQuote(msg: unknown) {
       Array.isArray(nestedData?.asks) ||
       Array.isArray(payload.bids) ||
       Array.isArray(payload.asks);
+    const directBidPrice = getNumber(
+      nestedData?.bid,
+      nestedData?.bidPrice,
+      nestedData?.best_bid,
+      nestedData?.bestBid,
+      nestedData?.b,
+      payload.bid,
+      payload.bidPrice,
+      payload.best_bid,
+      payload.bestBid,
+      payload.b
+    );
+    const directAskPrice = getNumber(
+      nestedData?.ask,
+      nestedData?.askPrice,
+      nestedData?.best_ask,
+      nestedData?.bestAsk,
+      nestedData?.a,
+      payload.ask,
+      payload.askPrice,
+      payload.best_ask,
+      payload.bestAsk,
+      payload.a
+    );
+    const hasDirectBidAsk = isPositiveNumber(directBidPrice) || isPositiveNumber(directAskPrice);
 
     if (
-      (messageType === "orderbook" || hasOrderbookArrays) &&
+      (messageType === "orderbook" ||
+        messageType === "quote" ||
+        messageType === "ticker" ||
+        hasOrderbookArrays ||
+        hasDirectBidAsk) &&
       resolvedSymbol
     ) {
       const symbol = resolvedSymbol;
@@ -214,19 +257,29 @@ function handleIncomingQuote(msg: unknown) {
         bid?.p,
         nestedData?.bid,
         nestedData?.bidPrice,
+        nestedData?.best_bid,
+        nestedData?.bestBid,
+        nestedData?.b,
         payload.bid,
-        payload.bidPrice
+        payload.bidPrice,
+        payload.best_bid,
+        payload.bestBid,
+        payload.b
       );
       const askPrice = getNumber(
         ask?.price,
         ask?.p,
         nestedData?.ask,
         nestedData?.askPrice,
+        nestedData?.best_ask,
+        nestedData?.bestAsk,
+        nestedData?.a,
         payload.ask,
-        payload.askPrice
+        payload.askPrice,
+        payload.best_ask,
+        payload.bestAsk,
+        payload.a
       );
-
-      if (!bidPrice || !askPrice || bidPrice <= 0 || askPrice <= 0) return;
 
       for (const key of aliasKeys) {
         if (!shared.buffer[key]) {
@@ -236,7 +289,24 @@ function handleIncomingQuote(msg: unknown) {
 
       const baseKey = [...aliasKeys][0];
       const old = (shared.buffer[baseKey] ?? getPlaceholder(baseKey)) as QuoteLiveState;
-      const currentPrice = bidPrice;
+      const oldBid = Number(old.bid);
+      const oldAsk = Number(old.ask);
+      let nextBidPrice = isPositiveNumber(bidPrice)
+        ? bidPrice
+        : Number.isFinite(oldBid) && oldBid > 0
+        ? oldBid
+        : undefined;
+      let nextAskPrice = isPositiveNumber(askPrice)
+        ? askPrice
+        : Number.isFinite(oldAsk) && oldAsk > 0
+        ? oldAsk
+        : undefined;
+
+      if (!nextBidPrice && nextAskPrice) nextBidPrice = nextAskPrice;
+      if (!nextAskPrice && nextBidPrice) nextAskPrice = nextBidPrice;
+      if (!nextBidPrice || !nextAskPrice) return;
+
+      const currentPrice = nextBidPrice;
       const dayClose = typeof old.dayClose === "number" ? old.dayClose : 0;
 
       const dayHigh = getNumber(
@@ -286,8 +356,8 @@ function handleIncomingQuote(msg: unknown) {
         changePercent = (change / dayClose) * 100;
       }
 
-      const nextBid = String(bidPrice);
-      const nextAsk = String(askPrice);
+      const nextBid = String(nextBidPrice);
+      const nextAsk = String(nextAskPrice);
       const nextBidVolume = String(
         getNumber(bid?.volume, bid?.v, nestedData?.bidVolume, payload.bidVolume) ?? "--"
       );
@@ -305,9 +375,9 @@ function handleIncomingQuote(msg: unknown) {
       const nextAskDir =
         old.ask === "--"
           ? "same"
-          : askPrice > Number(old.ask)
+          : nextAskPrice > Number(old.ask)
           ? "up"
-          : askPrice < Number(old.ask)
+          : nextAskPrice < Number(old.ask)
           ? "down"
           : old.askDir;
 
