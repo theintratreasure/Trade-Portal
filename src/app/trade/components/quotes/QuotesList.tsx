@@ -49,6 +49,11 @@ const normalizeForDisplay = (q: QuoteLiveState): QuoteLiveState => {
   return next;
 };
 
+const canRenderQuoteRow = (q: QuoteLiveState): boolean => {
+  if (hasValidBidAsk(q)) return true;
+  return typeof getFallbackPrice(q) === "number";
+};
+
 export default function QuotesList({ onSelect, viewMode }: Props) {
   const [token, setToken] = useState<string | undefined>(() => {
     const next = getTradeTokenFromStorageSync();
@@ -87,7 +92,9 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
       if (!q || typeof q.symbol !== "string") continue;
       const symbol = normalizeSymbol(q.symbol);
       if (!symbol) continue;
-      next.set(symbol, normalizeForDisplay(q));
+      const normalized = normalizeForDisplay(q);
+      if (!canRenderQuoteRow(normalized)) continue;
+      next.set(symbol, normalized);
     }
     return next;
   }, [liveQuotes]);
@@ -105,18 +112,8 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
     }
 
     for (const symbol of watchlistSymbols) {
-      const q =
-        quoteMap.get(symbol) ??
-        compactLookup.get(compactSymbol(symbol)) ??
-        ({
-          symbol,
-          bid: "--",
-          ask: "--",
-          bidVolume: "--",
-          askVolume: "--",
-          bidDir: "same",
-          askDir: "same",
-        } as QuoteLiveState);
+      const q = quoteMap.get(symbol) ?? compactLookup.get(compactSymbol(symbol));
+      if (!q) continue;
       const normalizedQSymbol = normalizeSymbol(q.symbol);
       if (seen.has(normalizedQSymbol)) continue;
       output.push(q);
