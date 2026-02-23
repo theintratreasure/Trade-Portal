@@ -98,7 +98,7 @@ export default function KycPage() {
         upload.mutateAsync({ file: selfie, folder: "kyc/selfie" }),
       ]);
 
-      submitKyc.mutate({
+      const submittedKyc = await submitKyc.mutateAsync({
         documentType,
         documents: {
           front: frontImg,
@@ -107,7 +107,13 @@ export default function KycPage() {
         },
       });
 
-      setToast({ message: "KYC submitted successfully", type: "success" });
+      setToast({
+        message:
+          submittedKyc.status === "PENDING"
+            ? "KYC submitted successfully. Verification is pending."
+            : "KYC submitted successfully",
+        type: "success",
+      });
       setFront(null);
       setBack(null);
       setSelfie(null);

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { submitKyc, getMyKyc } from "@/services/kyc.service";
 import { SubmitKycPayload, KycResponse } from "@/types/kyc";
 
@@ -9,7 +9,14 @@ export const useMyKyc = () =>
     retry: false,
   });
 
-export const useSubmitKyc = () =>
-  useMutation<KycResponse, Error, SubmitKycPayload>({
+export const useSubmitKyc = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<KycResponse, Error, SubmitKycPayload>({
     mutationFn: submitKyc,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["my-kyc"], data);
+      queryClient.invalidateQueries({ queryKey: ["my-kyc"] });
+    },
   });
+};
