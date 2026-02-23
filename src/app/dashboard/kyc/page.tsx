@@ -262,43 +262,45 @@ function UploadState(props: {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2.5 md:gap-4">
-      {props.rejectionReason && (
-        <div className="space-y-1.5">
-          <StatusPill icon={<XCircle size={14} />} text={`Rejected: ${props.rejectionReason}`} color="error" />
-          <p className="text-[10px] text-[var(--text-muted)] md:text-[11px]">
-            Please upload clear photos with all corners visible.
-          </p>
+      <div className="ios-momentum-scroll min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1 md:space-y-4">
+        {props.rejectionReason && (
+          <div className="space-y-1.5">
+            <StatusPill icon={<XCircle size={14} />} text={`Rejected: ${props.rejectionReason}`} color="error" />
+            <p className="text-[10px] text-[var(--text-muted)] md:text-[11px]">
+              Please upload clear photos with all corners visible.
+            </p>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-2">
+          <Select
+            label="Document type"
+            value={props.documentType}
+            onChange={(val) => props.setDocumentType(val as KycDocumentType)}
+            options={[
+              { label: "Passport", value: "PASSPORT" },
+              { label: "National ID", value: "NIC" },
+              { label: "Driving License", value: "DRIVING_LICENSE" },
+            ]}
+          />
         </div>
-      )}
 
-      <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-2">
-        <Select
-          label="Document type"
-          value={props.documentType}
-          onChange={(val) => props.setDocumentType(val as KycDocumentType)}
-          options={[
-            { label: "Passport", value: "PASSPORT" },
-            { label: "National ID", value: "NIC" },
-            { label: "Driving License", value: "DRIVING_LICENSE" },
-          ]}
+        <UploadRow
+          front={props.frontPreview}
+          back={props.backPreview}
+          selfie={props.selfiePreview}
+          setFront={props.setFront}
+          setBack={props.setBack}
+          setSelfie={props.setSelfie}
+          loading={props.submitting}
+          onError={props.onError}
         />
-      </div>
 
-      <UploadRow
-        front={props.frontPreview}
-        back={props.backPreview}
-        selfie={props.selfiePreview}
-        setFront={props.setFront}
-        setBack={props.setBack}
-        setSelfie={props.setSelfie}
-        loading={props.submitting}
-        onError={props.onError}
-      />
+        <CompactTips />
 
-      <CompactTips />
-
-      <div className="rounded-xl border border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(37,99,235,0.08),rgba(15,23,42,0.03))] px-3 py-1.5 text-[10px] text-[var(--text-muted)] md:text-[11px]">
-        Uploaded <span className="font-semibold text-[var(--text-main)]">{completeCount}/3</span> | Front and Selfie required
+        <div className="rounded-xl border border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(37,99,235,0.08),rgba(15,23,42,0.03))] px-3 py-1.5 text-[10px] text-[var(--text-muted)] md:text-[11px]">
+          Uploaded <span className="font-semibold text-[var(--text-main)]">{completeCount}/3</span> | Front and Selfie required
+        </div>
       </div>
 
       <button
