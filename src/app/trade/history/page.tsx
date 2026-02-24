@@ -361,6 +361,7 @@ export default function TradeHistory() {
     ? [
       { label: "Profit", value: summary.totalPnL.toFixed(2), raw: summary.totalPnL },
       { label: "Deposit", value: summary.totalDeposit.toFixed(2) },
+      { label: "Withdrawal", value: `-${Number(summary.totalWithdraw ?? 0).toFixed(2)}` },
       { label: "Swap", value: summary.totalSwap.toFixed(2) },
       { label: "Commission", value: summary.totalCommission.toFixed(2) },
       { label: "Balance", value: summary.balance.toFixed(2) },
@@ -368,6 +369,15 @@ export default function TradeHistory() {
     : [];
 
   const symbolOrderSummary = useMemo(() => {
+    const apiSummary = ordersPages?.pages.find((page) => page?.summary)?.summary;
+    if (apiSummary) {
+      return {
+        totalOrders: Number(apiSummary.totalOrders ?? 0),
+        totalFilled: Number(apiSummary.totalFilled ?? 0),
+        totalCancelled: Number(apiSummary.totalCancelled ?? 0),
+      };
+    }
+
     const totalOrders = allOrders.length;
     const totalFilled = allOrders.filter((o: any) =>
       ["FILLED", "CLOSED"].includes(String(o.status).toUpperCase())
@@ -377,7 +387,7 @@ export default function TradeHistory() {
     ).length;
 
     return { totalOrders, totalFilled, totalCancelled };
-  }, [allOrders]);
+  }, [allOrders, ordersPages]);
 
   const symbolDropdownRef = useRef<HTMLDivElement | null>(null);
   const sideDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -756,7 +766,7 @@ export default function TradeHistory() {
               <div className="hidden md:block">
                 <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
-                    <div className="font-semibold text-[14px]">Orders ({allOrders.length})</div>
+                    <div className="font-semibold text-[14px]">Orders ({symbolOrderSummary.totalOrders})</div>
                   </div>
                   <div className="w-full overflow-x-auto">
                     <div className="min-w-[980px] w-full">
@@ -843,12 +853,15 @@ export default function TradeHistory() {
                     />
 
                     <span
-                      className={`font-semibold whitespace-nowrap ${row.label === "Profit"
-                        ? row.raw >= 0
-                          ? "text-[var(--mt-blue)]"
-                          : "text-[var(--mt-red)]"
-                        : ""
-                        }`}
+                      className={`font-semibold whitespace-nowrap ${
+                        row.label === "Profit"
+                          ? row.raw >= 0
+                            ? "text-[var(--mt-blue)]"
+                            : "text-[var(--mt-red)]"
+                          : row.label === "Withdrawal"
+                            ? "text-[var(--mt-red)]"
+                            : ""
+                      }`}
                     >
                       {row.value}
                     </span>
@@ -981,6 +994,36 @@ export default function TradeHistory() {
               </div>
 
               <div className="hidden md:block">
+                <div className="space-y-[6px] mb-3">
+                  {positionSummary.map((row) => (
+                    <div key={row.label} className="flex items-center gap-2">
+                      <span className="font-semibold whitespace-nowrap">{row.label}:</span>
+                      <span
+                        className="flex-1 h-[6px] translate-y-[5px]"
+                        style={{
+                          backgroundImage:
+                            "radial-gradient(circle, rgba(156,163,175,0.35) .5px, transparent 1.6px)",
+                          backgroundSize: "8px 6px",
+                          backgroundRepeat: "repeat-x",
+                          backgroundPosition: "left center",
+                        }}
+                      />
+                      <span
+                        className={`font-semibold whitespace-nowrap ${
+                          row.label === "Profit"
+                            ? row.raw >= 0
+                              ? "text-[var(--mt-blue)]"
+                              : "text-[var(--mt-red)]"
+                            : row.label === "Withdrawal"
+                              ? "text-[var(--mt-red)]"
+                              : ""
+                        }`}
+                      >
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
                 <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
                     <div className="font-semibold text-[14px]">Positions ({allPositions.length})</div>
@@ -1077,12 +1120,15 @@ export default function TradeHistory() {
                     />
 
                     <span
-                      className={`font-semibold whitespace-nowrap ${row.label === "Profit"
-                        ? row.raw >= 0
-                          ? "text-[var(--mt-blue)]"
-                          : "text-[var(--mt-red)]"
-                        : ""
-                        }`}
+                      className={`font-semibold whitespace-nowrap ${
+                        row.label === "Profit"
+                          ? row.raw >= 0
+                            ? "text-[var(--mt-blue)]"
+                            : "text-[var(--mt-red)]"
+                          : row.label === "Withdrawal"
+                            ? "text-[var(--mt-red)]"
+                            : ""
+                      }`}
                     >
                       {row.value}
                     </span>
@@ -1200,6 +1246,36 @@ export default function TradeHistory() {
               </div>
 
               <div className="hidden md:block">
+                <div className="space-y-[6px] mb-3">
+                  {positionSummary.map((row) => (
+                    <div key={row.label} className="flex items-center gap-2">
+                      <span className="font-semibold whitespace-nowrap">{row.label}:</span>
+                      <span
+                        className="flex-1 h-[6px] translate-y-[5px]"
+                        style={{
+                          backgroundImage:
+                            "radial-gradient(circle, rgba(156,163,175,0.35) .5px, transparent 1.6px)",
+                          backgroundSize: "8px 6px",
+                          backgroundRepeat: "repeat-x",
+                          backgroundPosition: "left center",
+                        }}
+                      />
+                      <span
+                        className={`font-semibold whitespace-nowrap ${
+                          row.label === "Profit"
+                            ? row.raw >= 0
+                              ? "text-[var(--mt-blue)]"
+                              : "text-[var(--mt-red)]"
+                            : row.label === "Withdrawal"
+                              ? "text-[var(--mt-red)]"
+                              : ""
+                        }`}
+                      >
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
                 <div className="bg-[var(--bg-card)] border border-[var(--border-soft)] rounded-md overflow-hidden shadow-sm">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)] bg-[var(--bg-glass)]">
                     <div className="font-semibold text-[14px]">Deals ({allDeals.length})</div>

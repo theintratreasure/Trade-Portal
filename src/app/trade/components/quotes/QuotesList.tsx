@@ -40,7 +40,7 @@ const normalizeForDisplay = (q: QuoteLiveState): QuoteLiveState => {
   if (hasValidBidAsk(q)) return q;
   const fallback = getFallbackPrice(q);
   if (!fallback) return q;
-  const next = { ...q };
+  const next = { ...(q as QuoteLiveState) };
   const fallbackText = String(fallback);
   if (!Number.isFinite(Number(next.bid)) || Number(next.bid) <= 0) next.bid = fallbackText;
   if (!Number.isFinite(Number(next.ask)) || Number(next.ask) <= 0) next.ask = fallbackText;
