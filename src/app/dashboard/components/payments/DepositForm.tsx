@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import Select from "@/app/components/ui/Select";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { Toast } from "@/app/components/ui/Toast";
+import SuccessModal from "@/app/components/ui/SuccessModal";
 
 import { useCreateDeposit } from "@/hooks/deposits/useCreateDeposit";
 import { useMyAccounts } from "@/hooks/useMyAccounts";
@@ -49,6 +50,7 @@ export default function DepositForm() {
   const [error, setError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const proofUploadPromiseRef = useRef<Promise<CloudinaryUploadResult> | null>(null);
 
@@ -360,8 +362,7 @@ export default function DepositForm() {
       });
 
       resetForm();
-      setToast({ message: "Deposit submitted successfully", type: "success" });
-      setTimeout(() => setToast(null), 3000);
+      setShowSuccessModal(true);
     } catch (err: unknown) {
       const row = err as { response?: { data?: { message?: string } }; message?: string };
       setError(row?.response?.data?.message || row?.message || "Deposit failed. Please try again.");
@@ -574,6 +575,15 @@ export default function DepositForm() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {showSuccessModal && (
+        <SuccessModal
+          title="Deposit Submitted Successfully"
+          message="Your deposit request has been submitted. It will be added and credited to your account once approved."
+          actionLabel="Okay"
+          onAction={() => setShowSuccessModal(false)}
+          onClose={() => setShowSuccessModal(false)}
+        />
+      )}
     </>
   );
 }

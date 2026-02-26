@@ -7,6 +7,7 @@ import Select from "@/app/components/ui/Select";
 import { PremiumInput } from "@/app/components/ui/TextInput";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { Toast } from "@/app/components/ui/Toast";
+import SuccessModal from "@/app/components/ui/SuccessModal";
 import { useSearchParams } from "next/navigation";
 
 export default function WithdrawForm() {
@@ -17,6 +18,7 @@ export default function WithdrawForm() {
 
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
 
     const [form, setForm] = useState<any>({
         accountId: "",
@@ -60,10 +62,7 @@ export default function WithdrawForm() {
                 amount: Number(form.amount),
             });
 
-            setToast({
-                message: "Withdrawal request submitted successfully",
-                type: "success",
-            });
+            setShowSuccessModal(true);
 
             setForm({ accountId: "", amount: "", method: "UPI", payout: {} });
 
@@ -209,6 +208,15 @@ export default function WithdrawForm() {
             )}
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            {showSuccessModal && (
+                <SuccessModal
+                    title="Withdrawal Submitted Successfully"
+                    message="Your withdrawal request has been submitted successfully. Funds will be transferred to your selected payout method once approved."
+                    actionLabel="Okay"
+                    onAction={() => setShowSuccessModal(false)}
+                    onClose={() => setShowSuccessModal(false)}
+                />
+            )}
         </div>
     );
 }

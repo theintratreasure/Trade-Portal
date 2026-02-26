@@ -15,6 +15,7 @@ import { useMyKyc, useSubmitKyc } from "@/hooks/useKyc";
 import { useCloudinaryUpload } from "@/hooks/useCloudinaryUpload";
 import { KycDocumentType, KycImage } from "@/types/kyc";
 import { Toast } from "@/app/components/ui/Toast";
+import SuccessModal from "@/app/components/ui/SuccessModal";
 import KycFaq from "../components/kyc/KycFaq";
 import Select from "@/app/components/ui/Select";
 
@@ -56,6 +57,7 @@ export default function KycPage() {
   const [selfie, setSelfie] = useState<File | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const uploadingRef = useRef(false);
 
@@ -107,13 +109,11 @@ export default function KycPage() {
         },
       });
 
-      setToast({
-        message:
-          submittedKyc.status === "PENDING"
-            ? "KYC submitted successfully. Verification is pending."
-            : "KYC submitted successfully",
-        type: "success",
-      });
+      setSuccessMessage(
+        submittedKyc.status === "PENDING"
+          ? "Your KYC was submitted successfully. Verification is now pending."
+          : "Your KYC was submitted successfully."
+      );
       setFront(null);
       setBack(null);
       setSelfie(null);
@@ -199,6 +199,13 @@ export default function KycPage() {
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {successMessage && (
+        <SuccessModal
+          title="KYC Submitted Successfully"
+          message={successMessage}
+          onClose={() => setSuccessMessage(null)}
+        />
+      )}
     </div>
   );
 }
@@ -428,13 +435,47 @@ function UploadCard({
   onError?: (message: string) => void;
 }) {
   const hasImage = Boolean(image);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const openPicker = () => {
+    if (disabled) return;
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      return;
+    }
+    inputRef.current?.click();
+  };
 
   return (
-    <label
+    <div
+      role={disabled ? undefined : "button"}
+      tabIndex={disabled ? -1 : 0}
+      onPointerDown={(e) => {
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        isDraggingRef.current = false;
+      }}
+      onPointerMove={(e) => {
+        if (!dragStartRef.current) return;
+        const dx = Math.abs(e.clientX - dragStartRef.current.x);
+        const dy = Math.abs(e.clientY - dragStartRef.current.y);
+        if (dx > 8 || dy > 8) isDraggingRef.current = true;
+      }}
+      onPointerUp={() => {
+        dragStartRef.current = null;
+      }}
+      onClick={openPicker}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openPicker();
+        }
+      }}
       className={`group relative flex aspect-[1/1] flex-col overflow-hidden rounded-2xl border bg-[var(--bg-glass)] transition ${
         disabled
           ? "cursor-default border-[var(--border-soft)] opacity-70"
-          : "cursor-pointer border-[var(--border-soft)] hover:-translate-y-0.5 hover:border-[var(--primary)] hover:shadow-[0_12px_20px_var(--primary-glow)]"
+          : "cursor-pointer border-[var(--border-soft)] touch-pan-y hover:-translate-y-0.5 hover:border-[var(--primary)] hover:shadow-[0_12px_20px_var(--primary-glow)]"
       }`}
       style={{
         animation: "fadeUp 0.36s ease forwards",
@@ -501,8 +542,9 @@ function UploadCard({
 
       {!disabled && (
         <input
+          ref={inputRef}
           type="file"
-          hidden
+          className="hidden"
           accept="image/*"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -520,7 +562,7 @@ function UploadCard({
           }}
         />
       )}
-    </label>
+    </div>
   );
 }
 
