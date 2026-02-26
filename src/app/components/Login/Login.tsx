@@ -1,6 +1,6 @@
 "use client";
 import { getFcmToken } from "@/lib/getFcmToken";
-import { JSX, useEffect, useState } from "react";
+import { JSX, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   User,
@@ -64,6 +64,8 @@ export default function LoginPage() {
     otp: "",
     newPassword: "",
   });
+  const identityInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const updateForm = (key: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -220,6 +222,23 @@ export default function LoginPage() {
       },
     });
   };
+
+  const handleLoginFieldEnter =
+    (fieldKey: keyof FormState) =>
+      (e: KeyboardEvent<HTMLInputElement>) => {
+        if (step !== "login" || e.key !== "Enter") return;
+
+        e.preventDefault();
+
+        if (fieldKey === "identity") {
+          passwordInputRef.current?.focus();
+          return;
+        }
+
+        if (fieldKey === "password" && !isSubmitting) {
+          handleLogin();
+        }
+      };
 
 
 
@@ -406,6 +425,20 @@ export default function LoginPage() {
                     updateForm(field.key, v)
                   }
                   icon={field.icon}
+                  inputRef={
+                    step === "login"
+                      ? field.key === "identity"
+                        ? identityInputRef
+                        : field.key === "password"
+                        ? passwordInputRef
+                        : undefined
+                      : undefined
+                  }
+                  onKeyDown={
+                    step === "login"
+                      ? handleLoginFieldEnter(field.key)
+                      : undefined
+                  }
                 />
               ))}
             </div>

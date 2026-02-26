@@ -1,7 +1,7 @@
 "use client";
 
 import { LucideIcon, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { KeyboardEventHandler, Ref, useState } from "react";
 
 type PremiumInputProps = {
   label: string;
@@ -9,7 +9,9 @@ type PremiumInputProps = {
   value: string;
   onChange: (v: string) => void;
   icon?: LucideIcon;
-  required?: boolean | undefined
+  required?: boolean | undefined;
+  inputRef?: Ref<HTMLInputElement>;
+  onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
 };
 
 export function PremiumInput({
@@ -19,6 +21,8 @@ export function PremiumInput({
   onChange,
   icon: Icon,
   required = false,
+  inputRef,
+  onKeyDown,
 }: PremiumInputProps) {
   const filled = value.length > 0;
   const [showPassword, setShowPassword] = useState(false);
@@ -36,10 +40,12 @@ export function PremiumInput({
       )}
 
       <input
+        ref={inputRef}
         type={inputType}
         value={value}
         required={required}  
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
         className={`
           peer w-full rounded-lg border border-[var(--border-glass)]
           bg-[var(--bg-card)] px-3 ${Icon ? "pl-9" : "pl-3"}

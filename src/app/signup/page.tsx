@@ -17,7 +17,7 @@ import BackButton from "../components/ui/BackButton";
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SignupPageFallback />}>
       <SignupContent />
     </Suspense>
   );
@@ -34,6 +34,7 @@ function SignupContent() {
     () => countries?.[0] ?? null,
     [countries]
   );
+  const countriesReady = !!defaultCountry;
 
   const [country, setCountry] = useState<Country | null>(null);
   const [step, setStep] = useState<"signup" | "verify">("signup");
@@ -55,8 +56,6 @@ function SignupContent() {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   };
-
-  if (!countries || !defaultCountry) return null;
 
   const isPasswordValid = (password: string) =>
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,16}$/.test(password);
@@ -144,10 +143,21 @@ function SignupContent() {
             />
 
             <div className="flex gap-2">
-              <CountrySelect
-                value={country ?? defaultCountry}
-                onChange={setCountry}
-              />
+              {defaultCountry ? (
+                <CountrySelect
+                  value={country ?? defaultCountry}
+                  onChange={setCountry}
+                />
+              ) : (
+                <div
+                  className="
+                    flex w-28 items-center rounded-lg border border-[var(--border-glass)]
+                    bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-muted)]
+                  "
+                >
+                  +--
+                </div>
+              )}
 
               <input
                 type="tel"
@@ -194,15 +204,19 @@ function SignupContent() {
 
             <button
               onClick={handleSignup}
-              disabled={signup.isPending}
+              disabled={signup.isPending || !countriesReady}
               className="
                 w-full rounded-lg py-3 font-medium text-[var(--text-main)]
                 bg-[var(--primary)]
                 hover:shadow-[0_0_30px_var(--primary-glow)]
-                transition
+                transition disabled:opacity-70 disabled:cursor-not-allowed
               "
             >
-              {signup.isPending ? "Sending Mail..." : "Create account"}
+              {signup.isPending
+                ? "Sending Mail..."
+                : countriesReady
+                ? "Create account"
+                : "Loading..."}
             </button>
           </>
         )}
@@ -255,6 +269,22 @@ function SignupContent() {
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function SignupPageFallback() {
+  return (
+    <div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-main)] px-4">
+      <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-[var(--primary)] opacity-20 blur-3xl" />
+      <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-indigo-500 opacity-20 blur-3xl" />
+      <div className="relative w-full max-w-md rounded-2xl border border-[var(--border-glass)] bg-[var(--bg-card)] backdrop-blur-xl shadow-2xl p-6 space-y-4">
+        <div className="h-8 w-44 rounded bg-white/10" />
+        <div className="h-4 w-56 rounded bg-white/10" />
+        <div className="h-11 w-full rounded-lg bg-white/10" />
+        <div className="h-11 w-full rounded-lg bg-white/10" />
+        <div className="h-11 w-full rounded-lg bg-white/10" />
+      </div>
     </div>
   );
 }
