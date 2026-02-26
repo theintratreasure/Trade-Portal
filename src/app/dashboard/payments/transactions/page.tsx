@@ -28,37 +28,60 @@ export default function TransactionsPage() {
     fromDate: fromDate || undefined,
   });
 
+  const visibleTransactions = (data?.data ?? []).filter((tx) => String(tx.type).toUpperCase() !== "SWAP");
+
+  const formatDateDDMMYYYY = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "-";
+    return new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(parsed);
+  };
+
+  const handleResetDate = () => {
+    setPage(1);
+    setFromDate("");
+  };
+
   return (
     <div className="p-2 md:p-6 space-y-4 md:space-y-6">
 
       {/* HEADER + FILTERS */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card)]/90 backdrop-blur-xl p-4 md:p-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 
-        <h1 className="text-2xl md:text-3xl font-semibold text-[var(--text-main)]">
-          Transaction History
-        </h1>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-
-          <div className="w-full sm:w-44">
-            <Select
-              options={typeOptions}
-              value={type}
-              onChange={(v) => {
-                setPage(1);
-                setType(v);
-              }}
-            />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold text-[var(--text-main)]">
+              Transaction History
+            </h1>
+            <p className="text-xs md:text-sm text-[var(--text-muted)] mt-1">
+              Filter and review all account transactions
+            </p>
           </div>
 
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => {
-              setPage(1);
-              setFromDate(e.target.value);
-            }}
-            className="
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+
+            <div className="w-full sm:w-48">
+              <Select
+                options={typeOptions}
+                value={type}
+                onChange={(v) => {
+                  setPage(1);
+                  setType(v);
+                }}
+              />
+            </div>
+
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setPage(1);
+                setFromDate(e.target.value);
+              }}
+              className="
               rounded-xl
               border border-[var(--border-soft)]
               bg-[var(--bg-card)]
@@ -67,7 +90,20 @@ export default function TransactionsPage() {
               focus:outline-none focus:ring-2 focus:ring-[var(--primary)]
               transition
             "
-          />
+            />
+
+            <button
+              onClick={handleResetDate}
+              disabled={!fromDate}
+              className="
+                rounded-xl border border-[var(--border-soft)] px-4 py-2 text-sm font-medium
+                bg-[var(--bg-glass)] text-[var(--text-main)] transition
+                hover:bg-[var(--primary)]/10 disabled:opacity-50 disabled:cursor-not-allowed
+              "
+            >
+              Reset Date
+            </button>
+          </div>
         </div>
       </div>
 
@@ -75,8 +111,9 @@ export default function TransactionsPage() {
       <div className="
         rounded-2xl
         border border-[var(--border-soft)]
-        bg-[var(--bg-card)]
-        shadow-[0_10px_30px_rgba(0,0,0,0.05)]
+        bg-[var(--bg-card)]/95
+        backdrop-blur-xl
+        shadow-[0_16px_40px_rgba(0,0,0,0.08)]
         overflow-hidden
       ">
         <div className="hidden md:block overflow-x-auto">
@@ -85,41 +122,49 @@ export default function TransactionsPage() {
 
             <thead className="bg-[var(--bg-glass)] text-[var(--text-muted)]">
               <tr>
-                <th className="px-3 py-3 text-left">Type</th>
-                <th className="px-3 py-3 text-left">Amount No</th>
-                <th className="px-3 py-3 text-left">Amount</th>
-                <th className="px-3 py-3 text-left">Status</th>
-                <th className="px-3 py-3 text-left">Balance</th>
-                <th className="px-3 py-3 text-left">Date</th>
+                <th className="px-4 py-3 text-left font-semibold">Type</th>
+                <th className="px-4 py-3 text-left font-semibold">Account No</th>
+                <th className="px-4 py-3 text-left font-semibold">Amount</th>
+                <th className="px-4 py-3 text-left font-semibold">Status</th>
+                <th className="px-4 py-3 text-left font-semibold">Balance</th>
+                <th className="px-4 py-3 text-left font-semibold">Date</th>
               </tr>
             </thead>
 
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-[var(--text-muted)]">
+                  <td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">
                     Loading...
                   </td>
                 </tr>
               )}
 
-              {data?.data.map((tx) => (
+              {!isLoading && visibleTransactions.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                    No transactions found for selected filters.
+                  </td>
+                </tr>
+              )}
+
+              {visibleTransactions.map((tx) => (
                 <tr
                   key={tx._id}
-                  className="border-t border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition"
+                  className="border-t border-[var(--border-soft)] hover:bg-[var(--bg-glass)]/70 transition"
                 >
-                  <td className="px-3 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
+                  <td className="px-4 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
                     {tx.type}
                   </td>
-                  <td className="px-3 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
+                  <td className="px-4 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
                     {tx.accountNumber}
                   </td>
 
-                  <td className="px-3 py-3 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap font-medium">
                     $ {tx.amount.toLocaleString()}
                   </td>
 
-                  <td className="px-3 py-3">
+                  <td className="px-4 py-3">
                     <span
                       className={`
                         px-2 py-1 rounded-full text-[10px] md:text-xs font-semibold
@@ -136,12 +181,12 @@ export default function TransactionsPage() {
                     </span>
                   </td>
 
-                  <td className="px-3 py-3 whitespace-nowrap">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     $ {tx.balanceAfter.toLocaleString()}
                   </td>
 
-                  <td className="px-3 py-3 text-[var(--text-muted)] whitespace-nowrap">
-                    {new Date(tx.createdAt).toLocaleDateString()}
+                  <td className="px-4 py-3 text-[var(--text-muted)] whitespace-nowrap">
+                    {formatDateDDMMYYYY(tx.createdAt)}
                   </td>
                 </tr>
               ))}
@@ -157,10 +202,16 @@ export default function TransactionsPage() {
             </div>
           )}
 
-          {!isLoading && data?.data?.map((tx) => (
+          {!isLoading && visibleTransactions.length === 0 && (
+            <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-3 text-sm text-[var(--text-muted)] text-center">
+              No transactions found for selected filters.
+            </div>
+          )}
+
+          {!isLoading && visibleTransactions.map((tx) => (
             <div
               key={tx._id}
-              className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-3 space-y-2"
+              className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)]/80 p-3 space-y-2"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -191,7 +242,7 @@ export default function TransactionsPage() {
                 </div>
                 <div className="col-span-2">
                   <p className="text-[var(--text-muted)]">Date</p>
-                  <p className="font-medium">{new Date(tx.createdAt).toLocaleString()}</p>
+                  <p className="font-medium">{formatDateDDMMYYYY(tx.createdAt)}</p>
                 </div>
               </div>
             </div>

@@ -3,7 +3,6 @@
 import { useMyAccounts } from "@/hooks/useMyAccounts";
 import { useUserMe } from "@/hooks/useUser";
 import {
-  LayoutDashboard,
   Wallet,
   ArrowLeftRight,
   Layers,
@@ -22,9 +21,8 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import type { ComponentType } from "react";
 
 const items = [
-  { label: "Overview", icon: LayoutDashboard, href: "/dashboard" },
+  { label: "Accounts", icon: Landmark, href: "/dashboard/accounts" },
   { label: "Assets", icon: Wallet, href: "/dashboard/assets" },
-  { label: "Account", icon: Landmark, href: "/dashboard/accounts" },
 ];
 
 const paymentItems = [
@@ -201,11 +199,7 @@ export default function Sidebar({
             <NavButton
               key={item.label}
               {...item}
-              active={
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href)
-              }
+              active={pathname.startsWith(item.href)}
               onClick={() => {
                 navigateTo(item.href);
               }}

@@ -89,9 +89,11 @@ export default function PaymentMethodCard({ method }: { method: PaymentMethod })
 
                     {method.type === "BANK" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {method.bank_name ? <CopyField label="Bank Name" value={method.bank_name} /> : null}
                             <CopyField label="Account Name" value={method.account_name!} />
                             <CopyField label="Account Number" value={method.account_number!} />
                             <CopyField label="IFSC Code" value={method.ifsc!} />
+                            {method.swift_code ? <CopyField label="Swift Code" value={method.swift_code} /> : null}
                         </div>
                     )}
 

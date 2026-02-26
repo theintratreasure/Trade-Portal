@@ -9,6 +9,7 @@ export interface PaymentMethod {
   account_name?: string;
   account_number?: string;
   ifsc?: string;
+  swift_code?: string;
   crypto_network?: string;
   crypto_address?: string;
   international_name?: string;

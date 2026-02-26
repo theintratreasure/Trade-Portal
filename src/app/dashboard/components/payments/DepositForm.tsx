@@ -117,6 +117,10 @@ export default function DepositForm() {
     () => methodOptions.find((opt) => opt.value === selectedMethodKey) || methodOptions[0],
     [methodOptions, selectedMethodKey]
   );
+  const selectedPaymentMethod = useMemo(
+    () => paymentMethods.find((pm: PaymentMethod) => pm._id === selectedMethodOption?.value),
+    [paymentMethods, selectedMethodOption?.value]
+  );
 
   const method = selectedMethodOption?.method || "INTERNATIONAL";
   const sourceCurrency: CurrencyCode = selectedMethodOption?.sourceCurrency || "USDT";
@@ -408,6 +412,39 @@ export default function DepositForm() {
           <label className="text-sm font-medium text-[var(--text-main)]">Payment Method</label>
           <Select value={selectedMethodOption?.value || ""} onChange={setSelectedMethodKey} options={methodOptions} />
         </div>
+
+        {method === "BANK" && selectedPaymentMethod && (
+          <div className="mb-4 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] p-3 text-xs text-[var(--text-muted)]">
+            <p className="mb-2 font-semibold text-[var(--text-main)]">Bank Transfer Details</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {selectedPaymentMethod.bank_name ? (
+                <p>
+                  Bank: <span className="font-medium text-[var(--text-main)]">{selectedPaymentMethod.bank_name}</span>
+                </p>
+              ) : null}
+              {selectedPaymentMethod.account_name ? (
+                <p>
+                  A/C Name: <span className="font-medium text-[var(--text-main)]">{selectedPaymentMethod.account_name}</span>
+                </p>
+              ) : null}
+              {selectedPaymentMethod.account_number ? (
+                <p>
+                  A/C No: <span className="font-medium text-[var(--text-main)]">{selectedPaymentMethod.account_number}</span>
+                </p>
+              ) : null}
+              {selectedPaymentMethod.ifsc ? (
+                <p>
+                  IFSC: <span className="font-medium text-[var(--text-main)]">{selectedPaymentMethod.ifsc}</span>
+                </p>
+              ) : null}
+              {selectedPaymentMethod.swift_code ? (
+                <p>
+                  Swift: <span className="font-medium text-[var(--text-main)]">{selectedPaymentMethod.swift_code}</span>
+                </p>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {method === "CRYPTO" && (
           <div className="mb-4 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-glass)] px-3 py-2 text-xs text-[var(--text-muted)]">
