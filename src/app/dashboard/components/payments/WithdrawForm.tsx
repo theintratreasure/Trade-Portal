@@ -8,12 +8,13 @@ import { PremiumInput } from "@/app/components/ui/TextInput";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { Toast } from "@/app/components/ui/Toast";
 import SuccessModal from "@/app/components/ui/SuccessModal";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function WithdrawForm() {
     const { data: accounts = [] } = useMyAccounts();
     const { mutateAsync, isPending } = useCreateWithdrawal();
     const searchParams = useSearchParams();
+    const router = useRouter();
     const liveAccounts = accounts.filter((acc: any) => acc.account_type === "live");
 
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -213,8 +214,8 @@ export default function WithdrawForm() {
                     title="Withdrawal Submitted Successfully"
                     message="Your withdrawal request has been submitted successfully. Funds will be transferred to your selected payout method once approved."
                     actionLabel="Okay"
-                    onAction={() => setShowSuccessModal(false)}
-                    onClose={() => setShowSuccessModal(false)}
+                    onAction={() => router.push("/dashboard/accounts")}
+                    onClose={() => router.push("/dashboard/accounts")}
                 />
             )}
         </div>

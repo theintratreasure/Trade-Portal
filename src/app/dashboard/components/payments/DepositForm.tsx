@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Upload, CreditCard, Banknote, Bitcoin } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import Select from "@/app/components/ui/Select";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
@@ -38,6 +38,7 @@ export default function DepositForm() {
   const createDeposit = useCreateDeposit();
 
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [selectedMethodKey, setSelectedMethodKey] = useState("");
   const [accountId, setAccountId] = useState("");
@@ -580,8 +581,8 @@ export default function DepositForm() {
           title="Deposit Submitted Successfully"
           message="Your deposit request has been submitted. It will be added and credited to your account once approved."
           actionLabel="Okay"
-          onAction={() => setShowSuccessModal(false)}
-          onClose={() => setShowSuccessModal(false)}
+          onAction={() => router.push("/dashboard/accounts")}
+          onClose={() => router.push("/dashboard/accounts")}
         />
       )}
     </>
