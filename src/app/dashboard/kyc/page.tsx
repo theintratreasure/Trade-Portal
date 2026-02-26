@@ -18,6 +18,7 @@ import { Toast } from "@/app/components/ui/Toast";
 import SuccessModal from "@/app/components/ui/SuccessModal";
 import KycFaq from "../components/kyc/KycFaq";
 import Select from "@/app/components/ui/Select";
+import { useRouter } from "next/navigation";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -50,6 +51,7 @@ export default function KycPage() {
   const { data: myKyc } = useMyKyc();
   const submitKyc = useSubmitKyc();
   const upload = useCloudinaryUpload();
+  const router = useRouter();
 
   const [documentType, setDocumentType] = useState<KycDocumentType>("PASSPORT");
   const [front, setFront] = useState<File | null>(null);
@@ -203,7 +205,9 @@ export default function KycPage() {
         <SuccessModal
           title="KYC Submitted Successfully"
           message={successMessage}
-          onClose={() => setSuccessMessage(null)}
+          actionLabel="Okay"
+          onAction={() => router.push("/dashboard/accounts")}
+          onClose={() => router.push("/dashboard/accounts")}
         />
       )}
     </div>
