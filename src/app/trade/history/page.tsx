@@ -63,6 +63,15 @@ const formatOrderTypeLabel = (value: unknown) =>
     .trim()
     .toLowerCase();
 
+const isBalanceDeal = (deal: any) =>
+  String(deal?.type ?? "").trim().toUpperCase() === "BALANCE";
+
+const formatAmount = (value: unknown) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toFixed(2);
+};
+
 const HistoryTabs = memo(
   ({
     activeTab,
@@ -1141,20 +1150,15 @@ export default function TradeHistory() {
 
               {/* DEALS LIST */}
               {allDeals.map((deal: any) => {
+                const isBalance = isBalanceDeal(deal);
                 const isBuy = deal.type.includes("BUY");
                 const pnlColor =
                   deal.pnl < 0
                     ? "text-[var(--mt-red)]"
                     : "text-[var(--mt-blue)]";
 
-                return (
-                  <LongPressRow
-                    key={deal.tradeId + deal.date}
-                    onLongPress={() => {
-                      setSelectedItem(deal);
-                      setShowSheet(true);
-                    }}
-                  >
+                const rowContent = (
+                  <>
                     <div
                       onClick={() => toggleExpand(deal.tradeId + deal.date)}
                       className={`
@@ -1167,24 +1171,47 @@ export default function TradeHistory() {
                       <div className="flex justify-between">
                         <div>
                           <div className="font-semibold text-[15px] mt-font">
-                            {deal.symbol},{" "}
-                            <span
-                              className={
-                                deal.type.includes("BUY")
-                                  ? "text-[var(--mt-blue)] font-medium"
-                                  : "text-[var(--mt-red)] font-medium"
-                              }
-                            >
-                              {deal.type
-                                .toLowerCase()
-                                .replace("_", ", ")}
-                            </span>
+                            {isBalance ? (
+                              <>
+                                Balance{" "}
+                                <span className="text-[var(--text-muted)] font-medium">
+                                  update
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {deal.symbol},{" "}
+                                <span
+                                  className={
+                                    deal.type.includes("BUY")
+                                      ? "text-[var(--mt-blue)] font-medium"
+                                      : "text-[var(--mt-red)] font-medium"
+                                  }
+                                >
+                                  {deal.type
+                                    .toLowerCase()
+                                    .replace("_", ", ")}
+                                </span>
+                              </>
+                            )}
 
                           </div>
 
-                          <div className="mt-price-line">
-                            {deal.volume} at {deal.price}
-                          </div>
+                          {isBalance ? (
+                            <div className="mt-price-line">
+                              Balance: {formatAmount(deal.balance)}
+                            </div>
+                          ) : (
+                            <div className="mt-price-line">
+                              {deal.volume} at {deal.price}
+                            </div>
+                          )}
+
+                          {isBalance && deal.comment ? (
+                            <div className="mt-price-line text-[var(--text-muted)]">
+                              {deal.comment}
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="text-right">
@@ -1218,28 +1245,67 @@ export default function TradeHistory() {
                           <span>Deal:</span>
                           <span>{deal.tradeId.slice(0, 10)}</span>
                         </div>
-                        <div className="flex justify-between mr-2">
-                          <span>Swap:</span>
-                          <span>{deal.swap.toFixed(2)}</span>
-                        </div>
 
                         <div className="flex justify-between mr-2">
                           <span>Order:</span>
                           <span>{deal.tradeId.slice(0, 10)}</span>
                         </div>
-                        <div className="flex justify-between mr-2">
-                          <span>Charges:</span>
-                          <span>{deal.commission.toFixed(2)}</span>
-                        </div>
 
-                        <div className="flex justify-between mr-2">
-                          <span>Position:</span>
-                          <span>{deal.tradeId.slice(0, 10)}</span>
-                        </div>
+                        {isBalance ? (
+                          <>
+                            <div className="flex justify-between mr-2">
+                              <span>Balance:</span>
+                              <span>{formatAmount(deal.balance)}</span>
+                            </div>
+                            <div className="flex justify-between mr-2 col-span-2">
+                              <span>Comment:</span>
+                              <span className="text-right max-w-[70%] truncate">
+                                {deal.comment || "-"}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex justify-between mr-2">
+                              <span>Swap:</span>
+                              <span>{deal.swap.toFixed(2)}</span>
+                            </div>
+
+                            <div className="flex justify-between mr-2">
+                              <span>Charges:</span>
+                              <span>{deal.commission.toFixed(2)}</span>
+                            </div>
+
+                            <div className="flex justify-between mr-2">
+                              <span>Position:</span>
+                              <span>{deal.tradeId.slice(0, 10)}</span>
+                            </div>
+                          </>
+                        )}
 
 
                       </div>
                     )}
+                  </>
+                );
+
+                if (isBalance) {
+                  return (
+                    <div key={deal.tradeId + deal.date} className="select-none">
+                      {rowContent}
+                    </div>
+                  );
+                }
+
+                return (
+                  <LongPressRow
+                    key={deal.tradeId + deal.date}
+                    onLongPress={() => {
+                      setSelectedItem(deal);
+                      setShowSheet(true);
+                    }}
+                  >
+                    {rowContent}
                   </LongPressRow>
                 );
               })}
@@ -1297,34 +1363,54 @@ export default function TradeHistory() {
                         <div className="text-right">PNL</div>
                       </div>
                       {allDeals.length > 0 ? (
-                        allDeals.map((deal: any) => (
-                          <div
-                            key={deal.tradeId + deal.date}
-                            className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
-                            style={{ gridTemplateColumns: dealsGridTemplate }}
-                          >
-                            <div>{String(deal.tradeId ?? "-").slice(0, 10)}</div>
-                            <div>{formatDateTime24(deal.date)}</div>
-                            <div className="font-semibold">{deal.symbol ?? "-"}</div>
-                            <div className={String(deal.type ?? "").includes("BUY") ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
-                              {String(deal.type ?? "-").toLowerCase().replace("_", ", ")}
-                            </div>
-                            <div>{Number(deal.volume ?? 0).toFixed(2)}</div>
-                            <div>{Number(deal.price ?? 0).toFixed(2)}</div>
-                            <div>{Number(deal.swap ?? 0).toFixed(2)}</div>
-                            <div>{Number(deal.commission ?? 0).toFixed(2)}</div>
+                        allDeals.map((deal: any) => {
+                          const isBalance = isBalanceDeal(deal);
+                          return (
                             <div
-                              className={`text-right font-semibold ${Number(deal.pnl ?? 0) > 0
-                                ? "text-[var(--mt-blue)]"
-                                : Number(deal.pnl ?? 0) < 0
-                                ? "text-[var(--mt-red)]"
-                                : "text-[var(--text-muted)]"
-                                }`}
+                              key={deal.tradeId + deal.date}
+                              className="grid w-full px-4 py-2 text-[13px] border-b border-[var(--border-soft)] hover:bg-[var(--bg-glass)] transition items-center"
+                              style={{ gridTemplateColumns: dealsGridTemplate }}
                             >
-                              {Number(deal.pnl ?? 0).toFixed(2)}
+                              <div>{String(deal.tradeId ?? "-").slice(0, 10)}</div>
+                              <div>{formatDateTime24(deal.date)}</div>
+                              <div className="font-semibold">
+                                {isBalance
+                                  ? `Balance ${formatAmount(deal.balance)}`
+                                  : deal.symbol ?? "-"}
+                              </div>
+                              <div
+                                className={
+                                  isBalance
+                                    ? "text-[var(--text-muted)] truncate"
+                                    : String(deal.type ?? "").includes("BUY")
+                                      ? "text-[var(--mt-blue)]"
+                                      : "text-[var(--mt-red)]"
+                                }
+                                title={isBalance ? String(deal.comment ?? "") : undefined}
+                              >
+                                {isBalance
+                                  ? String(deal.comment ?? "BALANCE")
+                                  : String(deal.type ?? "-")
+                                    .toLowerCase()
+                                    .replace("_", ", ")}
+                              </div>
+                              <div>{isBalance ? "-" : Number(deal.volume ?? 0).toFixed(2)}</div>
+                              <div>{isBalance ? "-" : Number(deal.price ?? 0).toFixed(2)}</div>
+                              <div>{isBalance ? "-" : Number(deal.swap ?? 0).toFixed(2)}</div>
+                              <div>{isBalance ? "-" : Number(deal.commission ?? 0).toFixed(2)}</div>
+                              <div
+                                className={`text-right font-semibold ${Number(deal.pnl ?? 0) > 0
+                                  ? "text-[var(--mt-blue)]"
+                                  : Number(deal.pnl ?? 0) < 0
+                                  ? "text-[var(--mt-red)]"
+                                  : "text-[var(--text-muted)]"
+                                  }`}
+                              >
+                                {Number(deal.pnl ?? 0).toFixed(2)}
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       ) : (
                         <div className="text-center py-8 text-[var(--text-muted)]">No Deals Found</div>
                       )}
