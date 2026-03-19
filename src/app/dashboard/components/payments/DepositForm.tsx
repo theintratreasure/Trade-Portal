@@ -26,6 +26,7 @@ type PaymentMethodOption = {
   method: DepositMethod;
   sourceCurrency: CurrencyCode;
   network?: string;
+  conversionRate?: number;
 };
 
 const normalizeType = (value: unknown) => String(value || "").trim().toUpperCase();
@@ -74,11 +75,14 @@ export default function DepositForm() {
         }
 
         if (t === "BANK") {
+          const rate = Number(pm?.conversion_rate);
+          const hasRate = Number.isFinite(rate) && rate > 0;
           return {
             value: pm._id || fallbackValue,
             label: title || "Bank Transfer",
             method: "BANK" as const,
-            sourceCurrency: "INR" as const,
+            sourceCurrency: (hasRate ? "LOCAL" : "INR") as CurrencyCode,
+            conversionRate: hasRate ? rate : undefined,
           };
         }
 
@@ -96,11 +100,14 @@ export default function DepositForm() {
           };
         }
 
+        const intlRate = Number(pm?.conversion_rate);
+        const intlHasRate = Number.isFinite(intlRate) && intlRate > 0;
         return {
           value: pm._id || fallbackValue,
           label: title || "International",
           method: "INTERNATIONAL" as const,
-          sourceCurrency: "USDT" as const,
+          sourceCurrency: (intlHasRate ? "LOCAL" : "USDT") as CurrencyCode,
+          conversionRate: intlHasRate ? intlRate : undefined,
         };
       })
       .filter(Boolean);
@@ -127,6 +134,12 @@ export default function DepositForm() {
 
   const method = selectedMethodOption?.method || "INTERNATIONAL";
   const sourceCurrency: CurrencyCode = selectedMethodOption?.sourceCurrency || "USDT";
+  const manualRate =
+    typeof selectedMethodOption?.conversionRate === "number" &&
+    Number.isFinite(selectedMethodOption.conversionRate) &&
+    selectedMethodOption.conversionRate > 0
+      ? selectedMethodOption.conversionRate
+      : null;
   const selectedMethodLabel = selectedMethodOption?.label || method;
 
   useEffect(() => {
@@ -159,6 +172,12 @@ export default function DepositForm() {
       return;
     }
 
+    if (manualRate) {
+      const usdt = numericAmount / manualRate;
+      setConvertedAmount(Number(usdt.toFixed(8)));
+      return;
+    }
+
     const rates = ratesData?.data;
     if (!rates) {
       setConvertedAmount(null);
@@ -178,7 +197,7 @@ export default function DepositForm() {
     }
 
     setConvertedAmount(null);
-  }, [isValidAmount, numericAmount, ratesData, sourceCurrency]);
+  }, [isValidAmount, manualRate, numericAmount, ratesData, sourceCurrency]);
 
   const convertedUsdt = convertedAmount ?? 0;
 
@@ -468,15 +487,31 @@ export default function DepositForm() {
         )}
 
         <div className="mb-4 space-y-2 md:mb-6">
-          <label className="text-sm font-medium text-[var(--text-main)]">Amount ({sourceCurrency})</label>
+          <label className="text-sm font-medium text-[var(--text-main)]">
+            Amount {sourceCurrency === "LOCAL" ? "(Bank Currency)" : `(${sourceCurrency})`}
+          </label>
           <div className="relative">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-              {sourceCurrency === "INR" ? "INR" : sourceCurrency === "BTC" ? "BTC" : "USDT"}
+              {sourceCurrency === "LOCAL"
+                ? ""
+                : sourceCurrency === "INR"
+                ? "INR"
+                : sourceCurrency === "BTC"
+                ? "BTC"
+                : "USDT"}
             </div>
             <input
               type="text"
               inputMode="decimal"
-              placeholder={sourceCurrency === "BTC" ? "0.01" : sourceCurrency === "USDT" ? "100" : "9100"}
+              placeholder={
+                sourceCurrency === "LOCAL"
+                  ? "Amount"
+                  : sourceCurrency === "BTC"
+                  ? "0.01"
+                  : sourceCurrency === "USDT"
+                  ? "100"
+                  : "20000"
+              }
               className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-glass)] py-2.5 pl-10 pr-4 text-base font-medium text-[var(--text-main)] transition-all duration-200 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary-glow)] md:py-3 md:text-lg"
               value={amountInput}
               onChange={(e) => {
@@ -489,7 +524,7 @@ export default function DepositForm() {
           </div>
 
           <div className="rounded-lg border border-[var(--border-soft)] bg-[var(--bg-glass)] px-3 py-2 text-xs text-[var(--text-muted)]">
-            {!ratesData?.data && isConversionRequired ? (
+            {!ratesData?.data && isConversionRequired && !manualRate ? (
               <span>Loading conversion rates...</span>
             ) : (
               <>
@@ -498,11 +533,15 @@ export default function DepositForm() {
                   {isConversionRequired ? "Converted deposit amount:" : "Deposit amount:"}{" "}
                   <span className="font-semibold text-[var(--text-main)]">{convertedUsdt.toFixed(4)} USDT</span>
                 </p>
-                {ratesData?.data && isConversionRequired && (
+                {manualRate && isConversionRequired ? (
+                  <p className="mt-1 text-[10px] opacity-80">
+                    Rate: 1 USDT = {manualRate} (bank currency)
+                  </p>
+                ) : ratesData?.data && isConversionRequired ? (
                   <p className="mt-1 text-[10px] opacity-80">
                     Rate: 1 USDT = INR {ratesData.data.usdtInr} | 1 BTC = {ratesData.data.btcUsdt} USDT
                   </p>
-                )}
+                ) : null}
               </>
             )}
           </div>

@@ -1,6 +1,6 @@
 import api from "@/api/axios";
 
-export type CurrencyCode = "INR" | "USDT" | "BTC";
+export type CurrencyCode = "INR" | "USDT" | "BTC" | "USD" | "AED" | "EUR" | "GBP" | "LOCAL";
 
 export type ConvertPayload = {
   amount: number;
@@ -42,4 +42,3 @@ export const getConversionRates = async () => {
   const { data } = await api.get<ConversionRatesResponse>("/conversion/rates");
   return data;
 };
-
