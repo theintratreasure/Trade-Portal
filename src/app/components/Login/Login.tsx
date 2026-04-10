@@ -22,6 +22,7 @@ import BackButton from "../ui/BackButton";
 import { useSaveDeviceToken } from "@/hooks/useDevice";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import SuccessModal from "../ui/SuccessModal";
 
 type Step = "login" | "forgot" | "reset" | "verify";
 
@@ -57,6 +58,7 @@ export default function LoginPage() {
   const [step, setStep] = useState<Step>(() => (tokenFromUrl ? "reset" : "login"));
 
   const [toast, setToast] = useState<string | null>(null);
+  const [showForgotSuccessModal, setShowForgotSuccessModal] = useState(false);
 
   const [form, setForm] = useState<FormState>({
     identity: "",
@@ -159,10 +161,16 @@ export default function LoginPage() {
       { email: form.identity },
       {
         onSuccess: () => {
-          setToast("Reset link sent to your email");
+          setShowForgotSuccessModal(true);
         },
       }
     );
+  };
+
+  const handleForgotSuccessClose = () => {
+    setShowForgotSuccessModal(false);
+    setStep("login");
+    router.replace("/login");
   };
 
   const handleReset = () => {
@@ -469,6 +477,16 @@ export default function LoginPage() {
         <div className="fixed bottom-4 right-4 rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-main)] px-4 py-2 shadow-xl">
           {toast}
         </div>
+      )}
+
+      {showForgotSuccessModal && (
+        <SuccessModal
+          title="Reset Link Sent"
+          message="A password reset link has been sent to your registered email address. Please check your inbox and reset your password."
+          actionLabel="OK"
+          onAction={handleForgotSuccessClose}
+          onClose={handleForgotSuccessClose}
+        />
       )}
     </div>
   );
