@@ -13,6 +13,7 @@ const typeOptions = [
   { label: "Transfer Out", value: "INTERNAL_TRANSFER_OUT" },
   { label: "Trade Profit", value: "TRADE_PROFIT" },
   { label: "Trade Loss", value: "TRADE_LOSS" },
+  { label: "Manual Bonus", value: "BONUS_MANUAL" },
 ];
 
 export default function TransactionsPage() {

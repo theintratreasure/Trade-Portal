@@ -119,7 +119,7 @@ function SignupContent() {
             Create account
           </h2>
           <p className="text-sm text-[var(--text-muted)]">
-            Start your journey with Tradshape
+            Start your journey with ALS Trades
           </p>
         </div>
 
