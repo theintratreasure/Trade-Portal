@@ -7,6 +7,7 @@ import { PaymentMethod } from "@/services/paymentMethods.service";
 
 export default function PaymentMethodCard({ method }: { method: PaymentMethod }) {
     const [open, setOpen] = useState(false);
+    const hasValue = (value?: string | null) => Boolean(value?.trim());
 
     const downloadImage = async () => {
         if (!method.image_url) return;
@@ -76,34 +77,37 @@ export default function PaymentMethodCard({ method }: { method: PaymentMethod })
                         </div>
                     )}
 
-
-                    {method.type === "UPI" && method.upi_id && (
+                    {method.type === "UPI" && hasValue(method.upi_id) && (
                         <CopyField label="UPI ID" value={method.upi_id} />
                     )}
                     {method.type === "CRYPTO" && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <CopyField label="Crypto Network" value={method.crypto_network!} />
-                        <CopyField label="Crypto Address" value={method.crypto_address!} />
-                    </div>
+                            {hasValue(method.crypto_network) ? (
+                                <CopyField label="Crypto Network" value={method.crypto_network!} />
+                            ) : null}
+                            {hasValue(method.crypto_address) ? (
+                                <CopyField label="Crypto Address" value={method.crypto_address!} />
+                            ) : null}
+                        </div>
                     )}
 
                     {method.type === "BANK" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {method.bank_name ? <CopyField label="Bank Name" value={method.bank_name} /> : null}
-                            <CopyField label="Account Name" value={method.account_name!} />
-                            <CopyField label="Account Number" value={method.account_number!} />
-                            <CopyField label="IFSC Code" value={method.ifsc!} />
-                            {method.swift_code ? <CopyField label="Swift Code" value={method.swift_code} /> : null}
+                            {hasValue(method.bank_name) ? <CopyField label="Bank Name" value={method.bank_name!} /> : null}
+                            {hasValue(method.account_name) ? <CopyField label="Account Name" value={method.account_name!} /> : null}
+                            {hasValue(method.account_number) ? <CopyField label="Account Number" value={method.account_number!} /> : null}
+                            {hasValue(method.ifsc) ? <CopyField label="IFSC Code" value={method.ifsc!} /> : null}
+                            {hasValue(method.swift_code) ? <CopyField label="Swift Code" value={method.swift_code!} /> : null}
                         </div>
                     )}
 
                     {method.type === "INTERNATIONAL" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {method.international_name ? (
-                                <CopyField label="Account Holder Name" value={method.international_name} />
+                            {hasValue(method.international_name) ? (
+                                <CopyField label="Account Holder Name" value={method.international_name!} />
                             ) : null}
-                            {method.international_email ? (
-                                <CopyField label="Email" value={method.international_email} />
+                            {hasValue(method.international_email) ? (
+                                <CopyField label="Email" value={method.international_email!} />
                             ) : null}
                         </div>
                     )}
