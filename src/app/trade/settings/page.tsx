@@ -8,9 +8,10 @@ import {
   User,
   Users,
   Palette,
-  Globe,
   Calendar,
   LineChart,
+  Landmark,
+  ArrowUpRight,
 } from "lucide-react";
 
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
@@ -22,7 +23,6 @@ import TradeTopBar from "../components/layout/TradeTopBar";
 import GlobalLoader from "@/app/components/ui/GlobalLoader";
 import ConfirmModal from "@/app/components/ui/ConfirmModal";
 import { useLanguage } from "../components/LanguageProvider";
-import { translations } from "@/types/translations";
 import {
   TRADE_LOGIN_REMEMBER_KEY,
 } from "@/lib/tradeLoginAccounts";
@@ -46,8 +46,7 @@ export default function TradeSettingsPage() {
   );
   const { theme, toggleTheme } = useTheme();
 
-const { language, setLanguage } = useLanguage();
-const t = translations[language];
+  const { language, setLanguage } = useLanguage();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [calendarEnabled, setCalendarEnabled] = useState(true);
   const [quoteView, setQuoteView] = useState<"simple" | "advanced">(() => {
@@ -88,7 +87,7 @@ const t = translations[language];
   useEffect(() => {
     const saved = localStorage.getItem("trade-lang");
     if (saved) setLanguage(saved);
-  }, []);
+  }, [setLanguage]);
 
   useEffect(() => {
     localStorage.setItem("trade-lang", language);
@@ -119,6 +118,10 @@ const t = translations[language];
         new CustomEvent("trade-quote-view-change", { detail: next })
       );
     }
+  };
+
+  const handleSwitchToBroker = () => {
+    window.location.assign("/login");
   };
 
 
@@ -293,6 +296,40 @@ const t = translations[language];
             >
               Advanced View
             </button>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(20,83,45,0.92)_55%,rgba(5,150,105,0.82))] p-[1px] shadow-[0_18px_44px_rgba(5,150,105,0.18)]">
+          <div className="relative rounded-[calc(1rem-1px)] bg-[linear-gradient(135deg,rgba(15,23,42,0.94),rgba(15,23,42,0.78))] px-5 py-5 sm:px-6 sm:py-6">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.2),transparent_38%)]" />
+
+            <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+              <div className="max-w-2xl">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100">
+                  <Landmark size={14} />
+                  Broker Access
+                </div>
+                <h2 className="text-lg font-semibold text-white sm:text-xl">
+                  Switch to Broker Portal
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-emerald-50/80">
+                  Move from trading view to your broker workspace in one tap.
+                  If your broker session is not active, you will stay on the
+                  broker login screen until you sign in.
+                </p>
+              </div>
+
+              <button
+                onClick={handleSwitchToBroker}
+                className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-[0_16px_34px_rgba(255,255,255,0.12)] transition hover:-translate-y-0.5 hover:bg-emerald-50"
+              >
+                <span>Switch to Broker</span>
+                <ArrowUpRight
+                  size={16}
+                  className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                />
+              </button>
+            </div>
           </div>
         </div>
 
