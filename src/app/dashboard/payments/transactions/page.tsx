@@ -9,12 +9,24 @@ const typeOptions = [
   { label: "All", value: "" },
   { label: "Deposit", value: "DEPOSIT" },
   { label: "Withdrawal", value: "WITHDRAWAL" },
+  { label: "Tradable Fund", value: "TRADABLE_FUND" },
   { label: "Transfer In", value: "INTERNAL_TRANSFER_IN" },
   { label: "Transfer Out", value: "INTERNAL_TRANSFER_OUT" },
   { label: "Trade Profit", value: "TRADE_PROFIT" },
   { label: "Trade Loss", value: "TRADE_LOSS" },
   { label: "Manual Bonus", value: "BONUS_MANUAL" },
 ];
+
+const typeLabels: Record<string, string> = {
+  DEPOSIT: "Deposit",
+  WITHDRAWAL: "Withdrawal",
+  TRADABLE_FUND: "Tradable Fund",
+  INTERNAL_TRANSFER_IN: "Transfer In",
+  INTERNAL_TRANSFER_OUT: "Transfer Out",
+  TRADE_PROFIT: "Trade Profit",
+  TRADE_LOSS: "Trade Loss",
+  BONUS_MANUAL: "Manual Bonus",
+};
 
 export default function TransactionsPage() {
   const [page, setPage] = useState(1);
@@ -45,6 +57,8 @@ export default function TransactionsPage() {
     setPage(1);
     setFromDate("");
   };
+
+  const formatType = (value: string) => typeLabels[String(value).toUpperCase()] ?? value;
 
   return (
     <div className="p-2 md:p-6 space-y-4 md:space-y-6">
@@ -128,6 +142,7 @@ export default function TransactionsPage() {
                 <th className="px-4 py-3 text-left font-semibold">Amount</th>
                 <th className="px-4 py-3 text-left font-semibold">Status</th>
                 <th className="px-4 py-3 text-left font-semibold">Balance</th>
+                <th className="px-4 py-3 text-left font-semibold">Details</th>
                 <th className="px-4 py-3 text-left font-semibold">Date</th>
               </tr>
             </thead>
@@ -135,7 +150,7 @@ export default function TransactionsPage() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-muted)]">
                     Loading...
                   </td>
                 </tr>
@@ -143,7 +158,7 @@ export default function TransactionsPage() {
 
               {!isLoading && visibleTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--text-muted)]">
                     No transactions found for selected filters.
                   </td>
                 </tr>
@@ -155,7 +170,7 @@ export default function TransactionsPage() {
                   className="border-t border-[var(--border-soft)] hover:bg-[var(--bg-glass)]/70 transition"
                 >
                   <td className="px-4 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
-                    {tx.type}
+                    {formatType(tx.type)}
                   </td>
                   <td className="px-4 py-3 font-medium text-[var(--text-main)] whitespace-nowrap">
                     {tx.accountNumber}
@@ -184,6 +199,10 @@ export default function TransactionsPage() {
 
                   <td className="px-4 py-3 whitespace-nowrap">
                     $ {tx.balanceAfter.toLocaleString()}
+                  </td>
+
+                  <td className="px-4 py-3 text-[var(--text-muted)]">
+                    {tx.remark || "-"}
                   </td>
 
                   <td className="px-4 py-3 text-[var(--text-muted)] whitespace-nowrap">
@@ -216,7 +235,7 @@ export default function TransactionsPage() {
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold">{tx.type}</p>
+                  <p className="text-sm font-semibold">{formatType(tx.type)}</p>
                   <p className="text-[11px] text-[var(--text-muted)]">{tx.accountNumber}</p>
                 </div>
                 <span
@@ -240,6 +259,10 @@ export default function TransactionsPage() {
                 <div>
                   <p className="text-[var(--text-muted)]">Balance</p>
                   <p className="font-semibold">$ {tx.balanceAfter.toLocaleString()}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-[var(--text-muted)]">Details</p>
+                  <p className="font-medium">{tx.remark || "-"}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-[var(--text-muted)]">Date</p>
