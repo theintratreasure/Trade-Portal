@@ -27,6 +27,25 @@ type SplitPrice = {
   small?: string;
 };
 
+const SILVER_SYMBOLS = new Set(["SILVER", "XAGUSD"]);
+
+function normalizeSymbol(value: string): string {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function priceDigitsForSymbol(symbol: string, price: string): number {
+  if (SILVER_SYMBOLS.has(normalizeSymbol(symbol))) return 5;
+  const decimals = price.split(".")[1]?.length ?? 0;
+  return decimals > 0 ? Math.min(Math.max(decimals, 2), 6) : 2;
+}
+
+function formatPriceText(price: string | number | undefined, symbol: string): string {
+  if (price === undefined || price === null || price === "") return "--";
+  const n = Number(price);
+  if (!Number.isFinite(n)) return "--";
+  return n.toFixed(priceDigitsForSymbol(symbol, String(price)));
+}
+
 function splitPrice(price?: string): SplitPrice {
   if (!price || isNaN(Number(price))) {
     return {
@@ -88,9 +107,13 @@ function decimalDiff(bid: string, ask: string): string {
 }
 
 function QuoteRow({ live, viewMode = "advanced" }: Props) {
-  const bid = splitPrice(live.bid);
-  const ask = splitPrice(live.ask);
-  const diff = decimalDiff(live.bid, live.ask);
+  const bidText = formatPriceText(live.bid, live.symbol);
+  const askText = formatPriceText(live.ask, live.symbol);
+  const lowText = live.low === undefined ? "--" : formatPriceText(live.low, live.symbol);
+  const highText = live.high === undefined ? "--" : formatPriceText(live.high, live.symbol);
+  const bid = splitPrice(bidText);
+  const ask = splitPrice(askText);
+  const diff = decimalDiff(bidText, askText);
 
   const bidColor =
     live.bidDir === "up"
@@ -204,7 +227,7 @@ const formattedPercent =
           </div>
 
           <div className="text-xs max-[360px]:text-[10px] text-[var(--text-muted)]">
-            L: {live.low ?? "--"}
+            L: {lowText}
           </div>
         </div>
 
@@ -222,7 +245,7 @@ const formattedPercent =
 
 
           <div className="text-xs max-[360px]:text-[10px] text-[var(--text-muted)]">
-            H: {live.high ?? "--"}
+            H: {highText}
           </div>
         </div>
       </div>

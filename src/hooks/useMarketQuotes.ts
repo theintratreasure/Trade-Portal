@@ -9,6 +9,13 @@ import { useWatchlist } from "./watchlist/useWatchlist";
 type QuoteMap = Record<string, QuoteLiveState | undefined>;
 type QuoteListener = (quotes: QuoteMap) => void;
 
+const SYMBOL_ALIAS_MAP: Record<string, string> = {
+  SILVER: "XAGUSD",
+  XAGUSD: "SILVER",
+  GOLD: "XAUUSD",
+  XAUUSD: "GOLD",
+};
+
 function normalizeSymbol(value: string): string {
   return String(value ?? "").trim().toUpperCase();
 }
@@ -29,8 +36,10 @@ function buildSymbolAliases(symbol: string): string[] {
   };
 
   const normalized = normalizeSymbol(symbol);
+  const providerAlias = SYMBOL_ALIAS_MAP[normalized] ?? normalized;
   addAlias(normalized);
-  addAlias(compactSymbol(normalized));
+  addAlias(providerAlias);
+  addAlias(compactSymbol(providerAlias));
 
   const seed = Array.from(aliases);
   for (const candidate of seed) {
@@ -113,8 +122,27 @@ function handleIncomingQuote(msg: unknown) {
 
     if (payload.status === "subscribed" && typeof payload.symbol === "string") {
       const sym = normalizeSymbol(payload.symbol);
-      const cur = shared.buffer[sym];
-      if (!cur) return;
+      const providerSymbol =
+        typeof payload.providerSymbol === "string"
+          ? normalizeSymbol(payload.providerSymbol)
+          : "";
+      const symbolCompact = compactSymbol(sym);
+      const providerCompact = providerSymbol ? compactSymbol(providerSymbol) : "";
+      const aliasKeys = new Set<string>();
+
+      for (const key of Object.keys(shared.buffer)) {
+        const compact = compactSymbol(key);
+        if (compact === symbolCompact || (providerCompact && compact === providerCompact)) {
+          aliasKeys.add(key);
+        }
+      }
+      for (const key of shared.symbolRefCounts.keys()) {
+        const compact = compactSymbol(key);
+        if (compact === symbolCompact || (providerCompact && compact === providerCompact)) {
+          aliasKeys.add(key);
+        }
+      }
+      if (aliasKeys.size === 0) aliasKeys.add(sym);
 
       const dayHigh = getNumber(
         payload.dayHigh,
@@ -148,31 +176,35 @@ function handleIncomingQuote(msg: unknown) {
         nestedData?.dayClose,
         nestedData?.day_close
       );
-      const curBidNum = Number(cur.bid);
-      const curAskNum = Number(cur.ask);
-      const hasLiveBidAsk =
-        Number.isFinite(curBidNum) &&
-        curBidNum > 0 &&
-        Number.isFinite(curAskNum) &&
-        curAskNum > 0;
       const subscribeFallbackPrice = isPositiveNumber(dayCloseNum)
         ? String(dayCloseNum)
         : undefined;
 
-      shared.buffer[sym] = {
-        ...cur,
-        high: dayHigh ?? cur.high,
-        low: dayLow ?? cur.low,
-        dayOpen: dayOpen ?? cur.dayOpen,
-        dayClose: dayCloseNum ?? cur.dayClose,
-        // On subscribe ack (often when market is closed), use dayClose as a display fallback
-        // if live bid/ask is unavailable. Real orderbook ticks still override this immediately.
-        bid: hasLiveBidAsk ? cur.bid : subscribeFallbackPrice ?? cur.bid,
-        ask: hasLiveBidAsk ? cur.ask : subscribeFallbackPrice ?? cur.ask,
-        bidDir: "same",
-        askDir: "same",
-      };
-      shared.cache[sym] = shared.buffer[sym];
+      for (const key of aliasKeys) {
+        const cur = shared.buffer[key] ?? getPlaceholder(key);
+        const curBidNum = Number(cur.bid);
+        const curAskNum = Number(cur.ask);
+        const hasLiveBidAsk =
+          Number.isFinite(curBidNum) &&
+          curBidNum > 0 &&
+          Number.isFinite(curAskNum) &&
+          curAskNum > 0;
+
+        shared.buffer[key] = {
+          ...cur,
+          high: dayHigh ?? cur.high,
+          low: dayLow ?? cur.low,
+          dayOpen: dayOpen ?? cur.dayOpen,
+          dayClose: dayCloseNum ?? cur.dayClose,
+          // On subscribe ack (often when market is closed), use dayClose as a display fallback
+          // if live bid/ask is unavailable. Real orderbook ticks still override this immediately.
+          bid: hasLiveBidAsk ? cur.bid : subscribeFallbackPrice ?? cur.bid,
+          ask: hasLiveBidAsk ? cur.ask : subscribeFallbackPrice ?? cur.ask,
+          bidDir: "same",
+          askDir: "same",
+        };
+        shared.cache[key] = shared.buffer[key];
+      }
       scheduleEmit();
       return;
     }
@@ -228,13 +260,13 @@ function handleIncomingQuote(msg: unknown) {
       resolvedSymbol
     ) {
       const symbol = resolvedSymbol;
-      const symbolCompact = compactSymbol(symbol);
+      const messageAliasCompacts = new Set(buildSymbolAliases(symbol).map(compactSymbol));
       const aliasKeys = new Set<string>();
       for (const key of Object.keys(shared.buffer)) {
-        if (compactSymbol(key) === symbolCompact) aliasKeys.add(key);
+        if (messageAliasCompacts.has(compactSymbol(key))) aliasKeys.add(key);
       }
       for (const key of shared.symbolRefCounts.keys()) {
-        if (compactSymbol(key) === symbolCompact) aliasKeys.add(key);
+        if (messageAliasCompacts.has(compactSymbol(key))) aliasKeys.add(key);
       }
       if (aliasKeys.size === 0) {
         aliasKeys.add(symbol);
@@ -307,7 +339,6 @@ function handleIncomingQuote(msg: unknown) {
       if (!nextBidPrice || !nextAskPrice) return;
 
       const currentPrice = nextBidPrice;
-      const dayClose = typeof old.dayClose === "number" ? old.dayClose : 0;
 
       const dayHigh = getNumber(
         nestedData?.dayHigh,
@@ -329,6 +360,20 @@ function handleIncomingQuote(msg: unknown) {
         payload.low,
         payload.l
       );
+      const dayOpen = getNumber(
+        nestedData?.dayOpen,
+        nestedData?.day_open,
+        payload.dayOpen,
+        payload.day_open
+      );
+      const dayCloseNum = getNumber(
+        nestedData?.dayClose,
+        nestedData?.day_close,
+        payload.dayClose,
+        payload.day_close
+      );
+      const dayClose =
+        dayCloseNum ?? (typeof old.dayClose === "number" ? old.dayClose : 0);
 
       const nextHigh =
         dayHigh ?? (typeof old.high === "number" ? Math.max(old.high, currentPrice) : currentPrice);
@@ -394,6 +439,7 @@ function handleIncomingQuote(msg: unknown) {
           changePercent,
           high: nextHigh,
           low: nextLow,
+          dayOpen: dayOpen ?? old.dayOpen,
           dayClose: dayClose > 0 ? dayClose : undefined,
           bidDir: nextBidDir,
           askDir: nextAskDir,

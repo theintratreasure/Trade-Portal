@@ -19,6 +19,15 @@ const compactSymbol = (value: string) =>
     .replace(/[^A-Z0-9]/g, "")
     .replace(/^XBT/, "BTC");
 
+const ALIAS_GROUPS: Record<string, string> = {
+  SILVER: "SILVER",
+  XAGUSD: "SILVER",
+  GOLD: "GOLD",
+  XAUUSD: "GOLD",
+};
+
+const aliasGroupKey = (value: string) => ALIAS_GROUPS[compactSymbol(value)] ?? compactSymbol(value);
+
 const hasValidBidAsk = (q: QuoteLiveState | undefined): q is QuoteLiveState => {
   if (!q) return false;
   const bid = Number(q.bid);
@@ -105,25 +114,26 @@ export default function QuotesList({ onSelect, viewMode }: Props) {
     const compactLookup = new Map<string, QuoteLiveState>();
 
     for (const [symbol, q] of quoteMap.entries()) {
-      const key = compactSymbol(symbol);
+      const key = aliasGroupKey(symbol);
       if (!compactLookup.has(key)) {
         compactLookup.set(key, q);
       }
     }
 
     for (const symbol of watchlistSymbols) {
-      const q = quoteMap.get(symbol) ?? compactLookup.get(compactSymbol(symbol));
+      const q = quoteMap.get(symbol) ?? compactLookup.get(aliasGroupKey(symbol));
       if (!q) continue;
-      const normalizedQSymbol = normalizeSymbol(q.symbol);
+      const normalizedQSymbol = aliasGroupKey(q.symbol);
       if (seen.has(normalizedQSymbol)) continue;
       output.push(q);
       seen.add(normalizedQSymbol);
     }
 
     for (const [symbol, q] of quoteMap.entries()) {
-      if (seen.has(symbol)) continue;
+      const normalizedQSymbol = aliasGroupKey(symbol);
+      if (seen.has(normalizedQSymbol)) continue;
       output.push(q);
-      seen.add(symbol);
+      seen.add(normalizedQSymbol);
     }
 
     return output;
