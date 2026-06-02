@@ -30,6 +30,7 @@ export type LivePosition = {
   symbol: string;
   side: "BUY" | "SELL";
   volume: number;
+  contractSize?: number;
   openPrice: number;
   currentPrice: number;
   floatingPnL: number;
@@ -411,6 +412,7 @@ function normalizePosition(data: unknown): LivePosition | null {
     symbol,
     side: String(source.side).toUpperCase() === "SELL" ? "SELL" : "BUY",
     volume,
+    contractSize: toNumberOrUndefined(source.contractSize ?? source.contract_size),
     openPrice,
     currentPrice,
     floatingPnL: rawFloatingPnL ?? Number.NaN,

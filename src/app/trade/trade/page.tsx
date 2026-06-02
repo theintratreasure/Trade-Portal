@@ -12,6 +12,7 @@ import TopBarSlot from "../components/layout/TopBarSlot";
 import TradeTopBar from "../components/layout/TradeTopBar";
 import { useTradeAccount } from "@/hooks/accounts/useAccountById";
 import { useLiveTradeSocket, type LivePosition } from "@/hooks/useLiveTradeSocket";
+import { useMarketQuotes } from "@/hooks/useMarketQuotes";
 import DeleteOrderModal from "../components/trade/DeleteOrderModal";
 import OrderActionSheet from "../components/trade/OrderActionSheet";
 import MobilePositionItem from "../components/trade/MobilePositionItem";
@@ -183,6 +184,83 @@ const formatOrderTypeLabel = (value: unknown) =>
         .replace(/\s+/g, " ")
         .trim()
         .toUpperCase();
+
+const compactSymbol = (value: unknown) =>
+    String(value ?? "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .replace(/^XBT/, "BTC");
+
+const getQuotePriceForSide = (
+    quotes: ReturnType<typeof useMarketQuotes>,
+    symbol: unknown,
+    side: unknown
+): number | undefined => {
+    const compact = compactSymbol(symbol);
+    if (!compact) return undefined;
+
+    const quote = Object.values(quotes).find((item) => {
+        if (!item?.symbol) return false;
+        const quoteCompact = compactSymbol(item.symbol);
+        if (quoteCompact === compact) return true;
+        if (compact === "SILVER" && quoteCompact === "XAGUSD") return true;
+        if (compact === "XAGUSD" && quoteCompact === "SILVER") return true;
+        if (compact === "GOLD" && quoteCompact === "XAUUSD") return true;
+        if (compact === "XAUUSD" && quoteCompact === "GOLD") return true;
+        return false;
+    });
+    if (!quote) return undefined;
+
+    const bid = Number(quote.bid);
+    const ask = Number(quote.ask);
+    const sideText = toUpperText(side);
+    const preferred = sideText === "SELL" ? ask : bid;
+    const fallback = sideText === "SELL" ? bid : ask;
+
+    if (Number.isFinite(preferred) && preferred > 0) return preferred;
+    if (Number.isFinite(fallback) && fallback > 0) return fallback;
+    return undefined;
+};
+
+const getPositionContractSize = (
+    pos: LivePosition,
+    contractSizeBySymbol: Record<string, number>
+): number => {
+    const fromPosition = firstFiniteNumber(
+        (pos as LivePosition & { contractSize?: number }).contractSize
+    );
+    if (fromPosition && fromPosition > 0) return fromPosition;
+    const fromProperty = contractSizeBySymbol[compactSymbol(pos.symbol)];
+    return Number.isFinite(fromProperty) && fromProperty > 0 ? fromProperty : 1;
+};
+
+const calculateDisplayPnL = (
+    pos: LivePosition,
+    currentPrice: number,
+    contractSizeBySymbol: Record<string, number>
+): number => {
+    const snapshotPnL = Number(pos.floatingPnL);
+    const openPrice = Number(pos.openPrice);
+    const volume = Number(pos.volume);
+    const hasLiveMove =
+        Number.isFinite(currentPrice) &&
+        currentPrice > 0 &&
+        Number.isFinite(openPrice) &&
+        openPrice > 0 &&
+        !isAlmostEqual(currentPrice, openPrice);
+
+    if (!hasLiveMove || !Number.isFinite(volume) || volume <= 0) {
+        return Number.isFinite(snapshotPnL) ? snapshotPnL : 0;
+    }
+
+    const contractSize = getPositionContractSize(pos, contractSizeBySymbol);
+    const raw =
+        pos.side === "SELL"
+            ? (openPrice - currentPrice) * volume * contractSize
+            : (currentPrice - openPrice) * volume * contractSize;
+    return Number.isFinite(raw) ? raw : Number.isFinite(snapshotPnL) ? snapshotPnL : 0;
+};
 
 function isLimitOrStopOrderType(value: unknown): boolean {
     const orderType = toUpperText(value).replace(/[_-]+/g, " ");
@@ -510,6 +588,7 @@ export default function TradePage() {
                     symbol: String(row?.symbol ?? "-"),
                     side,
                     volume: Number(row?.qty ?? row?.volume ?? row?.lot ?? row?.lots ?? row?.size ?? 0),
+                    contractSize: firstFiniteNumber(row?.contractSize, row?.contract_size),
                     openPrice,
                     currentPrice,
                     floatingPnL,
@@ -644,6 +723,56 @@ export default function TradePage() {
     const positionsForUi =
         displayPositionsSource.length > 0 ? displayPositionsSource : socketOrRestPositions;
 
+    const livePriceSymbols = useMemo(() => {
+        const symbols = new Set<string>();
+        for (const pos of positionsForUi) {
+            const symbol = String(pos.symbol ?? "").trim();
+            if (symbol && symbol !== "-") symbols.add(symbol);
+        }
+        for (const order of socketOrRestPending) {
+            const symbol = String(order.symbol ?? "").trim();
+            if (symbol && symbol !== "-") symbols.add(symbol);
+        }
+        return Array.from(symbols);
+    }, [positionsForUi, socketOrRestPending]);
+
+    const livePriceQuotes = useMarketQuotes(token || undefined, livePriceSymbols);
+    const { data: contractSizeBySymbol = {} } = useQuery({
+        queryKey: ["trade-live-contract-sizes", livePriceSymbols],
+        enabled: Boolean(token && livePriceSymbols.length > 0),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        retry: 1,
+        queryFn: async () => {
+            const entries = await Promise.all(
+                livePriceSymbols.map(async (symbol) => {
+                    try {
+                        const res = await tradeApi.get(`/property/${encodeURIComponent(symbol)}`);
+                        const instrument = res.data?.data?.instrument;
+                        const contractSize = Number(instrument?.contractSize);
+                        const keys = [
+                            symbol,
+                            instrument?.code,
+                            instrument?.providerCode,
+                            instrument?.name,
+                        ]
+                            .map(compactSymbol)
+                            .filter(Boolean);
+                        return { keys, contractSize };
+                    } catch {
+                        return { keys: [compactSymbol(symbol)].filter(Boolean), contractSize: Number.NaN };
+                    }
+                })
+            );
+            const map: Record<string, number> = {};
+            for (const entry of entries) {
+                if (!Number.isFinite(entry.contractSize) || entry.contractSize <= 0) continue;
+                for (const key of entry.keys) map[key] = entry.contractSize;
+            }
+            return map;
+        },
+    });
+
     const [openMenu, setOpenMenu] = useState<DesktopMenuState | null>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -705,8 +834,9 @@ export default function TradePage() {
     const livePositions: Position[] = useMemo(() => {
         return positionsForUi.map((pos) => {
             const openPrice = toSafeNumber(pos.openPrice, 0);
-            const currentPrice = toSafeNumber(pos.currentPrice, openPrice);
-            const pnl = toSafeNumber(pos.floatingPnL, 0);
+            const quotePrice = getQuotePriceForSide(livePriceQuotes, pos.symbol, pos.side);
+            const currentPrice = quotePrice ?? toSafeNumber(pos.currentPrice, openPrice);
+            const pnl = calculateDisplayPnL(pos, currentPrice, contractSizeBySymbol);
 
             return {
                 id: pos.positionId,
@@ -725,7 +855,7 @@ export default function TradePage() {
                 takeProfit: pos.takeProfit == null ? null : toSafeNumber(pos.takeProfit, 0),
             };
         });
-    }, [positionsForUi]);
+    }, [contractSizeBySymbol, livePriceQuotes, positionsForUi]);
 
     const accountForUi = displayAccount;
     const accountBalance = toSafeNumber(accountForUi?.balance);
@@ -772,12 +902,13 @@ export default function TradePage() {
 
     const pendingWithLive = useMemo<PendingOrder[]>(() => {
         return socketOrRestPending.map((order) => {
+            const quotePrice = getQuotePriceForSide(livePriceQuotes, order.symbol, order.side);
             return {
                 ...order,
-                currentPrice: order.currentPrice ?? "-",
+                currentPrice: quotePrice ?? order.currentPrice ?? "-",
             } as PendingOrder;
         });
-    }, [socketOrRestPending]);
+    }, [livePriceQuotes, socketOrRestPending]);
 
     const router = useRouter();
     const positionsGridTemplate =
