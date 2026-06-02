@@ -834,8 +834,13 @@ export default function TradePage() {
     const livePositions: Position[] = useMemo(() => {
         return positionsForUi.map((pos) => {
             const openPrice = toSafeNumber(pos.openPrice, 0);
+            const positionPrice = toSafeNumber(pos.currentPrice, openPrice);
             const quotePrice = getQuotePriceForSide(livePriceQuotes, pos.symbol, pos.side);
-            const currentPrice = quotePrice ?? toSafeNumber(pos.currentPrice, openPrice);
+            const currentPrice =
+                quotePrice ??
+                (Number.isFinite(positionPrice) && positionPrice > 0
+                    ? positionPrice
+                    : openPrice);
             const pnl = calculateDisplayPnL(pos, currentPrice, contractSizeBySymbol);
 
             return {

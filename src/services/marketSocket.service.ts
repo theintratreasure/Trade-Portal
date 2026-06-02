@@ -109,7 +109,7 @@ export class MarketSocket {
       try {
         this.socket.send(JSON.stringify({
           type: "unsubscribe",
-          market: "crypto",
+          market: getMarketBySymbol(symbol),
           symbol,
         }));
       } catch (e) {
@@ -123,15 +123,16 @@ export class MarketSocket {
   private sendSubscribe(symbol: string) {
     try {
       if (this.sentSubscriptions.has(symbol)) return;
+      const market = getMarketBySymbol(symbol);
       const payload: {
         type: "subscribe";
-        market: "crypto";
+        market: string;
         symbol: string;
         depth: number;
         accountId?: string;
       } = {
         type: "subscribe",
-        market: "crypto",
+        market,
         symbol,
         depth: 1,
       };
@@ -207,4 +208,37 @@ export class MarketSocket {
   isOpen() {
     return !!this.socket && this.socket.readyState === WebSocket.OPEN;
   }
+}
+
+export function getMarketBySymbol(symbol: string): string {
+  const normalized = String(symbol ?? "").trim().toUpperCase();
+  if (!normalized) return "crypto";
+
+  if (
+    normalized.startsWith("XAU") ||
+    normalized.startsWith("XAG") ||
+    normalized.startsWith("XPT") ||
+    normalized.startsWith("XPD") ||
+    normalized === "GOLD" ||
+    normalized === "SILVER"
+  ) {
+    return "metal";
+  }
+
+  if (normalized.endsWith("USDT")) return "crypto";
+
+  if (
+    normalized.endsWith("USD") ||
+    normalized.endsWith("JPY") ||
+    normalized.endsWith("EUR") ||
+    normalized.endsWith("GBP") ||
+    normalized.endsWith("AUD") ||
+    normalized.endsWith("CAD") ||
+    normalized.endsWith("CHF") ||
+    normalized.endsWith("NZD")
+  ) {
+    return "forex";
+  }
+
+  return "crypto";
 }

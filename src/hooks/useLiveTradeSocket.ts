@@ -746,12 +746,8 @@ async function reconcileFromRest() {
       next[pos.positionId] = mergePosition(shared.positionsMap[pos.positionId], pos);
     }
     // REST /trade/positions is authoritative for currently open positions.
-    // Replace map with reconciled rows to prune stale/closed ghost positions.
-    const shouldKeepExistingPositions =
-      Object.keys(next).length === 0 && Object.keys(shared.positionsMap).length > 0;
-    if (!shouldKeepExistingPositions) {
-      shared.positionsMap = next;
-    }
+    // Always replace the map so closed positions cannot remain as ghosts.
+    shared.positionsMap = next;
 
     const pendingRows = parsePendingsFromUnknown(ordersRes.data);
     applyPendingSnapshot(pendingRows);
