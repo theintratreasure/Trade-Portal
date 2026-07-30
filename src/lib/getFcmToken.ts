@@ -1,4 +1,4 @@
-import { getMessaging, getToken } from "firebase/messaging";
+import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import { app } from "./firebase";
 import { Capacitor } from "@capacitor/core";
 
@@ -15,6 +15,7 @@ export const getFcmToken = async (): Promise<string | null> => {
   // ✅ Browser support check
   if (!("Notification" in window)) return null;
   if (!("serviceWorker" in navigator)) return null;
+  if (!(await isSupported())) return null;
 
   try {
     // ✅ Wait for service worker to be ready

@@ -120,10 +120,10 @@ export default function Support() {
             </p>
 
             <a
-              href="mailto:support@als.com"
+              href="mailto:support@FP.com"
               className="inline-flex items-center mt-3 text-sm font-medium text-[var(--primary)] hover:underline"
             >
-              support@als.com →
+              support@FP.com →
             </a>
           </div>
         </div>

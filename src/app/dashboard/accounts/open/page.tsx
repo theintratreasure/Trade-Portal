@@ -63,6 +63,11 @@ export default function OpenAccountPage() {
   };
 
   const handleConfirmCreate = async () => {
+    if (!selectedPlan) {
+      setErrorMsg("Please select an account plan.");
+      return;
+    }
+
     try {
       const payload: {
         account_plan_id: string;

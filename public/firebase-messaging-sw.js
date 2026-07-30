@@ -16,8 +16,8 @@ messaging.onBackgroundMessage((payload) => {
     payload.data?.title || "Notification",
     {
       body: payload.data?.body || "",
-      icon: "/icon.png",
-      badge: "/icon.png",
+      icon: "/fp-logo.png?v=fp-trades-20260730",
+      badge: "/fp-logo.png?v=fp-trades-20260730",
       data: payload.data || {},
     }
   );

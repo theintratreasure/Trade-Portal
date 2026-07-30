@@ -112,7 +112,7 @@ export default function TradeSidebar() {
             style={{ background: "var(--bg-plan)" }}
           >
             <img
-              src="/logo/logo.png"
+              src="/fp-logo.png?v=fp-trades-20260730"
               alt="Platform Logo"
               className="w-8 h-8 object-contain rounded-full"
             />
@@ -127,7 +127,7 @@ export default function TradeSidebar() {
               className="text-xs truncate"
               style={{ color: "var(--text-muted)" }}
             >
-              {account?.accountNumber} · ALS Traders
+              {account?.accountNumber} · FP Traders
             </span>
 
             <button
@@ -191,7 +191,7 @@ export default function TradeSidebar() {
           <Item
             icon={Info}
             label="About"
-            onClick={() => window.open("https://www.alstrades.com/about", "_blank")}
+            onClick={() => window.open("https://www.fptrades.com/about", "_blank")}
           />
         </div>
       </aside >

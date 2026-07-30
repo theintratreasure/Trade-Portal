@@ -281,10 +281,7 @@ export default function TradeHistory() {
   }, [rawOrders]);
 
   const allDeals = useMemo(() => {
-    return rawDeals.filter((deal: any) => {
-      const type = String(deal?.type ?? "").trim().toUpperCase();
-      return type !== "BALANCE";
-    });
+    return rawDeals;
   }, [rawDeals]);
 
   const allSymbols = useMemo(() => {
@@ -1136,6 +1133,12 @@ export default function TradeHistory() {
 
               {/* DEALS LIST */}
               {allDeals.map((deal: any) => {
+                const isBalanceDeal =
+                  String(deal?.type ?? "").toUpperCase() === "BALANCE";
+                const balanceLabel =
+                  String(deal?.transactionType ?? "").toUpperCase() === "WITHDRAWAL"
+                    ? "withdrawal"
+                    : "deposit";
                 const rowContent = (
                   <>
                     <div
@@ -1150,7 +1153,18 @@ export default function TradeHistory() {
                       <div className="flex justify-between">
                         <div>
                           <div className="font-semibold text-[15px] mt-font">
-                            <>
+                            {isBalanceDeal ? (
+                              <span
+                                className={
+                                  balanceLabel === "deposit"
+                                    ? "text-[var(--mt-blue)]"
+                                    : "text-[var(--mt-red)]"
+                                }
+                              >
+                                {balanceLabel}
+                              </span>
+                            ) : (
+                              <>
                               {deal.symbol},{" "}
                               <span
                                 className={
@@ -1163,12 +1177,15 @@ export default function TradeHistory() {
                                   .toLowerCase()
                                   .replace("_", ", ")}
                               </span>
-                            </>
+                              </>
+                            )}
 
                           </div>
 
                           <div className="mt-price-line">
-                            {deal.volume} at {deal.price}
+                            {isBalanceDeal
+                              ? deal.comment || balanceLabel
+                              : `${deal.volume} at ${deal.price}`}
                           </div>
                         </div>
 
@@ -1177,7 +1194,7 @@ export default function TradeHistory() {
                             {formatDateTime24(deal.date)}
                           </div>
 
-                          {deal.pnl !== 0 && (
+                          {(isBalanceDeal || deal.pnl !== 0) && (
                             <div
                               className={`mt-profit ${deal.pnl > 0
                                 ? "text-[var(--mt-blue)]  font-medium"
@@ -1186,9 +1203,9 @@ export default function TradeHistory() {
                                   : ""
                                 }`}
                             >
-                              {deal.pnl !== 0
-                                ? Math.abs(deal.pnl).toFixed(2)
-                                : ""}
+                              {isBalanceDeal
+                                ? `${deal.pnl > 0 ? "+" : ""}${Number(deal.pnl).toFixed(2)}`
+                                : Math.abs(deal.pnl).toFixed(2)}
                             </div>
                           )}
                         </div>
@@ -1209,7 +1226,8 @@ export default function TradeHistory() {
                           <span>{deal.tradeId.slice(0, 10)}</span>
                         </div>
 
-                        <>
+                        {!isBalanceDeal && (
+                          <>
                           <div className="flex justify-between mr-2">
                             <span>Swap:</span>
                             <span>{deal.swap.toFixed(2)}</span>
@@ -1224,7 +1242,20 @@ export default function TradeHistory() {
                             <span>Position:</span>
                             <span>{deal.tradeId.slice(0, 10)}</span>
                           </div>
-                        </>
+                          </>
+                        )}
+                        {isBalanceDeal && (
+                          <>
+                            <div className="flex justify-between mr-2">
+                              <span>Type:</span>
+                              <span className="capitalize">{balanceLabel}</span>
+                            </div>
+                            <div className="flex justify-between mr-2">
+                              <span>Balance:</span>
+                              <span>{Number(deal.balance ?? 0).toFixed(2)}</span>
+                            </div>
+                          </>
+                        )}
 
 
                       </div>
@@ -1299,6 +1330,12 @@ export default function TradeHistory() {
                       </div>
                       {allDeals.length > 0 ? (
                         allDeals.map((deal: any) => {
+                          const isBalanceDeal =
+                            String(deal?.type ?? "").toUpperCase() === "BALANCE";
+                          const balanceLabel =
+                            String(deal?.transactionType ?? "").toUpperCase() === "WITHDRAWAL"
+                              ? "Withdrawal"
+                              : "Deposit";
                           return (
                             <div
                               key={deal.tradeId + deal.date}
@@ -1307,20 +1344,28 @@ export default function TradeHistory() {
                             >
                               <div>{String(deal.tradeId ?? "-").slice(0, 10)}</div>
                               <div>{formatDateTime24(deal.date)}</div>
-                              <div className="font-semibold">{deal.symbol ?? "-"}</div>
+                              <div className="font-semibold">
+                                {isBalanceDeal ? "-" : deal.symbol ?? "-"}
+                              </div>
                               <div
                                 className={
-                                  String(deal.type ?? "").includes("BUY")
+                                  isBalanceDeal
+                                    ? balanceLabel === "Deposit"
+                                      ? "text-[var(--mt-blue)]"
+                                      : "text-[var(--mt-red)]"
+                                    : String(deal.type ?? "").includes("BUY")
                                     ? "text-[var(--mt-blue)]"
                                     : "text-[var(--mt-red)]"
                                 }
                               >
-                                {String(deal.type ?? "-")
-                                  .toLowerCase()
-                                  .replace("_", ", ")}
+                                {isBalanceDeal
+                                  ? balanceLabel
+                                  : String(deal.type ?? "-")
+                                      .toLowerCase()
+                                      .replace("_", ", ")}
                               </div>
-                              <div>{Number(deal.volume ?? 0).toFixed(2)}</div>
-                              <div>{Number(deal.price ?? 0).toFixed(2)}</div>
+                              <div>{isBalanceDeal ? "-" : Number(deal.volume ?? 0).toFixed(2)}</div>
+                              <div>{isBalanceDeal ? "-" : Number(deal.price ?? 0).toFixed(2)}</div>
                               <div>{Number(deal.swap ?? 0).toFixed(2)}</div>
                               <div>{Number(deal.commission ?? 0).toFixed(2)}</div>
                               <div

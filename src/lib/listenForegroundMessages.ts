@@ -1,9 +1,11 @@
-import { getMessaging, onMessage } from "firebase/messaging";
+import { getMessaging, isSupported, onMessage } from "firebase/messaging";
 import { app } from "./firebase";
 
-export const listenForegroundMessages = () => {
+export const listenForegroundMessages = async () => {
   if (typeof window === "undefined") return;
   if (!("Notification" in window)) return;
+
+  if (!(await isSupported())) return;
 
   const messaging = getMessaging(app);
 
@@ -20,7 +22,7 @@ export const listenForegroundMessages = () => {
     if (Notification.permission === "granted") {
       new Notification(title, {
         body,
-        icon: "/icon.png",
+        icon: "/fp-logo.png?v=fp-trades-20260730",
         data: {
           ...payload.data,
           type,

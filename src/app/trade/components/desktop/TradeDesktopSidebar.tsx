@@ -44,7 +44,7 @@ export default function TradeDesktopSidebar() {
         }}
       >
         <img
-          src="/logo/logo.png"
+          src="/fp-logo.png?v=fp-trades-20260730"
           className="w-6 h-6 object-contain"
         />
       </div>

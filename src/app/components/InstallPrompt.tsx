@@ -87,7 +87,7 @@ return (
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-xl font-semibold text-[var(--text-main)]">
-            Install ALS Trader
+            Install FP Trades
           </h3>
           <p className="text-sm text-[var(--text-muted)] mt-1">
             {platform === "android"

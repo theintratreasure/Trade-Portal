@@ -52,8 +52,8 @@ export default function AppIntro({ onFinish }: Props) {
         <div className="relative bg-[var(--bg-card)]/80 backdrop-blur-2xl border border-[var(--border-glass)] rounded-[2rem] p-8 shadow-[0_25px_80px_var(--primary-glow)]">
 
           <Image
-            src="/icon.png"
-            alt="ALS Trader"
+            src="/fp-logo.png?v=fp-trades-20260730"
+            alt="FP Trades"
             width={120}
             height={120}
             priority
@@ -69,7 +69,7 @@ export default function AppIntro({ onFinish }: Props) {
 
       {/* BRAND NAME */}
       <h1 className="text-4xl font-semibold tracking-[0.35em] text-[var(--text-main)] mb-6 flex">
-        {"ALSTrader".split("").map((char, i) => (
+        {"FP Trades".split("").map((char, i) => (
           <span key={i} className="letter-advanced">{char}</span>
         ))}
       </h1>

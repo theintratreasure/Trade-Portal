@@ -1,11 +1,13 @@
-import { getMessaging, onMessage } from "firebase/messaging";
+import { getMessaging, isSupported, onMessage } from "firebase/messaging";
 import { app } from "./firebase";
 
-export const initFcmListener = () => {
+export const initFcmListener = async () => {
   if (typeof window === "undefined") return;
   if (!("Notification" in window)) return;
 
   try {
+    if (!(await isSupported())) return;
+
     const messaging = getMessaging(app);
 
     onMessage(messaging, (payload) => {
@@ -16,7 +18,7 @@ export const initFcmListener = () => {
           payload.notification?.title || "Notification",
           {
             body: payload.notification?.body || "",
-            icon: "/icon.png",
+            icon: "/fp-logo.png?v=fp-trades-20260730",
           }
         );
       }

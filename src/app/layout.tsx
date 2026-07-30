@@ -28,11 +28,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
-  title: "ALS Trader",
-  description: "Advanced Trading Platform for ALS Tokens",
+export const metadata: Metadata = {
+  title: "FP Trades",
+  description: "Advanced Trading Platform for FP Tokens",
   manifest: "/manifest.json",
-  themeColor: "#2563eb",
+  icons: {
+    icon: "/fp-logo.png?v=fp-trades-20260730",
+    shortcut: "/fp-logo.png?v=fp-trades-20260730",
+    apple: "/fp-logo.png?v=fp-trades-20260730",
+  },
 };
 
 export const viewport: Viewport = {
@@ -63,6 +67,7 @@ export default function RootLayout({
         <meta httpEquiv="Surrogate-Control" content="no-store" />
 
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/fp-logo.png?v=fp-trades-20260730" type="image/png" />
 
         <meta name="theme-color" content="#2563eb" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -70,14 +75,14 @@ export default function RootLayout({
         {/* iOS */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="ALS Trader" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-title" content="FP Trades" />
+        <link rel="apple-touch-icon" href="/fp-logo.png?v=fp-trades-20260730" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="format-detection" content="telephone=no" />
 
 
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/fp-logo.png?v=fp-trades-20260730" />
         {/* 🔥 THEME INIT SCRIPT (RUNS BEFORE REACT) */}
         <script
           dangerouslySetInnerHTML={{

@@ -1,4 +1,5 @@
 import withPWAInit from "next-pwa";
+import type { FallbackRoutes } from "next-pwa";
 
 const isCapacitor = process.env.NEXT_PUBLIC_CAPACITOR === "true";
 const pwaInDev = process.env.NEXT_PUBLIC_PWA_DEV === "true";
@@ -10,7 +11,7 @@ const withPWA = withPWAInit({
   skipWaiting: true,
   fallbacks: {
     document: "/offline",
-  },
+  } as FallbackRoutes,
 });
 
 const nextConfig = {

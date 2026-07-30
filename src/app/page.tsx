@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { LogIn, LineChart, ChevronRight } from "lucide-react";
@@ -33,20 +33,9 @@ const options = [
 export default function Home() {
   const router = useRouter();
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [showIntro, setShowIntro] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const hasSeenIntro = sessionStorage.getItem("hasSeenIntro");
-
-    if (!hasSeenIntro) {
-      setShowIntro(true);
-    }
-  }, []);
+  const [showIntro, setShowIntro] = useState(true);
 
   const handleIntroFinish = () => {
-    sessionStorage.setItem("hasSeenIntro", "true");
     setShowIntro(false);
   };
 
@@ -72,7 +61,7 @@ export default function Home() {
                   className="text-center mb-12"
                 >
                   <span className="inline-flex items-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-card)]/80 px-4 py-1.5 text-xs font-semibold tracking-wide mb-4">
-                    ALS Trades
+                    FP Trades
                   </span>
                   <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[var(--text-main)] via-[var(--primary)] to-[var(--text-muted)] bg-clip-text text-transparent mb-4">
                     Trading Hub
@@ -148,7 +137,7 @@ export default function Home() {
                   className="text-center mb-8"
                 >
                   <span className="inline-flex items-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-card)]/85 px-3.5 py-1 text-[11px] font-semibold tracking-wide mb-3">
-                    ALS Trades
+                    FP Trades
                   </span>
                   <h1 className="text-4xl font-black bg-gradient-to-r from-[var(--text-main)] via-[var(--primary)] to-[var(--text-muted)] bg-clip-text text-transparent mb-4">
                     Trading Hub

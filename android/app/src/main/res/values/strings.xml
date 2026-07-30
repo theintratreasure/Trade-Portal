@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Trade Portal</string>
     <string name="title_activity_main">Trade Portal</string>
-    <string name="package_name">com.alstrades.portal</string>
-    <string name="custom_url_scheme">com.alstrades.portal</string>
+    <string name="package_name">com.fptrades.portal</string>
+    <string name="custom_url_scheme">com.fptrades.portal</string>
 </resources>

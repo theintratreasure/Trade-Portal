@@ -390,7 +390,7 @@ export default function LoginPage() {
             {/* BRAND */}
             <div className="text-center space-y-2">
               <h1 className="text-[28px] leading-tight font-semibold tracking-wide text-[var(--text-main)]">
-                ALS Trades
+                FP Trades
               </h1>
 
               <p className="text-sm text-[var(--text-muted)]">

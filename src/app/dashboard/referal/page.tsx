@@ -66,7 +66,7 @@ export default function ReferralPage() {
 
   const referralLink = useMemo(() => {
     if (!summary?.referralCode) return "";
-    return `https://user.alstrades.com/signup/?ref=${summary.referralCode}`;
+    return `https://user.fptrades.com/signup/?ref=${summary.referralCode}`;
   }, [summary?.referralCode]);
 
   const copyText = async (value: string, label: string) => {

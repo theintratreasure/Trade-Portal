@@ -78,7 +78,7 @@ export default function PaymentMethodCard({ method }: { method: PaymentMethod })
                     )}
 
                     {method.type === "UPI" && hasValue(method.upi_id) && (
-                        <CopyField label="UPI ID" value={method.upi_id} />
+                        <CopyField label="UPI ID" value={method.upi_id!} />
                     )}
                     {method.type === "CRYPTO" && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
