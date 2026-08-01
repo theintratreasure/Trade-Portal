@@ -21,7 +21,6 @@ import { useResendVerifyEmail } from "@/hooks/useUser";
 import BackButton from "../ui/BackButton";
 import { useSaveDeviceToken } from "@/hooks/useDevice";
 import { Capacitor } from "@capacitor/core";
-import { PushNotifications } from "@capacitor/push-notifications";
 import SuccessModal from "../ui/SuccessModal";
 
 type Step = "login" | "forgot" | "reset" | "verify";
@@ -113,25 +112,15 @@ export default function LoginPage() {
 
           setToast("Login successful");
 
+          // Navigate immediately. Notification setup must never block login.
+          router.replace("/dashboard");
+          router.refresh();
+
           // 🔥 UNIVERSAL FCM LOGIC
           try {
             let fcmToken: string | null = null;
 
-            if (Capacitor.isNativePlatform()) {
-              const perm = await PushNotifications.requestPermissions();
-              if (perm.receive === "granted") {
-                await PushNotifications.register();
-
-                PushNotifications.addListener("registration", (token) => {
-                  fcmToken = token.value;
-
-                  saveDevice.mutate({
-                    fcmToken: token.value,
-                    platform: "android",
-                  });
-                });
-              }
-            } else {
+            if (!Capacitor.isNativePlatform()) {
               fcmToken = await getFcmToken();
 
               if (fcmToken) {
@@ -144,9 +133,6 @@ export default function LoginPage() {
           } catch (err) {
             console.log("FCM error:", err);
           }
-
-          router.replace("/dashboard");
-          router.refresh();
         },
         onError: () => {
           setToast("Invalid email or password");

@@ -83,11 +83,6 @@ export default function RootLayout({
       {/* <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /> */}
 
       <head className={mtFont.className}>
-        <meta httpEquiv="Cache-Control" content="no-store, no-cache, must-revalidate, proxy-revalidate" />
-        <meta httpEquiv="Pragma" content="no-cache" />
-        <meta httpEquiv="Expires" content="0" />
-        <meta httpEquiv="Surrogate-Control" content="no-store" />
-
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/fp-logo.png?v=fp-trades-20260730-2" type="image/png" />
 

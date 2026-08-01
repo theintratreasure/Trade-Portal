@@ -46,12 +46,6 @@ export default function DashboardLayout({
   });
 
   useEffect(() => {
-    window.onerror = function (msg) {
-      alert("JS ERROR: " + msg);
-    };
-  }, []);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
 
     // âŒ Skip all web notification logic inside Android/iOS app

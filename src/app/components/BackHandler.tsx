@@ -39,10 +39,10 @@ export default function BackHandler() {
             return;
           }
 
-          if (event.canGoBack) {
+          if (event.canGoBack && window.history.length > 1) {
             window.history.back();
           } else {
-            CapacitorApp.exitApp();
+            router.replace("/");
           }
         }
       );
