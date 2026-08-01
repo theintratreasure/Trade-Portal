@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { LogIn, LineChart, ChevronRight } from "lucide-react";
@@ -33,11 +33,27 @@ const options = [
 export default function Home() {
   const router = useRouter();
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const introShown = sessionStorage.getItem("fp-trades-intro-shown");
+
+    if (introShown === "1") {
+      setShowIntro(false);
+      return;
+    }
+
+    sessionStorage.setItem("fp-trades-intro-shown", "1");
+    setShowIntro(true);
+  }, []);
 
   const handleIntroFinish = () => {
     setShowIntro(false);
   };
+
+  if (showIntro === null) {
+    return <div className="min-h-screen bg-[var(--bg-plan)] md:bg-[var(--bg-main)]" />;
+  }
 
   return (
     <>
