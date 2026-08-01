@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.fptrades.portal',
-  appName: 'Trade Portal',
+  appName: 'FP Trades',
   webDir: 'build', // not used when server.url present
   server: {
     url: 'https://user.fptradess.com',

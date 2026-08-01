@@ -3,6 +3,10 @@ package com.fptrades.portal;
 import android.os.Bundle;
 import android.webkit.WebSettings;
 import android.widget.Toast;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -11,6 +15,14 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+        ViewCompat.setOnApplyWindowInsetsListener(getBridge().getWebView(), (view, windowInsets) -> {
+            Insets statusBar = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars());
+            view.setPadding(0, statusBar.top, 0, 0);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(getBridge().getWebView());
 
         WebSettings settings = getBridge().getWebView().getSettings();
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
