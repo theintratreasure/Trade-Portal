@@ -162,7 +162,7 @@ export default function WithdrawForm() {
                         }
                     />
                     <PremiumInput
-                        label="IFSC Code"
+                        label="IFSC Code (Optional)"
                         value={form.payout?.ifsc || ""}
                         onChange={(v) =>
                             setForm({ ...form, payout: { ...form.payout, ifsc: v } })

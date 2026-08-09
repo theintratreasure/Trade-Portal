@@ -882,10 +882,20 @@ export default function TradeHistory() {
 
               {/* POSITIONS LIST */}
               {allPositions.map((pos: any) => {
+                const isBalanceEntry =
+                  pos?.isBalanceEntry === true ||
+                  String(pos?.type ?? "").toUpperCase() === "BALANCE";
+                const isWithdrawal =
+                  String(pos?.transactionType ?? "").toUpperCase() === "WITHDRAWAL";
+                const balanceLabel = isWithdrawal ? "Withdrawal" : "Deposit";
+                const balanceComment = isWithdrawal
+                  ? pos.comment || balanceLabel
+                  : pos.comment || balanceLabel;
                 return (
                   <LongPressRow
                     key={pos.orderId}
                     onLongPress={() => {
+                      if (isBalanceEntry) return;
                       setSelectedItem(pos);
                       setShowSheet(true);
                     }}
@@ -904,19 +914,25 @@ export default function TradeHistory() {
                       <div className="flex justify-between">
                         <div>
                           <div className="font-semibold text-[15px] mt-font">
-                            {pos.symbol},{" "}
-                            <span
-                              className={` ${pos.side === "BUY"
-                                ? "text-[var(--mt-blue)] font-medium"
-                                : "text-[var(--mt-red)] font-medium"
-                                } `}
-                            >
-                              {pos.side.toLowerCase()} {pos.qty.toFixed(2)}
-                            </span>
+                            {isBalanceEntry ? (
+                              "Balance"
+                            ) : (
+                              <>
+                                {pos.symbol},{" "}
+                                <span
+                                  className={` ${pos.side === "BUY"
+                                    ? "text-[var(--mt-blue)] font-medium"
+                                    : "text-[var(--mt-red)] font-medium"
+                                    } `}
+                                >
+                                  {pos.side.toLowerCase()} {pos.qty.toFixed(2)}
+                                </span>
+                              </>
+                            )}
                           </div>
 
                           <div className="mt-price-line">
-                            {pos.openPrice}{" "}
+                            {isBalanceEntry ? balanceComment : pos.openPrice}{" "}
                             {pos.closePrice ? `→ ${pos.closePrice}` : ""}
                           </div>
                         </div>
@@ -935,7 +951,7 @@ export default function TradeHistory() {
                               }`}
                           >
                             {pos.profitLoss !== 0
-                              ? Math.abs(pos.profitLoss).toFixed(2)
+                              ? `${pos.profitLoss > 0 ? "+" : "-"}${Math.abs(pos.profitLoss).toFixed(2)}`
                               : ""}
                           </div>
 
@@ -945,7 +961,15 @@ export default function TradeHistory() {
 
 
                     {/* EXPANDED DETAILS */}
-                    {expandedId === pos.orderId && (
+                    {expandedId === pos.orderId && isBalanceEntry && (
+                      <div className="pb-3 text-[12px] mt-price-line border-b border-[var(--border-grey)] space-y-1 animate-fadeIn">
+                        <div className="flex justify-between">
+                          <span>Balance:</span>
+                          <span>{Number(pos.balance ?? 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {expandedId === pos.orderId && !isBalanceEntry && (
                       <div className="pb-3 border-b border-[var(--border-grey)] md:border-[var(--border-soft)] md:px-3 md:rounded-b-md md:bg-[var(--bg-plan)] animate-fadeIn">
                         <div className="text-[12px] mt-price-line mt-font space-y-1 grid grid-cols-2">
 
@@ -1047,16 +1071,18 @@ export default function TradeHistory() {
                           >
                             <div className="truncate">{String(pos.orderId ?? "-").slice(0, 10)}</div>
                             <div className="truncate">{formatDateTime24(pos.openTime)}</div>
-                            <div className="font-semibold truncate">{pos.symbol ?? "-"}</div>
-                            <div className={String(pos.side).toUpperCase() === "BUY" ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
-                              {String(pos.side ?? "-").toUpperCase()}
+                            <div className="font-semibold truncate">
+                              {pos.isBalanceEntry ? "Balance" : pos.symbol ?? "-"}
                             </div>
-                            <div>{Number(pos.qty ?? 0).toFixed(2)}</div>
-                            <div>{Number(pos.openPrice ?? 0).toFixed(2)}</div>
-                            <div>{pos.closePrice != null ? Number(pos.closePrice).toFixed(2) : "-"}</div>
-                            <div>{pos.stopLoss ?? "-"}</div>
-                            <div>{pos.takeProfit ?? "-"}</div>
-                            <div>{Number(pos.swap ?? 0).toFixed(2)}</div>
+                            <div className={pos.isBalanceEntry ? "text-[var(--text-muted)]" : String(pos.side).toUpperCase() === "BUY" ? "text-[var(--mt-blue)]" : "text-[var(--mt-red)]"}>
+                              {pos.isBalanceEntry ? String(pos.transactionType ?? "BALANCE").toUpperCase() : String(pos.side ?? "-").toUpperCase()}
+                            </div>
+                            <div>{pos.isBalanceEntry ? "-" : Number(pos.qty ?? 0).toFixed(2)}</div>
+                            <div>{pos.isBalanceEntry ? "-" : Number(pos.openPrice ?? 0).toFixed(2)}</div>
+                            <div>{pos.isBalanceEntry ? "-" : pos.closePrice != null ? Number(pos.closePrice).toFixed(2) : "-"}</div>
+                            <div>{pos.isBalanceEntry ? "-" : pos.stopLoss ?? "-"}</div>
+                            <div>{pos.isBalanceEntry ? "-" : pos.takeProfit ?? "-"}</div>
+                            <div>{pos.isBalanceEntry ? "-" : Number(pos.swap ?? 0).toFixed(2)}</div>
                             <div
                               className={`text-right font-semibold ${Number(pos.profitLoss ?? 0) > 0
                                 ? "text-[var(--mt-blue)]"
@@ -1154,15 +1180,7 @@ export default function TradeHistory() {
                         <div>
                           <div className="font-semibold text-[15px] mt-font">
                             {isBalanceDeal ? (
-                              <span
-                                className={
-                                  balanceLabel === "deposit"
-                                    ? "text-[var(--mt-blue)]"
-                                    : "text-[var(--mt-red)]"
-                                }
-                              >
-                                {balanceLabel}
-                              </span>
+                              <span>Balance</span>
                             ) : (
                               <>
                               {deal.symbol},{" "}
@@ -1345,7 +1363,7 @@ export default function TradeHistory() {
                               <div>{String(deal.tradeId ?? "-").slice(0, 10)}</div>
                               <div>{formatDateTime24(deal.date)}</div>
                               <div className="font-semibold">
-                                {isBalanceDeal ? "-" : deal.symbol ?? "-"}
+                                {isBalanceDeal ? "Balance" : deal.symbol ?? "-"}
                               </div>
                               <div
                                 className={
