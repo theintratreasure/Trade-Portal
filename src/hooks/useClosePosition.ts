@@ -8,10 +8,15 @@ export const useClosePosition = () => {
     mutationFn: (payload: ClosePositionPayload) =>
       closePositionService(payload),
 
-    onSuccess: () => {
-      // Positions refetch karwa do
-      queryClient.invalidateQueries({ queryKey: ["livePositions"] });
-      queryClient.invalidateQueries({ queryKey: ["account"] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["livePositions"] }),
+        queryClient.invalidateQueries({ queryKey: ["account"] }),
+        queryClient.invalidateQueries({ queryKey: ["trade-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["trade-deals"] }),
+        queryClient.invalidateQueries({ queryKey: ["trade-positions"] }),
+        queryClient.invalidateQueries({ queryKey: ["trade-orders"] }),
+      ]);
     },
   });
 };

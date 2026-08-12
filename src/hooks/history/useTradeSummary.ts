@@ -5,7 +5,8 @@ export const useTradeSummary = () => {
   return useQuery({
     queryKey: ["trade-summary"],
     queryFn: getTradeSummary,
-    staleTime: 1000 * 30,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 };
