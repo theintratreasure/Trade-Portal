@@ -53,7 +53,9 @@ export const authService = {
   signup: async (payload: SignupPayload) => {
     const { data } = await api.post("/auth/signup", {
       ...payload,
-      // Lets backend attach user to fptrade@admin.com broker for this portal.
+      // Attach signup to FPTrade / BLACKOS broker (not Oceana default mix-up).
+      portalBrokerCode:
+        process.env.NEXT_PUBLIC_BROKER_CODE || "BLACKOS",
       portalHost:
         typeof window !== "undefined" ? window.location.hostname : undefined,
     });
